@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "paths": {
+      "@/*": ["./src/*"],
+      "@drivip/types": ["../packages/types/src/index.ts"],
+      "@drivip/supabase": ["../packages/supabase/src/index.ts"],
+      "@drivip/ui": ["../packages/ui/src/index.ts"],
+      "@drivip/maps": ["../packages/maps/src/index.ts"]
+    }
+  },
+  "include": ["src"]
+}

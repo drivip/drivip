@@ -1,0 +1,185 @@
+-- =============================================
+-- MODULO: CLIENTES (Superadmin)
+-- Fuente: packages/supabase/src/useClientes.ts,
+--         apps/superadmin/src/components/ClienteManager.tsx,
+--         apps/superadmin/src/components/ClienteDetailPanel.tsx
+-- Tablas: clientes, red_cliente, tenants
+-- Fecha: 2026-09-21
+-- =============================================
+
+-- =============================================
+-- OPERACION 1: useClientes - Listar todos los clientes
+-- Archivo: packages/supabase/src/useClientes.ts:38-41
+-- =============================================
+-- JavaScript:
+--   supabase.from("clientes")
+--     .select("*")
+--     .order("created_at", { ascending: false })
+--
+-- SQL equivalente:
+--   SELECT * FROM clientes
+--   ORDER BY created_at DESC;
+--
+-- Parametros: Ninguno
+--
+-- Retorna:
+--   - Array de Cliente[] (todos los clientes de la plataforma)
+--
+-- Usado por: ClienteManager (vista global de clientes)
+--
+-- NOTA: Requiere policy superadmin para ver clientes de otros tenants.
+--       Sin superadmin, solo retorna clientes del tenant autenticado.
+
+-- =============================================
+-- OPERACION 2: useClientes - Red de conductores por clientes
+-- Archivo: packages/supabase/src/useClientes.ts:52-56
+-- =============================================
+-- JavaScript:
+--   supabase.from("red_cliente")
+--     .select("*")
+--     .in("cliente_id", clienteIds)
+--
+-- SQL equivalente:
+--   SELECT * FROM red_cliente
+--   WHERE cliente_id = ANY($1::uuid[]);
+--
+-- Parametros:
+--   - clienteIds: UUID[] (array de IDs de clientes)
+--
+-- Retorna:
+--   - Array de RedCliente[] (registros de red para los clientes consultados)
+--
+-- Usado por: useClientes (para enriquecer cada cliente con su red de conductores)
+--
+-- NOTA: Requiere policy superadmin para ver red_cliente de otros usuarios.
+--       Sin superadmin, solo retorna red del usuario autenticado.
+
+-- =============================================
+-- OPERACION 3: useClientes - Resolver nombres de tenants
+-- Archivo: packages/supabase/src/useClientes.ts:68-72
+-- =============================================
+-- JavaScript:
+--   supabase.from("tenants")
+--     .select("id, nombre, slug")
+--     .in("id", tenantIds)
+--
+-- SQL equivalente:
+--   SELECT id, nombre, slug FROM tenants
+--   WHERE id = ANY($1::uuid[]);
+--
+-- Parametros:
+--   - tenantIds: UUID[] (array de IDs de tenants)
+--
+-- Retorna:
+--   - Array de { id, nombre, slug } (info basica de cada tenant)
+--
+-- Usado por: useClientes (para mostrar nombre del conductor en cada cliente)
+--
+-- NOTA: Requiere policy superadmin para ver tenants diferentes al autenticado.
+
+-- =============================================
+-- OPERACION 4: useClienteDetail - Detalle de un cliente
+-- Archivo: packages/supabase/src/useClientes.ts:129-133
+-- =============================================
+-- JavaScript:
+--   supabase.from("clientes")
+--     .select("*")
+--     .eq("id", clienteId)
+--     .single()
+--
+-- SQL equivalente:
+--   SELECT * FROM clientes
+--   WHERE id = $1
+--   LIMIT 1;
+--
+-- Parametros:
+--   - clienteId: UUID (id del registro cliente)
+--
+-- Retorna:
+--   - Cliente (registro unico con todos los campos)
+--
+-- Usado por: ClienteDetailPanel (vista de detalle)
+--
+-- NOTA: Requiere policy superadmin para ver clientes de otros tenants.
+
+-- =============================================
+-- OPERACION 5: useClienteDetail - Red del cliente
+-- Archivo: packages/supabase/src/useClientes.ts:143-144
+-- =============================================
+-- JavaScript:
+--   supabase.from("red_cliente")
+--     .select("*")
+--     .eq("cliente_id", clienteData.profile_id || clienteId)
+--
+-- SQL equivalente:
+--   SELECT * FROM red_cliente
+--   WHERE cliente_id = $1;
+--
+-- Parametros:
+--   - clienteProfileId: UUID (profile_id del cliente, o id del cliente como fallback)
+--
+-- Retorna:
+--   - Array de RedCliente[] (conductores en la red del cliente)
+--
+-- Usado por: ClienteDetailPanel (seccion "Red de Conductores")
+--
+-- NOTA: Requiere policy superadmin para ver red_cliente de otros usuarios.
+
+-- =============================================
+-- OPERACION 6: ClienteDetailPanel - Eliminar conductor de la red
+-- Archivo: apps/superadmin/src/components/ClienteDetailPanel.tsx:31
+-- =============================================
+-- JavaScript:
+--   supabase.from("red_cliente")
+--     .delete()
+--     .eq("id", redId)
+--
+-- SQL equivalente:
+--   DELETE FROM red_cliente
+--   WHERE id = $1;
+--
+-- Parametros:
+--   - redId: UUID (id del registro red_cliente a eliminar)
+--
+-- Retorna:
+--   - Success o error
+--
+-- Usado por: ClienteDetailPanel (boton eliminar en Red de Conductores)
+--
+-- NOTA: Requiere policy superadmin para eliminar red_cliente de otros usuarios.
+
+-- =============================================
+-- OPERACION 7: useClienteDetail - Resolver conductores de la red
+-- Archivo: packages/supabase/src/useClientes.ts:165-168
+-- =============================================
+-- JavaScript:
+--   supabase.from("tenants")
+--     .select("id, nombre, slug")
+--     .in("id", conductorTenantIds)
+--
+-- SQL equivalente:
+--   SELECT id, nombre, slug FROM tenants
+--   WHERE id = ANY($1::uuid[]);
+--
+-- Parametros:
+--   - conductorTenantIds: UUID[] (array de IDs de tenants conductores)
+--
+-- Retorna:
+--   - Array de { id, nombre, slug } (info de cada conductor)
+--
+-- Usado por: useClienteDetail (para mostrar nombre de cada conductor en la red)
+--
+-- NOTA: Requiere policy superadmin para ver tenants diferentes al autenticado.
+
+-- =============================================
+-- RESUMEN DE OPERACIONES
+-- =============================================
+-- Total: 7 operaciones
+-- SELECT: 5 (listar, red, tenants, detalle, conductores)
+-- DELETE: 1 (eliminar de red)
+-- INSERT: 0 (el superadmin no crea clientes directamente)
+-- UPDATE: 0 (el superadmin no edita clientes directamente)
+--
+-- Tablas consultadas: clientes, red_cliente, tenants
+-- Tablas modificadas: red_cliente (DELETE)
+-- =============================================

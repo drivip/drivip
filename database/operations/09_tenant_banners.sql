@@ -1,0 +1,87 @@
+-- =============================================
+-- MODULO: TENANT_BANNERS (Banners promocionales por tenant)
+-- Fuente: packages/supabase/src/useTenantBanners.ts
+-- Tabla: tenant_banners
+-- Migracion: 2026-09-17
+-- =============================================
+
+-- =============================================
+-- OPERACION 1: useTenantBanners (Listar banners del tenant)
+-- Archivo: packages/supabase/src/useTenantBanners.ts:18-28
+-- =============================================
+-- JavaScript:
+--   supabase.from("tenant_banners")
+--     .select("*")
+--     .eq("tenant_id", tenantId)
+--     .order("created_at", { ascending: false })
+--
+-- SQL equivalente:
+--   SELECT * FROM tenant_banners
+--   WHERE tenant_id = $1
+--   ORDER BY created_at DESC;
+--
+-- Parametros:
+--   - tenantId: UUID (id del tenant)
+--
+-- Retorna:
+--   - Array de TenantBanner[] (banners del tenant, mas recientes primero)
+--
+-- Usado por: DriverApp (mostrar banners), SuperAdmin (BannerManager)
+
+-- =============================================
+-- OPERACION 2: crearBanner (Crear nuevo banner)
+-- Archivo: packages/supabase/src/useTenantBanners.ts:33-44
+-- =============================================
+-- JavaScript:
+--   supabase.from("tenant_banners").insert(banner).select().single()
+--   // banner = { tenant_id, titulo, descripcion, imagen_url, activo, prioridad }
+--
+-- SQL equivalente:
+--   INSERT INTO tenant_banners (
+--     tenant_id, titulo, descripcion, imagen_url, activo, prioridad
+--   ) VALUES ($1, $2, $3, $4, $5, $6)
+--   RETURNING *;
+--
+-- Parametros:
+--   - tenant_id: UUID (requerido)
+--   - titulo: TEXT (requerido)
+--   - descripcion: TEXT | null
+--   - imagen_url: TEXT | null
+--   - activo: BOOLEAN (default: true)
+--   - prioridad: 'alta' | 'normal' | 'baja' (default: 'normal')
+--
+-- Retorna:
+--   - TenantBanner creado con id y created_at generados
+--
+-- Usado por: SuperAdmin (BannerManager - crear banner)
+
+-- =============================================
+-- OPERACION 3: toggleBanner (Activar/desactivar banner)
+-- Archivo: packages/supabase/src/useTenantBanners.ts:46-56
+-- =============================================
+-- JavaScript:
+--   supabase.from("tenant_banners").update({ activo }).eq("id", id)
+--
+-- SQL equivalente:
+--   UPDATE tenant_banners SET activo = $1 WHERE id = $2;
+--
+-- Parametros:
+--   - activo: BOOLEAN
+--   - id: UUID (id del banner)
+--
+-- Usado por: SuperAdmin (toggle开关 de banners)
+
+-- =============================================
+-- OPERACION 4: eliminarBanner (Eliminar banner)
+-- Archivo: packages/supabase/src/useTenantBanners.ts:58-68
+-- =============================================
+-- JavaScript:
+--   supabase.from("tenant_banners").delete().eq("id", id)
+--
+-- SQL equivalente:
+--   DELETE FROM tenant_banners WHERE id = $1;
+--
+-- Parametros:
+--   - id: UUID (id del banner)
+--
+-- Usado por: SuperAdmin (BannerManager - eliminar banner)

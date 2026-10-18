@@ -1,0 +1,45 @@
+interface AppDownloadBannerProps {
+  variant?: "light" | "dark";
+}
+
+export default function AppDownloadBanner({ variant = "dark" }: AppDownloadBannerProps) {
+  const isDark = variant === "dark";
+
+  return (
+    <div className={`${isDark ? "bg-white/5 border-white/10" : "bg-slate-50 border-slate-200"} rounded-2xl p-6 border backdrop-blur-sm`}>
+      <div className="flex flex-col md:flex-row items-center gap-6">
+        <div className="flex-1">
+          <h3 className={`text-lg font-black ${isDark ? "text-white" : "text-slate-900"} mb-2`}>
+            Descarga la App
+          </h3>
+          <p className={`text-[12px] ${isDark ? "text-white/60" : "text-slate-500"} mb-4`}>
+            Disponible para iOS y Android. Descarga gratis y empieza a usar Drivip hoy mismo.
+          </p>
+          <div className="flex items-center gap-3">
+            <button className={`px-4 py-2.5 rounded-xl ${isDark ? "bg-white/10 border-white/20 text-white hover:bg-white/20" : "bg-slate-900 text-white hover:bg-slate-800"} text-[12px] font-bold flex items-center gap-2 border active:scale-95 transition`}>
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.32 2.32-1.55 4.3-3.74 4.25z"/>
+              </svg>
+              App Store
+            </button>
+            <button className={`px-4 py-2.5 rounded-xl ${isDark ? "bg-white/10 border-white/20 text-white hover:bg-white/20" : "bg-slate-900 text-white hover:bg-slate-800"} text-[12px] font-bold flex items-center gap-2 border active:scale-95 transition`}>
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M3.609 1.814L13.792 12 3.61 22.186a.996.996 0 01-.61-.92V2.734a1 1 0 01.609-.92zm10.89 10.893l2.302 2.302-10.937 6.333 8.635-8.635zm3.199-3.199l2.302 2.302a1 1 0 010 1.38l-2.302 2.302L15.396 12l2.302-2.492zM5.864 2.658L16.8 8.99l-2.302 2.302L5.864 2.658z"/>
+              </svg>
+              Google Play
+            </button>
+          </div>
+        </div>
+
+        <div className="w-32 h-32 bg-white rounded-2xl p-2 flex items-center justify-center shadow-lg">
+          <div className="w-full h-full bg-slate-100 rounded-xl flex items-center justify-center">
+            <div className="text-center">
+              <span className="material-symbols-outlined text-[28px] text-slate-400">qr_code_2</span>
+              <p className="text-[8px] text-slate-400 font-bold mt-1">ESCANEAR</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

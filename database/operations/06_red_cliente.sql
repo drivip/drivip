@@ -1,0 +1,77 @@
+-- =============================================
+-- MODULO: RED_CLIENTE (Circulo de conductores del cliente)
+-- Fuente: packages/supabase/src/useRedCliente.ts,
+--         apps/cliente/src/components/passenger/AddConductor.tsx
+-- Tabla: red_cliente
+-- =============================================
+
+-- =============================================
+-- OPERACION 1: useRedCliente (Listar contactos del cliente)
+-- Archivo: packages/supabase/src/useRedCliente.ts:12-22
+-- =============================================
+-- JavaScript:
+--   supabase.from("red_cliente")
+--     .select("*")
+--     .eq("cliente_id", clienteId)
+--     .order("agregado_at", { ascending: false })
+--
+-- SQL equivalente:
+--   SELECT * FROM red_cliente
+--   WHERE cliente_id = $1
+--   ORDER BY agregado_at DESC;
+--
+-- Parametros:
+--   - clienteId: UUID (id del usuario auth del cliente)
+--
+-- Retorna:
+--   - Array de RedCliente[] (conductores agregados al circulo)
+--
+-- Usado por: ClienteApp (Mi Circulo / Mis Conductores)
+
+-- =============================================
+-- OPERACION 2: agregarContacto (Agregar conductor al circulo)
+-- Archivo: packages/supabase/src/useRedCliente.ts:27-37
+-- =============================================
+-- JavaScript:
+--   supabase.from("red_cliente").insert({
+--     cliente_id, conductor_tenant_id, apodo, favorito, notificaciones_activas
+--   }).select().single()
+--
+-- SQL equivalente:
+--   INSERT INTO red_cliente (
+--     cliente_id, conductor_tenant_id, apodo, favorito, notificaciones_activas
+--   ) VALUES ($1, $2, $3, $4, $5)
+--   RETURNING *;
+--
+-- Parametros:
+--   - cliente_id: UUID (requerido - id del usuario auth)
+--   - conductor_tenant_id: UUID (requerido - id del tenant conductor)
+--   - apodo: TEXT | null (nombre personalizado para el conductor)
+--   - favorito: BOOLEAN (default: false)
+--   - notificaciones_activas: BOOLEAN (default: true)
+--
+-- Retorna:
+--   - RedCliente creado con id y agregado_at generados
+--
+-- Usado por: AddConductor (agregar conductor desde enlace)
+--
+-- NOTA: No hay UNIQUE constraint en (cliente_id, conductor_tenant_id)
+--       por lo que podrian existir duplicados. El frontend maneja el error.
+
+-- =============================================
+-- OPERACION 3: eliminarContacto (Remover conductor del circulo)
+-- Archivo: packages/supabase/src/useRedCliente.ts:39-49
+-- =============================================
+-- JavaScript:
+--   supabase.from("red_cliente").delete().eq("id", id)
+--
+-- SQL equivalente:
+--   DELETE FROM red_cliente WHERE id = $1;
+--
+-- Parametros:
+--   - id: UUID (id del registro red_cliente)
+--
+-- Retorna:
+--   - Success o error
+--
+-- Usado por: ClienteApp (remover conductor de Mi Circulo)

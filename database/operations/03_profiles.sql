@@ -1,0 +1,75 @@
+-- =============================================
+-- MODULO: PROFILES (Perfiles de usuario)
+-- Fuente: packages/types/src/profile.ts
+-- Tabla: profiles
+-- =============================================
+
+-- =============================================
+-- OPERACION 1: INSERT (Crear perfil - REGISTRO)
+-- Archivo: apps/conductor/src/App.tsx (RegisterScreen)
+--          apps/cliente/src/App.tsx (RegisterScreen)
+-- Estado: Implementado
+-- =============================================
+-- JavaScript (conductor):
+--   supabase.from("profiles").insert({
+--     id: user.id,
+--     rol: "conductor",
+--     nombre: form.nombre,
+--     apellido: form.apellido,
+--     telefono: form.telefono,
+--     activo: true,
+--   })
+--
+-- JavaScript (cliente):
+--   supabase.from("profiles").insert({
+--     id: user.id,
+--     rol: "cliente",
+--     nombre: form.nombre,
+--     apellido: form.apellido,
+--     telefono: form.telefono,
+--     activo: true,
+--   })
+--
+-- SQL equivalente:
+--   INSERT INTO profiles (id, rol, nombre, apellido, telefono, activo)
+--   VALUES ($1, $2, $3, $4, $5, true)
+--   RETURNING *;
+--
+-- Parametros:
+--   - id: UUID (mismo id de auth.users, obtenido despues de signUp)
+--   - rol: TEXT ('cliente' | 'conductor')
+--   - nombre: TEXT
+--   - apellido: TEXT
+--   - telefono: TEXT
+--   - activo: BOOLEAN (default: true)
+
+-- =============================================
+-- OPERACION 2: SELECT (Obtener perfil por id)
+-- Fuente: No hay hook dedicado en @drivip/supabase
+-- Estado: PENDIENTE - Se necesita para mostrar datos del usuario
+-- =============================================
+-- SQL:
+--   SELECT * FROM profiles WHERE id = $1;
+--
+-- Parametros:
+--   - id: UUID (id del usuario auth)
+--
+-- Retorna:
+--   - Un registro Profile o null
+
+-- =============================================
+-- OPERACION 3: UPDATE (Actualizar perfil)
+-- Fuente: No hay hook dedicado en @drivip/supabase
+-- Estado: PENDIENTE - Se necesita para editar perfil
+-- =============================================
+-- SQL:
+--   UPDATE profiles
+--   SET nombre = $1, apellido = $2, telefono = $3, avatar_url = $4, updated_at = NOW()
+--   WHERE id = $5;
+--
+-- Parametros:
+--   - nombre: TEXT
+--   - apellido: TEXT
+--   - telefono: TEXT
+--   - avatar_url: TEXT | null
+--   - id: UUID

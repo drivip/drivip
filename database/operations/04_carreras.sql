@@ -1,0 +1,167 @@
+-- =============================================
+-- MODULO: CARRERAS (Viajes)
+-- Fuente: packages/supabase/src/useCarreras.ts,
+--         apps/cliente/src/hooks/useCarreraRealtime.ts
+-- Tabla: carreras
+-- =============================================
+
+-- =============================================
+-- OPERACION 1: useCarreras (Listar carreras por conductor)
+-- Archivo: packages/supabase/src/useCarreras.ts:20-31
+-- =============================================
+-- JavaScript:
+--   supabase.from("carreras").select("*").order("created_at", { ascending: false }).eq("conductor_id", conductorId)
+--
+-- SQL equivalente:
+--   SELECT * FROM carreras
+--   WHERE conductor_id = $1
+--   ORDER BY created_at DESC;
+--
+-- Parametros:
+--   - conductorId: UUID (id del tenant conductor)
+--
+-- Retorna:
+--   - Array de Carrera[] (todas las carreras del conductor, mas recientes primero)
+--
+-- Usado por: DriverApp (panel del conductor)
+
+-- =============================================
+-- OPERACION 2: useTenantDetail (Carreras recientes por tenant)
+-- Archivo: packages/supabase/src/useTenantDetail.ts:36
+-- =============================================
+-- JavaScript:
+--   supabase.from("carreras").select("*").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(20)
+--
+-- SQL equivalente:
+--   SELECT * FROM carreras
+--   WHERE tenant_id = $1
+--   ORDER BY created_at DESC
+--   LIMIT 20;
+--
+-- Parametros:
+--   - tenantId: UUID (id del tenant)
+--
+-- Retorna:
+--   - Array de Carrera[] (ultimas 20 carreras del tenant)
+--
+-- Usado por: SuperAdmin (TenantDetailPanel)
+
+-- =============================================
+-- OPERACION 3: createCarrera (Crear nueva carrera)
+-- Archivo: packages/supabase/src/useCarreras.ts:35-44
+-- =============================================
+-- JavaScript:
+--   supabase.from("carreras").insert(carrera).select().single()
+--
+-- SQL equivalente:
+--   INSERT INTO carreras (
+--     tenant_id, conductor_id, cliente_id,
+--     origen_lat, origen_lng, origen_direccion,
+--     destino_lat, destino_lng, destino_direccion,
+--     distancia_km, duracion_min, precio,
+--     metodo_pago, comprobante_url, estado,
+--     calificacion, comentario_calificacion,
+--     aceptada_at, completada_at, cancelada_at
+--   ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+--   RETURNING *;
+--
+-- Parametros:
+--   - tenant_id: UUID (requerido)
+--   - conductor_id: UUID | null
+--   - cliente_id: UUID | null
+--   - origen_lat: DOUBLE PRECISION (requerido)
+--   - origen_lng: DOUBLE PRECISION (requerido)
+--   - origen_direccion: TEXT | null
+--   - destino_lat: DOUBLE PRECISION | null
+--   - destino_lng: DOUBLE PRECISION | null
+--   - destino_direccion: TEXT | null
+--   - distancia_km: DOUBLE PRECISION | null
+--   - duracion_min: DOUBLE PRECISION | null
+--   - precio: DOUBLE PRECISION | null
+--   - metodo_pago: 'efectivo' | 'pago_movil' | 'transferencia' | null
+--   - comprobante_url: TEXT | null
+--   - estado: 'pendiente' (default) | 'aceptada' | 'en_curso' | 'completada' | 'cancelada'
+--   - calificacion: DOUBLE PRECISION | null
+--   - comentario_calificacion: TEXT | null
+--   - aceptada_at: TIMESTAMPTZ | null
+--   - completada_at: TIMESTAMPTZ | null
+--   - cancelada_at: TIMESTAMPTZ | null
+--
+-- Retorna:
+--   - Carrera creada con id y created_at generados automaticamente
+
+-- =============================================
+-- OPERACION 4: updateCarreraEstado (Cambiar estado de carrera)
+-- Archivo: packages/supabase/src/useCarreras.ts:46-58
+-- =============================================
+-- JavaScript:
+--   supabase.from("carreras").update(updates).eq("id", id)
+--   // updates = { estado, aceptada_at?, completada_at?, cancelada_at? }
+--
+-- SQL equivalente:
+--   UPDATE carreras
+--   SET estado = $1,
+--       aceptada_at = CASE WHEN $1 = 'aceptada' THEN NOW() ELSE aceptada_at END,
+--       completada_at = CASE WHEN $1 = 'completada' THEN NOW() ELSE completada_at END,
+--       cancelada_at = CASE WHEN $1 = 'cancelada' THEN NOW() ELSE cancelada_at END
+--   WHERE id = $2;
+--
+-- Parametros:
+--   - estado: 'pendiente' | 'aceptada' | 'en_curso' | 'completada' | 'cancelada'
+--   - id: UUID (id de la carrera)
+--
+-- Logica:
+--   - Si estado = 'aceptada': aceptada_at = NOW()
+--   - Si estado = 'completada': completada_at = NOW()
+--   - Si estado = 'cancelada': cancelada_at = NOW()
+--   - Los demas timestamps no se modifican
+--
+-- Usado por: DriverApp (accept/complete/cancel ride)
+
+-- =============================================
+-- OPERACION 5: useRealtimeCarreras (Suscripcion realtime - Conductor)
+-- Archivo: packages/supabase/src/useCarreras.ts:63-84
+-- =============================================
+-- JavaScript:
+--   supabase.channel(`carreras-${conductorId}`)
+--     .on("postgres_changes", {
+--       event: "*",
+--       schema: "public",
+--       table: "carreras",
+--       filter: `conductor_id=eq.${conductorId}`
+--     }, (payload) => callbackRef.current(payload.new as Carrera))
+--     .subscribe()
+--
+-- Implementacion:
+--   - Crea un canal WebSocket en Supabase
+--   - Escucha TODOS los eventos (INSERT, UPDATE, DELETE) en tabla carreras
+--   - Filtra por conductor_id = valor especifico
+--   - Retorna el registro modificado via callback
+--
+-- Usado por: DriverApp (recibir nuevas carreras en tiempo real)
+
+-- =============================================
+-- OPERACION 6: useCarreraRealtime (Suscripcion realtime - Cliente)
+-- Archivo: apps/cliente/src/hooks/useCarreraRealtime.ts:15-29
+-- =============================================
+-- JavaScript:
+--   supabase.channel(`carrera-${carreraId}`)
+--     .on("postgres_changes", {
+--       event: "UPDATE",
+--       schema: "public",
+--       table: "carreras",
+--       filter: `id=eq.${carreraId}`
+--     }, (payload) => callbackRef.current(payload.new as Carrera))
+--     .subscribe()
+--
+-- Implementacion:
+--   - Crea un canal WebSocket en Supabase
+--   - Escucha SOLO eventos UPDATE en tabla carreras
+--   - Filtra por id = valor especifico (una sola carrera)
+--   - Retorna el registro modificado via callback
+--
+-- Diferencia con la del conductor:
+--   - Conductor: escucha TODOS los eventos, filtra por conductor_id
+--   - Cliente: escucha solo UPDATE, filtra por id de carrera
+--
+-- Usado por: ClienteApp (seguir estado de carrera activa)

@@ -1,0 +1,19 @@
+{
+  "name": "drivip",
+  "private": true,
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "clean": "turbo clean"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "puppeteer": "^25.11.0",
+    "tailwindcss": "^4.3.3",
+    "turbo": "^2.4.0",
+    "typescript": "^5.7.0",
+    "ws": "^8.21.3"
+  },
+  "packageManager": "pnpm@9.15.0"
+}

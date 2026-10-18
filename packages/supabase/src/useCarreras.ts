@@ -1,0 +1,85 @@
+import { useState, useEffect, useCallback, useRef } from "react";
+import { supabase } from "./client";
+import type { Carrera } from "@drivip/types";
+
+interface CarrerasState {
+  carreras: Carrera[];
+  loading: boolean;
+  error: string | null;
+}
+
+export function useCarreras(conductorId?: string) {
+  const [state, setState] = useState<CarrerasState>({
+    carreras: [],
+    loading: true,
+    error: null,
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    let query = supabase.from("carreras").select("*").order("created_at", { ascending: false });
+    if (conductorId) query = query.eq("conductor_id", conductorId);
+
+    query.then(({ data, error }) => {
+      if (cancelled) return;
+      if (error) {
+        setState({ carreras: [], loading: false, error: error.message });
+      } else {
+        setState({ carreras: (data as Carrera[]) ?? [], loading: false, error: null });
+      }
+    });
+
+    return () => { cancelled = true; };
+  }, [conductorId]);
+
+  const createCarrera = useCallback(async (carrera: Omit<Carrera, "id" | "created_at">) => {
+    const { data, error } = await supabase
+      .from("carreras")
+      .insert(carrera)
+      .select()
+      .single();
+
+    if (error) return null;
+    return data as Carrera;
+  }, []);
+
+  const updateCarreraEstado = useCallback(async (id: string, estado: Carrera["estado"]) => {
+    const updates: Record<string, unknown> = { estado };
+    if (estado === "aceptada") updates.aceptada_at = new Date().toISOString();
+    if (estado === "completada") updates.completada_at = new Date().toISOString();
+    if (estado === "cancelada") updates.cancelada_at = new Date().toISOString();
+
+    const { error } = await supabase
+      .from("carreras")
+      .update(updates)
+      .eq("id", id);
+
+    return !error;
+  }, []);
+
+  return { ...state, createCarrera, updateCarreraEstado };
+}
+
+export function useRealtimeCarreras(conductorId: string, onCarrera: (carrera: Carrera) => void) {
+  const callbackRef = useRef(onCarrera);
+  callbackRef.current = onCarrera;
+
+  useEffect(() => {
+    if (!conductorId) return;
+
+    const channel = supabase
+      .channel(`carreras-${conductorId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "carreras", filter: `conductor_id=eq.${conductorId}` },
+        (payload) => {
+          callbackRef.current(payload.new as Carrera);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [conductorId]);
+}

@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+
+<html lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>Direcciones Guardadas - Drivip</title>
+<!-- Tailwind CSS v3 with plugins -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Configuration -->
+<script data-purpose="tailwind-config">
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+          },
+          colors: {
+            drivip: {
+              purple: '#6d28d9',
+              orange: '#f97316',
+              bg: '#f4f6f8'
+            }
+          },
+          boxShadow: {
+            'neumorphic': '6px 6px 14px #e2e8f0, -6px -6px 14px #ffffff',
+            'neumorphic-sm': '3px 3px 8px #e2e8f0, -3px -3px 8px #ffffff',
+            'neumorphic-inset': 'inset 2px 2px 5px #e2e8f0, inset -2px -2px 5px #ffffff',
+          }
+        }
+      }
+    }
+  </script>
+<!-- Google Fonts: Inter -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<style data-purpose="custom-enhancements">
+    /* iOS Momentum Scrolling & safe area */
+    body {
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    .hide-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .hide-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="bg-[#f4f6f8] text-slate-800 font-sans min-h-screen pb-28 antialiased selection:bg-purple-200">
+<!-- BEGIN: TopHeader -->
+<header class="sticky top-0 z-30 bg-[#f4f6f8]/90 backdrop-blur-md px-5 pt-4 pb-3 border-b border-slate-200/50" data-purpose="top-navigation">
+<div class="max-w-md mx-auto flex items-center justify-between">
+<!-- Back Button -->
+<button aria-label="Regresar" class="w-11 h-11 rounded-2xl bg-white shadow-neumorphic-sm flex items-center justify-center text-slate-700 active:scale-95 transition-transform border border-slate-100" type="button">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24">
+<path d="M15.75 19.5L8.25 12l7.5-7.5" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+<!-- Screen Title -->
+<div class="text-center">
+<h1 class="text-lg font-bold text-slate-900 tracking-tight">Direcciones Guardadas</h1>
+<p class="text-[11px] font-medium text-emerald-600 flex items-center justify-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+          Caracas y Gran Caracas
+        </p>
+</div>
+<!-- Add New Quick Button -->
+<button aria-label="Nueva dirección" class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 shadow-lg shadow-purple-500/25 flex items-center justify-center text-white active:scale-95 transition-transform" type="button">
+<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24">
+<path d="M12 4.5v15m7.5-7.5h-15" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</div>
+</header>
+<!-- END: TopHeader -->
+<!-- BEGIN: MainContentContainer -->
+<main class="max-w-md mx-auto px-5 pt-3 space-y-5" data-purpose="saved-locations-content">
+<!-- BEGIN: SearchBar -->
+<section data-purpose="search-input">
+<div class="relative">
+<div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<input class="w-full pl-11 pr-11 py-3.5 bg-white border border-slate-200/80 rounded-2xl text-sm font-medium text-slate-800 placeholder-slate-400 shadow-neumorphic-sm focus:outline-none focus:ring-2 focus:ring-purple-500/30 transition-all" placeholder="Buscar una dirección o lugar en Caracas..." type="text"/>
+<button aria-label="Limpiar o filtrar" class="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600" type="button">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M6 18L18 6M6 6l12 12" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</div>
+</section>
+<!-- END: SearchBar -->
+<!-- BEGIN: FastShortcutsSection -->
+<section data-purpose="quick-access-shortcuts">
+<div class="flex items-center justify-between mb-3 px-1">
+<h2 class="text-xs font-bold uppercase tracking-wider text-slate-500">Acceso Rápido (1 Toque)</h2>
+<span class="text-[11px] font-semibold text-purple-600">Personalizar</span>
+</div>
+<!-- Quick Category Grid -->
+<div class="grid grid-cols-4 gap-2.5">
+<!-- Quick: Casa -->
+<button class="bg-white p-3 rounded-2xl border border-slate-100 shadow-neumorphic-sm flex flex-col items-center justify-center gap-1.5 active:scale-95 transition-all text-center group">
+<div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-inner group-hover:bg-blue-600 group-hover:text-white transition-colors">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<span class="text-xs font-bold text-slate-800">Casa</span>
+<span class="text-[10px] text-slate-400 font-medium truncate w-full">P. Cristal</span>
+</button>
+<!-- Quick: Trabajo -->
+<button class="bg-white p-3 rounded-2xl border border-slate-100 shadow-neumorphic-sm flex flex-col items-center justify-center gap-1.5 active:scale-95 transition-all text-center group">
+<div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shadow-inner group-hover:bg-purple-600 group-hover:text-white transition-colors">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 00.75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 00-3.413-.387m4.5 8.006c-.194.165-.42.295-.673.38A23.978 23.978 0 0112 15.75c-2.648 0-5.195-.429-7.577-1.22a2.016 2.016 0 01-.673-.38m0 0A2.18 2.18 0 013 12.489V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 013.413-.387m7.5 0V5.25A2.25 2.25 0 0013.5 3h-3a2.25 2.25 0 00-2.25 2.25v.894m7.5 0a48.667 48.667 0 00-7.5 0" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<span class="text-xs font-bold text-slate-800">Trabajo</span>
+<span class="text-[10px] text-slate-400 font-medium truncate w-full">Cavendes</span>
+</button>
+<!-- Quick: Pareja / Familia -->
+<button class="bg-white p-3 rounded-2xl border border-slate-100 shadow-neumorphic-sm flex flex-col items-center justify-center gap-1.5 active:scale-95 transition-all text-center group">
+<div class="w-10 h-10 rounded-xl bg-pink-50 text-pink-600 flex items-center justify-center shadow-inner group-hover:bg-pink-600 group-hover:text-white transition-colors">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<span class="text-xs font-bold text-slate-800">Pareja</span>
+<span class="text-[10px] text-slate-400 font-medium truncate w-full">Chacao</span>
+</button>
+<!-- Quick: Gimnasio -->
+<button class="bg-white p-3 rounded-2xl border border-slate-100 shadow-neumorphic-sm flex flex-col items-center justify-center gap-1.5 active:scale-95 transition-all text-center group">
+<div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shadow-inner group-hover:bg-amber-600 group-hover:text-white transition-colors">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<span class="text-xs font-bold text-slate-800">Gym</span>
+<span class="text-[10px] text-slate-400 font-medium truncate w-full">Las Mercedes</span>
+</button>
+</div>
+</section>
+<!-- END: FastShortcutsSection -->
+<!-- BEGIN: SavedAddressesList -->
+<section class="space-y-3.5" data-purpose="frequent-locations-list">
+<div class="flex items-center justify-between px-1">
+<h2 class="text-xs font-bold uppercase tracking-wider text-slate-500">Direcciones Frecuentes Guardadas</h2>
+<span class="text-xs font-bold text-slate-500 bg-slate-200/70 px-2 py-0.5 rounded-full">5 guardadas</span>
+</div>
+<!-- Item 1: Casa (Default) -->
+<article class="bg-white rounded-3xl p-4 shadow-xl shadow-slate-200/60 border border-slate-100 relative overflow-hidden transition-all" data-purpose="saved-item-default">
+<div class="absolute top-0 right-0">
+<span class="bg-emerald-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl tracking-wider shadow-sm flex items-center gap-1">
+<svg class="w-3 h-3" fill="currentColor" viewbox="0 0 20 20">
+<path clip-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" fill-rule="evenodd"></path>
+</svg>
+            PREDETERMINADA
+          </span>
+</div>
+<div class="flex items-start gap-3.5 pt-1">
+<div class="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<div class="flex-1 pr-16">
+<h3 class="font-bold text-slate-900 text-base leading-tight">Casa</h3>
+<p class="text-xs text-slate-600 mt-1 font-medium leading-relaxed">
+              Av. Francisco de Miranda, Edif. Parque Cristal, Piso 8, Los Palos Grandes.
+            </p>
+<p class="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
+              Frente a estación Metro Parque del Este
+            </p>
+</div>
+</div>
+<!-- Action Bar for Casa -->
+<div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+<div class="flex items-center gap-1">
+<button class="p-2 text-slate-400 hover:text-purple-600 active:scale-95 transition-colors" title="Editar" type="button">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+<button class="p-2 text-slate-400 hover:text-rose-500 active:scale-95 transition-colors" title="Eliminar" type="button">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</div>
+<!-- Primary Direct Action -->
+<button class="bg-gradient-to-r from-purple-700 to-indigo-700 text-white font-semibold text-xs py-2 px-4 rounded-xl shadow-md shadow-purple-500/20 active:scale-95 transition-all flex items-center gap-1.5" type="button">
+<span>Pedir Chofer Aquí</span>
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24">
+<path d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</div>
+</article>
+<!-- Item 2: Oficina / Trabajo -->
+<article class="bg-white rounded-3xl p-4 shadow-xl shadow-slate-200/60 border border-slate-100 transition-all">
+<div class="flex items-start justify-between">
+<div class="flex items-start gap-3.5">
+<div class="w-12 h-12 rounded-2xl bg-purple-50 border border-purple-100 text-purple-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 00.75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 00-3.413-.387m4.5 8.006c-.194.165-.42.295-.673.38A23.978 23.978 0 0112 15.75c-2.648 0-5.195-.429-7.577-1.22a2.016 2.016 0 01-.673-.38m0 0A2.18 2.18 0 013 12.489V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 013.413-.387m7.5 0V5.25A2.25 2.25 0 0013.5 3h-3a2.25 2.25 0 00-2.25 2.25v.894m7.5 0a48.667 48.667 0 00-7.5 0" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<div>
+<h3 class="font-bold text-slate-900 text-base leading-tight">Oficina / Trabajo</h3>
+<p class="text-xs text-slate-600 mt-1 font-medium">Torre Cavendes, Piso 5, Altamira, Chacao.</p>
+<!-- Driver Note Pill -->
+<div class="mt-2 inline-flex items-center gap-1.5 bg-amber-50 text-amber-800 border border-amber-200/60 px-2.5 py-1 rounded-lg text-[11px] font-medium">
+<svg class="w-3.5 h-3.5 text-amber-600 flex-shrink-0" fill="currentColor" viewbox="0 0 20 20">
+<path clip-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" fill-rule="evenodd"></path>
+</svg>
+<span>Nota Chofer: Entrada por la Av. San Juan Bosco</span>
+</div>
+</div>
+</div>
+<button class="p-2 text-slate-300 hover:text-slate-600" type="button">
+<svg class="w-5 h-5" fill="currentColor" viewbox="0 0 20 20">
+<path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path>
+</svg>
+</button>
+</div>
+</article>
+<!-- Item 3: C.C. Sambil Chacao -->
+<article class="bg-white rounded-3xl p-4 shadow-xl shadow-slate-200/60 border border-slate-100 flex items-center justify-between transition-all">
+<div class="flex items-center gap-3.5">
+<div class="w-12 h-12 rounded-2xl bg-orange-50 border border-orange-100 text-orange-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007zM8.625 10.5a.375.375 0 11-.75 0 .375.375 0 01.75 0zm7.5 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<div>
+<h3 class="font-bold text-slate-900 text-base leading-tight">C.C. Sambil Chacao</h3>
+<p class="text-xs text-slate-600 mt-0.5 font-medium">Entrada Libertador frente al metro</p>
+<span class="text-[10px] text-slate-400">Punto común de recogida</span>
+</div>
+</div>
+<button class="w-9 h-9 rounded-xl bg-slate-50 border border-slate-200/70 flex items-center justify-center text-slate-600 active:scale-95" type="button">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24">
+<path d="M8.25 4.5l7.5 7.5-7.5 7.5" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</article>
+<!-- Item 4: Aeropuerto Maiquetía -->
+<article class="bg-white rounded-3xl p-4 shadow-xl shadow-slate-200/60 border border-slate-100 flex items-center justify-between transition-all">
+<div class="flex items-center gap-3.5">
+<div class="w-12 h-12 rounded-2xl bg-sky-50 border border-sky-100 text-sky-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<h3 class="font-bold text-slate-900 text-base leading-tight">Aeropuerto Maiquetía</h3>
+<span class="text-[9px] bg-sky-100 text-sky-700 font-bold px-1.5 py-0.5 rounded">La Guaira</span>
+</div>
+<p class="text-xs text-slate-600 mt-0.5 font-medium">Terminal Nacional, Puerta 3</p>
+<span class="text-[10px] text-slate-400 font-medium">Tarifa fija acordada sin peaje</span>
+</div>
+</div>
+<button class="w-9 h-9 rounded-xl bg-slate-50 border border-slate-200/70 flex items-center justify-center text-slate-600 active:scale-95" type="button">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24">
+<path d="M8.25 4.5l7.5 7.5-7.5 7.5" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</article>
+<!-- Item 5: Clínica El Ávila -->
+<article class="bg-white rounded-3xl p-4 shadow-xl shadow-slate-200/60 border border-slate-100 flex items-center justify-between transition-all">
+<div class="flex items-center gap-3.5">
+<div class="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M12 4.5v15m7.5-7.5h-15" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<div>
+<h3 class="font-bold text-slate-900 text-base leading-tight">Clínica El Ávila</h3>
+<p class="text-xs text-slate-600 mt-0.5 font-medium">Altamira, 6ta transversal con Av. San Juan Bosco</p>
+<span class="text-[10px] text-slate-400">Entrada principal / Emergencia</span>
+</div>
+</div>
+<button class="w-9 h-9 rounded-xl bg-slate-50 border border-slate-200/70 flex items-center justify-center text-slate-600 active:scale-95" type="button">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24">
+<path d="M8.25 4.5l7.5 7.5-7.5 7.5" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</article>
+</section>
+<!-- END: SavedAddressesList -->
+<!-- BEGIN: AddNewLocationCard -->
+<section class="pt-2" data-purpose="add-location-preview">
+<div class="bg-gradient-to-br from-white to-slate-50 rounded-3xl p-5 border-2 border-dashed border-purple-200 shadow-sm text-center">
+<div class="w-12 h-12 mx-auto rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center mb-3">
+<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24">
+<path d="M12 9v6m3-3H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<h4 class="text-sm font-bold text-slate-900">¿Tienes un nuevo punto frecuente?</h4>
+<p class="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
+          Guarda la ubicación de tu universidad, consultorio o familiares para solicitar viajes con 1 toque.
+        </p>
+<button class="mt-4 w-full py-3 px-4 bg-white border border-purple-300 text-purple-700 font-bold text-xs rounded-2xl shadow-neumorphic-sm hover:bg-purple-50 active:scale-[0.98] transition-all flex items-center justify-center gap-2" type="button">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24">
+<path d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round"></path>
+<path d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+          + Agregar Nueva Ubicación en el Mapa
+        </button>
+</div>
+</section>
+<!-- END: AddNewLocationCard -->
+</main>
+<!-- END: MainContentContainer -->
+<!-- BEGIN: BottomNavigation -->
+<nav class="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-lg border-t border-slate-200/80 px-4 py-2" data-purpose="main-bottom-tabs">
+<div class="max-w-md mx-auto flex items-center justify-between relative">
+<!-- Tab: En Vivo -->
+<a class="flex flex-col items-center justify-center flex-1 py-1 text-slate-400 hover:text-purple-600 transition-colors" href="#">
+<div class="relative">
+<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round"></path>
+<path d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<span class="text-[10px] font-semibold mt-1">En Vivo</span>
+</a>
+<!-- Tab: Choferes -->
+<a class="flex flex-col items-center justify-center flex-1 py-1 text-slate-400 hover:text-purple-600 transition-colors" href="#">
+<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 00-10.026 0 1.106 1.106 0 00-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="text-[10px] font-semibold mt-1">Choferes</span>
+</a>
+<!-- Center Floating Action: Solicitar Viaje Rápido -->
+<div class="relative -top-5 flex-shrink-0 px-2">
+<button aria-label="Nuevo Pedido Rápido" class="w-14 h-14 rounded-full bg-gradient-to-tr from-orange-500 via-rose-500 to-purple-600 shadow-lg shadow-orange-500/30 flex items-center justify-center text-white text-2xl active:scale-95 transition-transform border-4 border-white" type="button">
+<svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="3" viewbox="0 0 24 24">
+<path d="M12 4.5v15m7.5-7.5h-15" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</div>
+<!-- Tab: Historial -->
+<a class="flex flex-col items-center justify-center flex-1 py-1 text-slate-400 hover:text-purple-600 transition-colors" href="#">
+<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="text-[10px] font-semibold mt-1">Historial</span>
+</a>
+<!-- Tab: Menú (Active because Addresses are in Account/Settings) -->
+<a class="flex flex-col items-center justify-center flex-1 py-1 text-purple-700 font-bold transition-colors" href="#">
+<div class="relative">
+<svg class="w-6 h-6 text-purple-700" fill="none" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24">
+<path d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="absolute -top-1 -right-1.5 w-2 h-2 rounded-full bg-orange-500"></span>
+</div>
+<span class="text-[10px] font-bold mt-1 text-purple-700">Menú</span>
+</a>
+</div>
+</nav>
+<!-- END: BottomNavigation -->
+<!-- BEGIN: InteractiveModalPreview (Simulated Bottom Sheet Overlay for New Address) -->
+<div class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-end justify-center" data-purpose="add-address-modal" id="new-location-sheet">
+<div class="bg-white w-full max-w-md rounded-t-[32px] p-6 shadow-2xl space-y-4 animate-bounce-short">
+<div class="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-2"></div>
+<div class="flex items-center justify-between">
+<h3 class="text-lg font-bold text-slate-900">Guardar Nueva Ubicación</h3>
+<button class="text-slate-400 hover:text-slate-600 p-1" type="button">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M6 18L18 6M6 6l12 12" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</div>
+<div class="space-y-3 pt-2">
+<div>
+<label class="block text-xs font-bold text-slate-600 mb-1">Nombre del Lugar</label>
+<input class="w-full text-sm rounded-xl border-slate-200 focus:ring-purple-500" placeholder="Ej: Universidad Metropolitana, Casa Mamá" type="text"/>
+</div>
+<div>
+<label class="block text-xs font-bold text-slate-600 mb-1">Dirección Exacta</label>
+<input class="w-full text-sm rounded-xl border-slate-200 focus:ring-purple-500" placeholder="Calle, Edificio o Punto de Referencia" type="text"/>
+</div>
+<div>
+<label class="block text-xs font-bold text-slate-600 mb-1">Referencia al Conductor</label>
+<input class="w-full text-sm rounded-xl border-slate-200 focus:ring-purple-500" placeholder="Ej: Portón verde con vigilancia 24h" type="text"/>
+</div>
+</div>
+<button class="w-full py-3.5 bg-purple-700 text-white font-bold rounded-2xl shadow-lg shadow-purple-600/30 active:scale-95 transition-all" type="button">
+        Guardar Dirección
+      </button>
+</div>
+</div>
+<!-- END: InteractiveModalPreview -->
+</body></html>

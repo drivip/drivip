@@ -1,0 +1,83 @@
+-- =============================================
+-- MODULO: UBICACIONES (Posiciones GPS)
+-- Fuente: packages/supabase/src/useUbicaciones.ts
+-- Tabla: ubicaciones
+-- =============================================
+
+-- =============================================
+-- OPERACION 1: useUbicaciones (Obtener ultimas ubicaciones)
+-- Archivo: packages/supabase/src/useUbicaciones.ts:12-23
+-- =============================================
+-- JavaScript:
+--   supabase.from("ubicaciones")
+--     .select("*")
+--     .eq("conductor_id", conductorId)
+--     .order("timestamp", { ascending: false })
+--     .limit(50)
+--
+-- SQL equivalente:
+--   SELECT * FROM ubicaciones
+--   WHERE conductor_id = $1
+--   ORDER BY timestamp DESC
+--   LIMIT 50;
+--
+-- Parametros:
+--   - conductorId: UUID (id del tenant conductor)
+--
+-- Retorna:
+--   - Array de Ubicacion[] (ultimas 50 posiciones GPS, mas recientes primero)
+--
+-- Usado por: DriverApp (mostrar historial de ubicacion)
+
+-- =============================================
+-- OPERACION 2: reportarUbicacion (Insertar nueva posicion)
+-- Archivo: packages/supabase/src/useUbicaciones.ts:37-41
+-- =============================================
+-- JavaScript:
+--   supabase.from("ubicaciones").insert({
+--     conductor_id, tenant_id, lat, lng, velocidad, direccion, carrera_id,
+--     timestamp: new Date().toISOString()
+--   })
+--
+-- SQL equivalente:
+--   INSERT INTO ubicaciones (
+--     conductor_id, tenant_id, lat, lng, velocidad, direccion, carrera_id, timestamp
+--   ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
+--
+-- Parametros:
+--   - conductor_id: UUID (requerido)
+--   - tenant_id: UUID (requerido)
+--   - lat: DOUBLE PRECISION (requerido)
+--   - lng: DOUBLE PRECISION (requerido)
+--   - velocidad: DOUBLE PRECISION | null (m/s)
+--   - direccion: DOUBLE PRECISION | null (heading en grados, 0-360)
+--   - carrera_id: UUID | null (si esta en carrera activa)
+--   - timestamp: TIMESTAMPTZ (generado automaticamente en el frontend)
+--
+-- Usado por: DriverApp (reportar posicion cada vez que cambia el GPS)
+-- Frecuencia: Cada vez que el navegador detecta cambio de posicion
+
+-- =============================================
+-- OPERACION 3: useRealtimeUbicacionConductor (Suscripcion realtime)
+-- Archivo: packages/supabase/src/useUbicaciones.ts:57-71
+-- =============================================
+-- JavaScript:
+--   supabase.channel(`ubicacion-${conductorId}`)
+--     .on("postgres_changes", {
+--       event: "*",
+--       schema: "public",
+--       table: "ubicaciones",
+--       filter: `conductor_id=eq.${conductorId}`
+--     }, (payload) => callbackRef.current(payload.new as Ubicacion))
+--     .subscribe()
+--
+-- Implementacion:
+--   - Crea un canal WebSocket en Supabase
+--   - Escucha TODOS los eventos (INSERT, UPDATE, DELETE) en tabla ubicaciones
+--   - Filtra por conductor_id = valor especifico
+--   - Retorna el registro modificado via callback
+--
+-- Usado por:
+--   - DriverApp: mantener ubicacion actualizada
+--   - ClienteApp (useConductorLocation.ts): ver ubicacion del conductor en tiempo real
+--   - ClienteApp (ActiveTripMap.tsx): rastrear conductor durante carrera activa

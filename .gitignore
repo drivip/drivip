@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.turbo/
+*.tsbuildinfo
+.env
+.env.local
+.env.*.local
+*.log
+
+# Development artifacts / one-off debug output
+dom-dump.html
+live-css.css
+tailwind-output.css
+inspect*.js
+check-*.js

@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+
+<html lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>Mis Conductores - Drivip</title>
+<!-- Tailwind CSS CDN with forms and container plugins -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            drivip: {
+              purple: '#5B21B6',
+              violet: '#6D28D9',
+              indigo: '#4338CA',
+              dark: '#0F172A',
+              surface: '#F4F6F8'
+            }
+          },
+          boxShadow: {
+            'neu-flat': '6px 6px 14px #d9dce1, -6px -6px 14px #ffffff',
+            'neu-pressed': 'inset 3px 3px 6px #d9dce1, inset -3px -3px 6px #ffffff',
+            'neu-card': '0 12px 30px -10px rgba(148, 163, 184, 0.25), 0 2px 8px -2px rgba(148, 163, 184, 0.15)'
+          }
+        }
+      }
+    }
+  </script>
+<!-- Phosphor Icons for iOS-grade clean SVG icons -->
+<script src="https://unpkg.com/@phosphor-icons/web"></script>
+<style data-purpose="base-enhancements">
+    /* Disables bouncy overscroll for authentic app feel */
+    body {
+      -webkit-tap-highlight-color: transparent;
+      overscroll-behavior-y: none;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    /* Hide scrollbars for filter tabs */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="bg-[#f4f6f8] text-slate-800 antialiased min-h-screen pb-28 select-none">
+<!-- BEGIN: TopHeader -->
+<header class="sticky top-0 z-30 bg-[#f4f6f8]/95 backdrop-blur-md px-4 pt-3 pb-3 border-b border-slate-200/50">
+<div class="flex items-center justify-between">
+<!-- Back button with soft neumorphic pill -->
+<button aria-label="Volver" class="w-10 h-10 rounded-2xl bg-white shadow-md shadow-slate-200 flex items-center justify-center text-slate-700 active:scale-95 transition-all border border-slate-100" type="button">
+<i class="ph-bold ph-arrow-left text-lg"></i>
+</button>
+<!-- Center brand title -->
+<div class="text-center">
+<div class="flex items-center justify-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+<h1 class="text-base font-bold text-slate-900 tracking-tight">Mis Conductores VIP</h1>
+</div>
+<p class="text-[11px] font-medium text-slate-400">Directo en Caracas • Sin intermediarios</p>
+</div>
+<!-- Quick QR Scan trigger -->
+<button aria-label="Escanear QR" class="w-10 h-10 rounded-2xl bg-white shadow-md shadow-slate-200 flex items-center justify-center text-violet-700 active:scale-95 transition-all border border-slate-100" type="button">
+<i class="ph-bold ph-qr-code text-xl"></i>
+</button>
+</div>
+<!-- Status badge banner -->
+<div class="mt-3 flex items-center justify-between bg-gradient-to-r from-violet-600/10 via-indigo-600/10 to-transparent p-2.5 rounded-2xl border border-violet-100">
+<div class="flex items-center gap-2">
+<div class="w-6 h-6 rounded-lg bg-violet-600 text-white flex items-center justify-center text-xs shadow-sm">
+<i class="ph-fill ph-shield-check"></i>
+</div>
+<p class="text-xs font-semibold text-violet-950">Módulo Multi-Chofer Confiable</p>
+</div>
+<span class="text-[11px] font-bold bg-violet-600 text-white px-2.5 py-0.5 rounded-full shadow-sm">0% Comisión</span>
+</div>
+</header>
+<!-- END: TopHeader -->
+<!-- BEGIN: FilterTabs -->
+<nav aria-label="Filtros de choferes" class="px-4 mt-3">
+<div class="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+<!-- Active Pill -->
+<button class="flex-shrink-0 px-4 py-2 bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-xs font-bold rounded-2xl shadow-md shadow-violet-500/25 flex items-center gap-1.5 transition-transform active:scale-95" type="button">
+<i class="ph-bold ph-users-four"></i>
+<span>Todos (6)</span>
+</button>
+<!-- Inactive Pills with soft elevation -->
+<button class="flex-shrink-0 px-3.5 py-2 bg-white text-slate-600 text-xs font-semibold rounded-2xl shadow-sm border border-slate-200/80 hover:bg-slate-50 flex items-center gap-1.5 transition-all" type="button">
+<span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+<span>En Línea (4)</span>
+</button>
+<button class="flex-shrink-0 px-3.5 py-2 bg-white text-slate-600 text-xs font-semibold rounded-2xl shadow-sm border border-slate-200/80 hover:bg-slate-50 flex items-center gap-1.5 transition-all" type="button">
+<i class="ph-fill ph-taxi text-violet-600"></i>
+<span>Taxis (4)</span>
+</button>
+<button class="flex-shrink-0 px-3.5 py-2 bg-white text-slate-600 text-xs font-semibold rounded-2xl shadow-sm border border-slate-200/80 hover:bg-slate-50 flex items-center gap-1.5 transition-all" type="button">
+<i class="ph-fill ph-motorcycle text-amber-500"></i>
+<span>Moto Taxis (2)</span>
+</button>
+</div>
+</nav>
+<!-- END: FilterTabs -->
+<!-- BEGIN: DriversList -->
+<main class="px-4 mt-4 space-y-4">
+<!-- DRIVER CARD 1: José Rivera (Featured from Snapshot) -->
+<article class="bg-white rounded-3xl p-4 shadow-neu-card border border-slate-100/90 relative overflow-hidden" data-purpose="driver-card">
+<!-- Top subtle badge -->
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-3">
+<div class="relative">
+<img alt="Foto de perfil de José Rivera" class="w-14 h-14 rounded-2xl object-cover shadow-sm border-2 border-violet-100" src="https://lh3.googleusercontent.com/aida/AEtjO1UtcPVc3Q3lAz8nr1VmoqLAl5T0lgizVxTrazT9sC9ZDM_cRsDKVuHjIaIX0wcBNEV1WKS9wk428xTkPA3azZgVXrNT4aS7W2aTgitlKI9zngnrbGDH-2s7Fjdmztf58Hk0cjSuYFw6O1QPwSHuVrYFd_ER2x5Fc8yIBrz847a2LdSejbVlVe-5TUFGLbZxAon4324QNvfjHJjBlqpXPaapJZnNo2aIalP2ftK3Jmp4pgPCxbliIceftzvS"/>
+<span class="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-white"></span>
+</div>
+<div>
+<div class="flex items-center gap-1.5">
+<h2 class="text-base font-bold text-slate-900 leading-tight">José Rivera</h2>
+<span class="bg-amber-100 text-amber-800 text-[10px] font-extrabold px-1.5 py-0.5 rounded-md flex items-center gap-0.5">
+<i class="ph-fill ph-star text-amber-500"></i> 4.98
+              </span>
+</div>
+<p class="text-xs text-slate-500 font-medium mt-0.5">Toyota Corolla 2018 Plata</p>
+<div class="flex items-center gap-2 mt-1">
+<span class="bg-slate-100 text-slate-600 text-[10px] font-mono font-semibold px-2 py-0.5 rounded-md">AB123CD</span>
+<span class="text-[11px] text-slate-400">• 340 viajes</span>
+</div>
+</div>
+</div>
+<!-- Availability pill -->
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200/60 text-emerald-700 text-[11px] font-bold">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
+          Disponible (3m)
+        </span>
+</div>
+<!-- Payment Methods Accepted -->
+<div class="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
+<span class="text-[11px] font-medium text-slate-400">Recibe:</span>
+<div class="flex items-center gap-1.5">
+<span class="px-2 py-0.5 rounded-lg bg-slate-50 border border-slate-200/80 text-[10px] font-semibold text-slate-700">Efectivo $</span>
+<span class="px-2 py-0.5 rounded-lg bg-slate-50 border border-slate-200/80 text-[10px] font-semibold text-slate-700">Bs BCV</span>
+<span class="px-2 py-0.5 rounded-lg bg-violet-50 border border-violet-200/80 text-[10px] font-semibold text-violet-700">Pago Móvil</span>
+</div>
+</div>
+<!-- Action Buttons Group -->
+<div class="mt-3.5 grid grid-cols-2 gap-2">
+<button class="w-full py-2.5 px-3 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-400/30 active:scale-98 transition-transform" type="button">
+<i class="ph-bold ph-whatsapp-logo text-base"></i>
+<span>WhatsApp directo</span>
+</button>
+<button class="w-full py-2.5 px-3 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-violet-500/20 active:scale-98 transition-transform" type="button">
+<i class="ph-bold ph-paper-plane-tilt text-base"></i>
+<span>Pedir Carrera</span>
+</button>
+</div>
+</article>
+<!-- DRIVER CARD 2: Marcos Peña (Moto Taxi) -->
+<article class="bg-white rounded-3xl p-4 shadow-neu-card border border-slate-100/90 relative" data-purpose="driver-card">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-3">
+<div class="relative">
+<!-- Avatar Initials / Badge -->
+<div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-400 text-white font-black text-lg flex items-center justify-center shadow-sm">
+              MP
+            </div>
+<span class="absolute -bottom-1 -right-1 w-4 h-4 bg-amber-500 rounded-full border-2 border-white flex items-center justify-center text-[9px] text-white">
+<i class="ph-bold ph-motorcycle"></i>
+</span>
+</div>
+<div>
+<div class="flex items-center gap-1.5">
+<h2 class="text-base font-bold text-slate-900 leading-tight">Marcos Peña</h2>
+<span class="bg-amber-100 text-amber-800 text-[10px] font-extrabold px-1.5 py-0.5 rounded-md flex items-center gap-0.5">
+<i class="ph-fill ph-star text-amber-500"></i> 4.92
+              </span>
+</div>
+<p class="text-xs text-slate-500 font-medium mt-0.5">Moto Bera SBR 2023 Azul</p>
+<div class="flex items-center gap-2 mt-1">
+<span class="bg-slate-100 text-slate-600 text-[10px] font-mono font-semibold px-2 py-0.5 rounded-md">MD994X</span>
+<span class="text-[11px] text-slate-400">• 185 viajes</span>
+</div>
+</div>
+</div>
+<!-- Waiting Pill -->
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-[11px] font-bold">
+<i class="ph-bold ph-clock"></i>
+          Libre en 8m
+        </span>
+</div>
+<!-- Payment Methods -->
+<div class="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
+<span class="text-[11px] font-medium text-slate-400">Recibe:</span>
+<div class="flex items-center gap-1.5">
+<span class="px-2 py-0.5 rounded-lg bg-slate-50 border border-slate-200/80 text-[10px] font-semibold text-slate-700">Pago Móvil</span>
+<span class="px-2 py-0.5 rounded-lg bg-slate-50 border border-slate-200/80 text-[10px] font-semibold text-slate-700">Efectivo $</span>
+</div>
+</div>
+<!-- Action Buttons -->
+<div class="mt-3.5 grid grid-cols-2 gap-2">
+<button class="w-full py-2.5 px-3 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-400/30 active:scale-98 transition-transform" type="button">
+<i class="ph-bold ph-whatsapp-logo text-base"></i>
+<span>WhatsApp directo</span>
+</button>
+<button class="w-full py-2.5 px-3 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/20 active:scale-98 transition-transform" type="button">
+<i class="ph-bold ph-calendar-check text-base"></i>
+<span>Reservar cupo</span>
+</button>
+</div>
+</article>
+<!-- DRIVER CARD 3: Carlos Colmenares -->
+<article class="bg-white rounded-3xl p-4 shadow-neu-card border border-slate-100/90 relative" data-purpose="driver-card">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-3">
+<div class="relative">
+<div class="w-14 h-14 rounded-2xl bg-slate-800 text-white font-bold text-lg flex items-center justify-center shadow-sm">
+              CC
+            </div>
+<span class="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-white"></span>
+</div>
+<div>
+<div class="flex items-center gap-1.5">
+<h2 class="text-base font-bold text-slate-900 leading-tight">Carlos Colmenares</h2>
+<span class="bg-amber-100 text-amber-800 text-[10px] font-extrabold px-1.5 py-0.5 rounded-md flex items-center gap-0.5">
+<i class="ph-fill ph-star text-amber-500"></i> 4.95
+              </span>
+</div>
+<p class="text-xs text-slate-500 font-medium mt-0.5">Chevrolet Aveo 2015 Blanco</p>
+<div class="flex items-center gap-2 mt-1">
+<span class="bg-slate-100 text-slate-600 text-[10px] font-mono font-semibold px-2 py-0.5 rounded-md">AF892LK</span>
+<span class="text-[11px] text-slate-400">• 512 viajes</span>
+</div>
+</div>
+</div>
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200/60 text-emerald-700 text-[11px] font-bold">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+          A 6 min
+        </span>
+</div>
+<!-- Payment and Action -->
+<div class="mt-3.5 pt-3 border-t border-slate-100 flex items-center justify-between">
+<div class="flex items-center gap-1">
+<span class="px-2 py-0.5 rounded-lg bg-slate-50 text-[10px] font-semibold text-slate-600">Efectivo $</span>
+<span class="px-2 py-0.5 rounded-lg bg-slate-50 text-[10px] font-semibold text-slate-600">Pago Móvil</span>
+</div>
+<button class="py-2 px-4 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm shadow-violet-400/30" type="button">
+<i class="ph-bold ph-lightning"></i>
+<span>Pedir</span>
+</button>
+</div>
+</article>
+<!-- DRIVER CARD 4: Daniel Zambrano (Moto Taxi) -->
+<article class="bg-white rounded-3xl p-4 shadow-neu-card border border-slate-100/90 relative" data-purpose="driver-card">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-3">
+<div class="relative">
+<div class="w-14 h-14 rounded-2xl bg-rose-500 text-white font-bold text-lg flex items-center justify-center shadow-sm">
+              DZ
+            </div>
+<span class="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-white"></span>
+</div>
+<div>
+<div class="flex items-center gap-1.5">
+<h2 class="text-base font-bold text-slate-900 leading-tight">Daniel Zambrano</h2>
+<span class="bg-amber-100 text-amber-800 text-[10px] font-extrabold px-1.5 py-0.5 rounded-md flex items-center gap-0.5">
+<i class="ph-fill ph-star text-amber-500"></i> 4.90
+              </span>
+</div>
+<p class="text-xs text-slate-500 font-medium mt-0.5">Keeway Express 150cc Rojo</p>
+<div class="flex items-center gap-2 mt-1">
+<span class="bg-slate-100 text-slate-600 text-[10px] font-mono font-semibold px-2 py-0.5 rounded-md">AK440P</span>
+<span class="text-[11px] text-slate-400">• En ruta rápida</span>
+</div>
+</div>
+</div>
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200/60 text-emerald-700 text-[11px] font-bold">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+          Disponible
+        </span>
+</div>
+<!-- Action -->
+<div class="mt-3.5 pt-3 border-t border-slate-100 flex items-center justify-between">
+<span class="text-[11px] text-slate-400">Acepta Bs BCV y Divisas</span>
+<button class="py-2 px-4 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm" type="button">
+<i class="ph-bold ph-lightning"></i>
+<span>Pedir</span>
+</button>
+</div>
+</article>
+</main>
+<!-- END: DriversList -->
+<!-- BEGIN: LinkNewDriverSection -->
+<section aria-labelledby="vincular-heading" class="px-4 mt-6">
+<div class="bg-white rounded-3xl p-4 shadow-neu-card border border-slate-100">
+<div class="flex items-center gap-2 mb-2">
+<div class="w-7 h-7 rounded-xl bg-violet-100 text-violet-700 flex items-center justify-center font-bold">
+<i class="ph-bold ph-user-plus"></i>
+</div>
+<div>
+<h3 class="text-xs font-bold text-slate-900 uppercase tracking-wide" id="vincular-heading">Vincular nuevo chofer de confianza</h3>
+<p class="text-[11px] text-slate-400">Agrégalo por su usuario o código QR</p>
+</div>
+</div>
+<div class="mt-3 flex items-center gap-2">
+<div class="relative flex-1">
+<span class="absolute inset-y-0 left-3 flex items-center text-slate-400 text-xs font-medium">@</span>
+<input class="w-full pl-7 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:bg-white transition-all" placeholder="ej. josetaxi o placa" type="text"/>
+</div>
+<button class="px-4 py-2.5 bg-slate-900 hover:bg-black text-white text-xs font-bold rounded-2xl shadow-sm active:scale-95 transition-all flex items-center gap-1" type="button">
+<span>Vincular</span>
+<i class="ph-bold ph-plus"></i>
+</button>
+</div>
+</div>
+</section>
+<!-- END: LinkNewDriverSection -->
+<!-- BEGIN: BottomNavigation -->
+<nav aria-label="Navegación principal" class="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-lg border-t border-slate-200/80 px-4 py-2">
+<div class="max-w-md mx-auto flex items-center justify-between relative">
+<!-- Item 1: En Vivo -->
+<a class="flex flex-col items-center py-1 text-slate-400 hover:text-slate-600 transition-colors" href="#">
+<i class="ph-bold ph-map-pin text-xl"></i>
+<span class="text-[10px] font-medium mt-0.5">En Vivo</span>
+</a>
+<!-- Item 2: Choferes (Active) -->
+<a class="flex flex-col items-center py-1 text-violet-600 font-bold transition-colors" href="#">
+<i class="ph-fill ph-users-three text-xl"></i>
+<span class="text-[10px] font-bold mt-0.5">Choferes</span>
+</a>
+<!-- Center Floating Button: Pedir / Nuevo -->
+<div class="relative -top-5">
+<button aria-label="Pedir Viaje Inmediato" class="w-14 h-14 rounded-full bg-gradient-to-tr from-amber-500 via-rose-500 to-violet-600 text-white flex items-center justify-center shadow-lg shadow-violet-500/40 border-4 border-white active:scale-90 transition-transform" type="button">
+<i class="ph-bold ph-plus text-2xl"></i>
+</button>
+</div>
+<!-- Item 3: Historial -->
+<a class="flex flex-col items-center py-1 text-slate-400 hover:text-slate-600 transition-colors" href="#">
+<i class="ph-bold ph-clipboard-text text-xl"></i>
+<span class="text-[10px] font-medium mt-0.5">Historial</span>
+</a>
+<!-- Item 4: Menú -->
+<a class="flex flex-col items-center py-1 text-slate-400 hover:text-slate-600 transition-colors" href="#">
+<i class="ph-bold ph-list text-xl"></i>
+<span class="text-[10px] font-medium mt-0.5">Menú</span>
+</a>
+</div>
+</nav>
+<!-- END: BottomNavigation -->
+</body></html>

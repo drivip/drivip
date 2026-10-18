@@ -1,0 +1,89 @@
+-- =============================================
+-- MODULO: SUSCRIPCIONES (Pagos de suscripcion)
+-- Fuente: packages/supabase/src/useSuscripciones.ts
+-- Tabla: suscripciones
+-- =============================================
+
+-- =============================================
+-- OPERACION 1: useSuscripciones (Listar todas las suscripciones)
+-- Archivo: packages/supabase/src/useSuscripciones.ts:24-27
+-- =============================================
+-- JavaScript:
+--   supabase.from("suscripciones")
+--     .select("*")
+--     .order("created_at", { ascending: false })
+--
+-- SQL equivalente:
+--   SELECT * FROM suscripciones ORDER BY created_at DESC;
+--
+-- Retorna:
+--   - Array de Suscripcion[] (todas las suscripciones, mas recientes primero)
+--   - El frontend filtra pendientes: all.filter(s => s.estado === "pendiente")
+--
+-- Usado por: SuperAdmin (ver pagos pendientes y historial)
+
+-- =============================================
+-- OPERACION 2: verificarSuscripcion (Aprobar o rechazar pago)
+-- Archivo: packages/supabase/src/useSuscripciones.ts:44-86
+-- =============================================
+-- JavaScript:
+--   // Paso 1: Actualizar estado de suscripcion
+--   supabase.from("suscripciones").update({
+--     estado: aprobado ? "verificado" : "rechazado",
+--     verificado_por: verificadoPor,
+--     fecha_inicio: now,              // solo si aprobado
+--     fecha_fin: now + 30 dias,       // solo si aprobado
+--   }).eq("id", id)
+--
+--   // Paso 2: Si aprobar, activar tenant
+--   supabase.from("tenants").update({
+--     suscripcion_activa: true,
+--     fecha_vencimiento: fecha_fin,
+--   }).eq("id", sub.tenant_id)
+--
+-- SQL equivalente (transaccion):
+--   BEGIN;
+--
+--   -- Paso 1: Actualizar suscripcion
+--   UPDATE suscripciones
+--   SET
+--     estado = CASE WHEN $1 THEN 'verificado' ELSE 'rechazado' END,
+--     verificado_por = $2,
+--     fecha_inicio = CASE WHEN $1 THEN NOW() ELSE fecha_inicio END,
+--     fecha_fin = CASE WHEN $1 THEN NOW() + INTERVAL '30 days' ELSE fecha_fin END
+--   WHERE id = $3;
+--
+--   -- Paso 2: Si aprobar, activar tenant
+--   UPDATE tenants
+--   SET
+--     suscripcion_activa = true,
+--     fecha_vencimiento = (SELECT fecha_fin FROM suscripciones WHERE id = $3)
+--   WHERE id = (SELECT tenant_id FROM suscripciones WHERE id = $3);
+--
+--   COMMIT;
+--
+-- Parametros:
+--   - id: UUID (id de la suscripcion)
+--   - aprobado: BOOLEAN (true = verificar, false = rechazar)
+--   - verificadoPor: TEXT (email del admin, ej: "admin@drivip.app")
+--
+-- Logica:
+--   Si aprobado=true:
+--     - suscripciones.estado = 'verificado'
+--     - suscripciones.fecha_inicio = NOW()
+--     - suscripciones.fecha_fin = NOW() + 30 dias
+--     - tenants.suscripcion_activa = true
+--     - tenants.fecha_vencimiento = NOW() + 30 dias
+--
+--   Si aprobado=false:
+--     - suscripciones.estado = 'rechazado'
+--     - No se modifica el tenant
+--
+-- Usado por: SuperAdmin (botones Aprobar/Rechazar en panel de pagos)
+--
+-- FLUJO COMPLETO DE PAGO:
+--   1. Conductor se registra -> signUp() crea auth.users
+--   2. Conductor envia comprobante por WhatsApp
+--   3. Admin crea registro en suscripciones (manual o via interfaz)
+--   4. Admin verifica pago -> verificarSuscripcion(id, true, "admin@drivip.app")
+--   5. Tenant queda activo y puede usar la plataforma

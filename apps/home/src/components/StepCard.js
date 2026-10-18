@@ -1,0 +1,4 @@
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+export default function StepCard({ step, icon, title, description, gradient }) {
+    return (_jsxs("div", { className: "text-center", children: [_jsxs("div", { className: "relative inline-block mb-4", children: [_jsx("div", { className: `w-16 h-16 rounded-2xl bg-gradient-to-tr ${gradient} text-white flex items-center justify-center shadow-lg mx-auto`, children: _jsx("span", { className: "material-symbols-outlined text-[28px]", children: icon }) }), _jsx("div", { className: "absolute -top-2 -right-2 w-7 h-7 rounded-full bg-white text-slate-900 text-[11px] font-black flex items-center justify-center shadow-md", children: step })] }), _jsx("h3", { className: "text-sm font-extrabold text-white mb-1", children: title }), _jsx("p", { className: "text-[12px] text-white/60 leading-relaxed max-w-xs mx-auto", children: description })] }));
+}

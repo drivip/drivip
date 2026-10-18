@@ -1,0 +1,139 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+  --font-display: "Poppins", sans-serif;
+
+  /* Drivip Color Tokens — Soft Neumorphism Light UI */
+  --color-primary: #6b21a8;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #7c3aed;
+  --color-on-primary-container: #f3e8ff;
+  --color-inverse-primary: #a855f7;
+
+  --color-secondary: #f97316;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #fb923c;
+  --color-on-secondary-container: #fff7ed;
+
+  --color-tertiary: #f59e0b;
+  --color-on-tertiary: #ffffff;
+  --color-tertiary-container: #f59e0b;
+  --color-on-tertiary-container: #fffbeb;
+
+  --color-error: #ef4444;
+  --color-on-error: #ffffff;
+  --color-error-container: #fef2f2;
+  --color-on-error-container: #dc2626;
+
+  --color-success: #22c55e;
+  --color-warning: #facc15;
+
+  /* Surfaces — light neumorphic palette */
+  --color-surface: #f4f6f8;
+  --color-surface-dim: #e8ecf0;
+  --color-surface-bright: #ffffff;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f8f9fb;
+  --color-surface-container: #ffffff;
+  --color-surface-container-high: #f1f4f8;
+  --color-surface-container-highest: #e8ecf0;
+  --color-surface-variant: #e2e8f0;
+
+  /* On surfaces */
+  --color-on-surface: #1e293b;
+  --color-on-surface-variant: #64748b;
+  --color-inverse-surface: #1e293b;
+  --color-inverse-on-surface: #f8fafc;
+
+  /* Outlines */
+  --color-outline: #94a3b8;
+  --color-outline-variant: #cbd5e1;
+
+  --color-text-primary: #1e293b;
+  --color-text-secondary: #64748b;
+
+  /* Primary fixed tones */
+  --color-primary-fixed: #f3e8ff;
+  --color-primary-fixed-dim: #c084fc;
+  --color-on-primary-fixed: #3b0764;
+  --color-on-primary-fixed-variant: #6b21a8;
+
+  /* Secondary fixed tones */
+  --color-secondary-fixed: #ffedd5;
+  --color-secondary-fixed-dim: #fb923c;
+  --color-on-secondary-fixed: #7c2d12;
+  --color-on-secondary-fixed-variant: #c2410c;
+
+  /* Tertiary fixed tones */
+  --color-tertiary-fixed: #fef3c7;
+  --color-tertiary-fixed-dim: #fbbf24;
+  --color-on-tertiary-fixed: #78350f;
+  --color-on-tertiary-fixed-variant: #b45309;
+
+  --color-background: #f4f6f8;
+  --color-on-background: #1e293b;
+
+  --color-surface-tint: #c084fc;
+
+  /* Spacing — avoid naming --spacing-sm/md/lg etc. because Tailwind v4
+     uses --spacing-* for the max-w-* scale (max-w-sm → var(--spacing-sm)).
+     Use numeric spacing keys or custom names that don't collide. */
+
+  /* Border Radius */
+  --radius-sm: 0.25rem;
+  --radius-DEFAULT: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+  --radius-2xl: 2rem;
+  --radius-full: 9999px;
+
+  /* Typography Scale */
+  --text-headline-xl: 36px;
+  --text-headline-lg: 30px;
+  --text-headline-lg-mobile: 24px;
+  --text-headline-md: 22px;
+  --text-headline-sm: 18px;
+  --text-body-lg: 16px;
+  --text-body-md: 14px;
+  --text-body-sm: 12px;
+  --text-label-lg: 16px;
+  --text-label-md: 14px;
+  --text-label-sm: 12px;
+
+  /* Neumorphic Shadows */
+  --shadow-neu-flat: 6px 6px 14px #d9dce1, -6px -6px 14px #ffffff;
+  --shadow-neu-pressed: inset 3px 3px 6px #d9dce1, inset -3px -3px 6px #ffffff;
+  --shadow-neu-card: 0 12px 30px -10px rgba(148, 163, 184, 0.25), 0 2px 8px -2px rgba(148, 163, 184, 0.15);
+  --shadow-neu-btn: 4px 4px 10px #d9dde2, -4px -4px 10px #ffffff;
+  --shadow-neumorph: 6px 6px 14px #d1d5db, -6px -6px 14px #ffffff;
+  --shadow-neumorph-inset: inset 3px 3px 6px #d1d5db, inset -3px -3px 6px #ffffff;
+}
+
+@layer base {
+  html, body {
+    margin: 0;
+    padding: 0;
+    background-color: #f4f6f8;
+    color: var(--color-on-surface);
+    font-family: var(--font-sans);
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    min-height: 100dvh;
+  }
+  #root {
+    margin: 0;
+    padding: 0;
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { scrollbar-width: none; }
+}

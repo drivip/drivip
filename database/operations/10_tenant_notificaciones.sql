@@ -1,0 +1,77 @@
+-- =============================================
+-- MODULO: TENANT_NOTIFICACIONES (Notificaciones por tenant)
+-- Fuente: packages/supabase/src/useTenantNotificaciones.ts
+-- Tabla: tenant_notificaciones
+-- Migracion: 2026-09-17
+-- =============================================
+
+-- =============================================
+-- OPERACION 1: useTenantNotificaciones (Listar notificaciones)
+-- Archivo: packages/supabase/src/useTenantNotificaciones.ts:18-28
+-- =============================================
+-- JavaScript:
+--   supabase.from("tenant_notificaciones")
+--     .select("*")
+--     .eq("tenant_id", tenantId)
+--     .order("created_at", { ascending: false })
+--     .limit(50)
+--
+-- SQL equivalente:
+--   SELECT * FROM tenant_notificaciones
+--   WHERE tenant_id = $1
+--   ORDER BY created_at DESC
+--   LIMIT 50;
+--
+-- Parametros:
+--   - tenantId: UUID (id del tenant)
+--
+-- Retorna:
+--   - Array de TenantNotificacion[] (ultimas 50 notificaciones)
+--
+-- Usado por: DriverApp (mostrar notificaciones), SuperAdmin (enviar notificaciones)
+
+-- =============================================
+-- OPERACION 2: enviarNotificacion (Crear y marcar como enviada)
+-- Archivo: packages/supabase/src/useTenantNotificaciones.ts:34-45
+-- =============================================
+-- JavaScript:
+--   supabase.from("tenant_notificaciones").insert({
+--     ...notif,
+--     enviada: true,
+--     enviada_at: new Date().toISOString()
+--   }).select().single()
+--
+-- SQL equivalente:
+--   INSERT INTO tenant_notificaciones (
+--     tenant_id, titulo, mensaje, tipo, enviada, enviada_at
+--   ) VALUES ($1, $2, $3, $4, true, NOW())
+--   RETURNING *;
+--
+-- Parametros:
+--   - tenant_id: UUID (requerido)
+--   - titulo: TEXT (requerido)
+--   - mensaje: TEXT (requerido)
+--   - tipo: 'info' | 'promocion' | 'alerta' | 'sistema' (requerido)
+--
+-- Retorna:
+--   - TenantNotificacion creada con id, created_at, enviada=true, enviada_at=ahora
+--
+-- NOTA: La notificacion se crea directamente como "enviada"
+--       No hay sistema de cola ni envio programado actualmente
+--
+-- Usado por: SuperAdmin (enviar notificacion a un conductor)
+
+-- =============================================
+-- OPERACION 3: eliminarNotificacion (Eliminar notificacion)
+-- Archivo: packages/supabase/src/useTenantNotificaciones.ts:47-57
+-- =============================================
+-- JavaScript:
+--   supabase.from("tenant_notificaciones").delete().eq("id", id)
+--
+-- SQL equivalente:
+--   DELETE FROM tenant_notificaciones WHERE id = $1;
+--
+-- Parametros:
+--   - id: UUID (id de la notificacion)
+--
+-- Usado por: SuperAdmin (eliminar notificacion)

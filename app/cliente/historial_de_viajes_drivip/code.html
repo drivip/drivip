@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+
+<html lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>Historial de Viajes y Recibos - Drivip</title>
+<!-- Tailwind CSS v3 -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;family=JetBrains+Mono:wght@500;600;700&amp;display=swap" rel="stylesheet"/>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            drivip: {
+              purple: '#6C47FF',
+              dark: '#111827',
+              accent: '#F97316',
+              surface: '#F4F6F8'
+            }
+          }
+        }
+      }
+    }
+  </script>
+<style data-purpose="custom-neumorphism">
+    /* Soft Neumorphism Shadows & Effects */
+    .neu-flat {
+      background: #FFFFFF;
+      box-shadow: 0 10px 25px -5px rgba(148, 163, 184, 0.2), 0 8px 10px -6px rgba(148, 163, 184, 0.15);
+    }
+    .neu-pressed {
+      background: #F1F4F9;
+      box-shadow: inset 2px 2px 5px rgba(148, 163, 184, 0.3), inset -2px -2px 5px rgba(255, 255, 255, 0.8);
+    }
+    .neu-btn {
+      background: #FFFFFF;
+      box-shadow: 3px 3px 8px rgba(160, 175, 200, 0.25), -3px -3px 8px rgba(255, 255, 255, 0.9);
+      transition: all 0.15s ease;
+    }
+    .neu-btn:active {
+      box-shadow: inset 2px 2px 4px rgba(160, 175, 200, 0.3), inset -2px -2px 4px rgba(255, 255, 255, 0.8);
+      transform: scale(0.98);
+    }
+    /* Hide scrollbars for clean mobile app feel */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="bg-[#f4f6f8] text-slate-800 font-sans min-h-screen flex justify-center selection:bg-purple-100 selection:text-purple-700">
+<!-- BEGIN: MobileDeviceFrame -->
+<div class="w-full max-w-md min-h-screen bg-[#f4f6f8] flex flex-col relative pb-28 shadow-2xl border-x border-slate-200/50">
+<!-- BEGIN: TopBar -->
+<header class="sticky top-0 z-30 bg-[#f4f6f8]/90 backdrop-blur-md px-5 pt-4 pb-3 flex items-center justify-between border-b border-slate-200/40">
+<!-- Back button -->
+<button aria-label="Volver atrás" class="neu-btn w-10 h-10 rounded-2xl flex items-center justify-center text-slate-700 hover:text-slate-900 focus:outline-none" type="button">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" viewbox="0 0 24 24">
+<polyline points="15 18 9 12 15 6"></polyline>
+</svg>
+</button>
+<!-- Center Title -->
+<div class="text-center">
+<h1 class="text-base font-bold text-slate-900 tracking-tight">Historial de Viajes</h1>
+<p class="text-[11px] font-medium text-emerald-600 flex items-center justify-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+          0% Comisiones • Directo
+        </p>
+</div>
+<!-- Action / Date Filter Button -->
+<button aria-label="Filtrar por fecha" class="neu-btn w-10 h-10 rounded-2xl flex items-center justify-center text-slate-700 hover:text-purple-600 focus:outline-none" type="button">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24">
+<rect height="18" rx="2" ry="2" width="18" x="3" y="4"></rect>
+<line x1="16" x2="16" y1="2" y2="6"></line>
+<line x1="8" x2="8" y1="2" y2="6"></line>
+<line x1="3" x2="21" y1="10" y2="10"></line>
+</svg>
+</button>
+</header>
+<!-- END: TopBar -->
+<!-- BEGIN: MainContent -->
+<main class="px-5 pt-4 space-y-5">
+<!-- BEGIN: UserMetricsSummary -->
+<section aria-label="Resumen de ahorros y viajes" class="grid grid-cols-2 gap-3.5" data-purpose="metrics-summary">
+<!-- Stat 1: Total Viajes -->
+<div class="neu-flat p-4 rounded-3xl border border-slate-100/80 flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Viajes</span>
+<div class="w-7 h-7 rounded-xl bg-purple-50 flex items-center justify-center text-[#6C47FF]">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24">
+<circle cx="12" cy="12" r="10"></circle>
+<polyline points="12 6 12 12 16 14"></polyline>
+</svg>
+</div>
+</div>
+<div class="mt-2">
+<span class="text-2xl font-extrabold text-slate-900 font-mono tracking-tight">18</span>
+<span class="text-xs font-medium text-slate-400 block mt-0.5">Completados</span>
+</div>
+</div>
+<!-- Stat 2: Ahorro Estimado -->
+<div class="neu-flat p-4 rounded-3xl border border-slate-100/80 flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Ahorro</span>
+<div class="w-7 h-7 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" viewbox="0 0 24 24">
+<path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+</svg>
+</div>
+</div>
+<div class="mt-2">
+<span class="text-2xl font-extrabold text-emerald-600 font-mono tracking-tight">~$42.00</span>
+<span class="text-[11px] font-medium text-slate-400 block mt-0.5">Sin intermediarios</span>
+</div>
+</div>
+</section>
+<!-- END: UserMetricsSummary -->
+<!-- BEGIN: CategoryFilters -->
+<section aria-label="Filtro de viajes" class="overflow-x-auto no-scrollbar -mx-5 px-5 py-1" data-purpose="quick-filters">
+<div class="flex gap-2 w-max">
+<button class="neu-flat px-4 py-2 rounded-2xl text-xs font-bold text-white bg-slate-900 shadow-md" type="button">
+            Todos (18)
+          </button>
+<button class="neu-btn px-4 py-2 rounded-2xl text-xs font-semibold text-slate-600 hover:text-slate-900" type="button">
+            Esta semana
+          </button>
+<button class="neu-btn px-4 py-2 rounded-2xl text-xs font-semibold text-slate-600 hover:text-slate-900" type="button">
+            Completados
+          </button>
+<button class="neu-btn px-4 py-2 rounded-2xl text-xs font-semibold text-slate-600 hover:text-purple-700 flex items-center gap-1.5" type="button">
+<svg class="w-3.5 h-3.5 text-purple-600" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+            Con Recibo
+          </button>
+</div>
+</section>
+<!-- END: CategoryFilters -->
+<!-- BEGIN: RidesListSection -->
+<section aria-label="Lista de viajes anteriores" class="space-y-4" data-purpose="rides-history">
+<!-- Trip Card 1 -->
+<article class="neu-flat bg-white rounded-3xl p-4 border border-slate-100 shadow-xl shadow-slate-200/50 space-y-3.5">
+<!-- Card Header: Date & Status Badge -->
+<div class="flex items-center justify-between pb-2 border-b border-slate-100">
+<div class="flex items-center gap-2">
+<span class="text-xs font-bold text-slate-800">Ayer, 6:45 PM</span>
+<span class="text-slate-300">•</span>
+<span class="text-[11px] text-slate-500 font-medium">Auto VIP</span>
+</div>
+<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              Pagado Directo
+            </span>
+</div>
+<!-- Trip Route (Origin -> Destination) -->
+<div class="relative pl-6 space-y-3">
+<!-- Visual Line Connector -->
+<div class="absolute left-2.5 top-2.5 bottom-2.5 w-0.5 bg-slate-200"></div>
+<!-- Origin -->
+<div class="relative flex items-start">
+<div class="absolute -left-6 top-1 w-3.5 h-3.5 rounded-full bg-emerald-500 ring-4 ring-white shadow-sm flex items-center justify-center">
+<div class="w-1.5 h-1.5 rounded-full bg-white"></div>
+</div>
+<div>
+<p class="text-[11px] font-semibold text-slate-400 uppercase leading-none">Punto de Origen</p>
+<p class="text-xs font-bold text-slate-800 mt-1">Torre Cavendes, Altamira</p>
+</div>
+</div>
+<!-- Destination -->
+<div class="relative flex items-start">
+<div class="absolute -left-6 top-1 w-3.5 h-3.5 rounded-full bg-[#F97316] ring-4 ring-white shadow-sm flex items-center justify-center">
+<div class="w-1.5 h-1.5 rounded-full bg-white"></div>
+</div>
+<div>
+<p class="text-[11px] font-semibold text-slate-400 uppercase leading-none">Destino</p>
+<p class="text-xs font-bold text-slate-800 mt-1">CCCT, Chuao</p>
+</div>
+</div>
+</div>
+<!-- Driver & Pricing Summary -->
+<div class="bg-slate-50 rounded-2xl p-3 flex items-center justify-between border border-slate-100">
+<!-- Driver Info -->
+<div class="flex items-center gap-2.5">
+<div class="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-xs">
+                JR
+              </div>
+<div>
+<p class="text-xs font-bold text-slate-900 leading-tight">José Rivera</p>
+<p class="text-[11px] text-slate-500 leading-tight">Toyota Corolla • <span class="text-amber-500 font-semibold">⭐ 5.0</span></p>
+</div>
+</div>
+<!-- Price -->
+<div class="text-right">
+<p class="text-sm font-extrabold text-slate-900 font-mono tracking-tight">$8.50 <span class="text-[10px] text-slate-500 font-sans font-medium">USD</span></p>
+<p class="text-[11px] text-slate-500 font-mono font-medium">Bs. 493.00</p>
+</div>
+</div>
+<!-- Payment Method Details -->
+<div class="flex items-center justify-between text-[11px] px-1 text-slate-500 font-medium">
+<span class="flex items-center gap-1.5">
+<svg class="w-3.5 h-3.5 text-purple-600" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<rect height="14" rx="2" width="20" x="2" y="5"></rect>
+<line x1="2" x2="22" y1="10" y2="10"></line>
+</svg>
+              Pago Móvil
+            </span>
+<span class="font-mono text-slate-600 font-semibold">Ref: #849201</span>
+</div>
+<!-- Action Buttons -->
+<div class="grid grid-cols-2 gap-2 pt-1">
+<button class="neu-btn py-2.5 px-3 rounded-2xl text-xs font-bold text-[#6C47FF] bg-purple-50/60 border border-purple-100 flex items-center justify-center gap-1.5" onclick="document.getElementById('receipt-modal').classList.remove('hidden')" type="button">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+              Ver Recibo
+            </button>
+<button class="neu-btn py-2.5 px-3 rounded-2xl text-xs font-bold text-slate-700 hover:text-slate-900 flex items-center justify-center gap-1.5" type="button">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+              Repetir Viaje
+            </button>
+</div>
+</article>
+<!-- Trip Card 2 -->
+<article class="neu-flat bg-white rounded-3xl p-4 border border-slate-100 shadow-xl shadow-slate-200/50 space-y-3.5">
+<!-- Card Header -->
+<div class="flex items-center justify-between pb-2 border-b border-slate-100">
+<div class="flex items-center gap-2">
+<span class="text-xs font-bold text-slate-800">12 Mayo, 2:15 PM</span>
+<span class="text-slate-300">•</span>
+<span class="text-[11px] text-slate-500 font-medium">Interurbano</span>
+</div>
+<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              Pagado Directo
+            </span>
+</div>
+<!-- Trip Route -->
+<div class="relative pl-6 space-y-3">
+<div class="absolute left-2.5 top-2.5 bottom-2.5 w-0.5 bg-slate-200"></div>
+<div class="relative flex items-start">
+<div class="absolute -left-6 top-1 w-3.5 h-3.5 rounded-full bg-emerald-500 ring-4 ring-white shadow-sm flex items-center justify-center">
+<div class="w-1.5 h-1.5 rounded-full bg-white"></div>
+</div>
+<div>
+<p class="text-[11px] font-semibold text-slate-400 uppercase leading-none">Punto de Origen</p>
+<p class="text-xs font-bold text-slate-800 mt-1">Los Palos Grandes</p>
+</div>
+</div>
+<div class="relative flex items-start">
+<div class="absolute -left-6 top-1 w-3.5 h-3.5 rounded-full bg-[#F97316] ring-4 ring-white shadow-sm flex items-center justify-center">
+<div class="w-1.5 h-1.5 rounded-full bg-white"></div>
+</div>
+<div>
+<p class="text-[11px] font-semibold text-slate-400 uppercase leading-none">Destino</p>
+<p class="text-xs font-bold text-slate-800 mt-1">Aeropuerto Int. Maiquetía</p>
+</div>
+</div>
+</div>
+<!-- Driver & Pricing Summary -->
+<div class="bg-slate-50 rounded-2xl p-3 flex items-center justify-between border border-slate-100">
+<div class="flex items-center gap-2.5">
+<div class="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
+                CC
+              </div>
+<div>
+<p class="text-xs font-bold text-slate-900 leading-tight">Carlos Colmenares</p>
+<p class="text-[11px] text-slate-500 leading-tight">Chevrolet Aveo • <span class="text-amber-500 font-semibold">⭐ 4.9</span></p>
+</div>
+</div>
+<div class="text-right">
+<p class="text-sm font-extrabold text-slate-900 font-mono tracking-tight">$28.00 <span class="text-[10px] text-slate-500 font-sans font-medium">USD</span></p>
+<p class="text-[11px] text-slate-500 font-mono font-medium">Bs. 1.624,00</p>
+</div>
+</div>
+<!-- Payment Details -->
+<div class="flex items-center justify-between text-[11px] px-1 text-slate-500 font-medium">
+<span class="flex items-center gap-1.5">
+<svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+              Efectivo Divisas $
+            </span>
+<span class="font-mono text-slate-600 font-semibold">Acuerdo Mano a Mano</span>
+</div>
+<!-- Buttons -->
+<div class="grid grid-cols-2 gap-2 pt-1">
+<button class="neu-btn py-2.5 px-3 rounded-2xl text-xs font-bold text-[#6C47FF] bg-purple-50/60 border border-purple-100 flex items-center justify-center gap-1.5" onclick="document.getElementById('receipt-modal').classList.remove('hidden')" type="button">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+              Ver Recibo
+            </button>
+<button class="neu-btn py-2.5 px-3 rounded-2xl text-xs font-bold text-slate-700 hover:text-slate-900 flex items-center justify-center gap-1.5" type="button">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+              Repetir Viaje
+            </button>
+</div>
+</article>
+<!-- Trip Card 3 -->
+<article class="neu-flat bg-white rounded-3xl p-4 border border-slate-100 shadow-xl shadow-slate-200/50 space-y-3.5">
+<!-- Card Header -->
+<div class="flex items-center justify-between pb-2 border-b border-slate-100">
+<div class="flex items-center gap-2">
+<span class="text-xs font-bold text-slate-800">10 Mayo, 9:30 AM</span>
+<span class="text-slate-300">•</span>
+<span class="text-[11px] text-slate-500 font-medium">Moto Taxi</span>
+</div>
+<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              Pagado Directo
+            </span>
+</div>
+<!-- Trip Route -->
+<div class="relative pl-6 space-y-3">
+<div class="absolute left-2.5 top-2.5 bottom-2.5 w-0.5 bg-slate-200"></div>
+<div class="relative flex items-start">
+<div class="absolute -left-6 top-1 w-3.5 h-3.5 rounded-full bg-emerald-500 ring-4 ring-white shadow-sm flex items-center justify-center">
+<div class="w-1.5 h-1.5 rounded-full bg-white"></div>
+</div>
+<div>
+<p class="text-[11px] font-semibold text-slate-400 uppercase leading-none">Punto de Origen</p>
+<p class="text-xs font-bold text-slate-800 mt-1">Chacao (Estación Metro)</p>
+</div>
+</div>
+<div class="relative flex items-start">
+<div class="absolute -left-6 top-1 w-3.5 h-3.5 rounded-full bg-[#F97316] ring-4 ring-white shadow-sm flex items-center justify-center">
+<div class="w-1.5 h-1.5 rounded-full bg-white"></div>
+</div>
+<div>
+<p class="text-[11px] font-semibold text-slate-400 uppercase leading-none">Destino</p>
+<p class="text-xs font-bold text-slate-800 mt-1">Las Mercedes (Calle París)</p>
+</div>
+</div>
+</div>
+<!-- Driver & Pricing Summary -->
+<div class="bg-slate-50 rounded-2xl p-3 flex items-center justify-between border border-slate-100">
+<div class="flex items-center gap-2.5">
+<div class="w-9 h-9 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center font-bold text-xs">
+                MP
+              </div>
+<div>
+<p class="text-xs font-bold text-slate-900 leading-tight">Marcos Peña</p>
+<p class="text-[11px] text-slate-500 leading-tight">Bera SBR 150 • <span class="text-amber-500 font-semibold">⭐ 4.8</span></p>
+</div>
+</div>
+<div class="text-right">
+<p class="text-sm font-extrabold text-slate-900 font-mono tracking-tight">$4.00 <span class="text-[10px] text-slate-500 font-sans font-medium">USD</span></p>
+<p class="text-[11px] text-slate-500 font-mono font-medium">Bs. 232.00</p>
+</div>
+</div>
+<!-- Payment Details -->
+<div class="flex items-center justify-between text-[11px] px-1 text-slate-500 font-medium">
+<span class="flex items-center gap-1.5">
+<svg class="w-3.5 h-3.5 text-purple-600" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<rect height="14" rx="2" width="20" x="2" y="5"></rect>
+<line x1="2" x2="22" y1="10" y2="10"></line>
+</svg>
+              Pago Móvil
+            </span>
+<span class="font-mono text-slate-600 font-semibold">Ref: #551902</span>
+</div>
+<!-- Buttons -->
+<div class="grid grid-cols-2 gap-2 pt-1">
+<button class="neu-btn py-2.5 px-3 rounded-2xl text-xs font-bold text-[#6C47FF] bg-purple-50/60 border border-purple-100 flex items-center justify-center gap-1.5" onclick="document.getElementById('receipt-modal').classList.remove('hidden')" type="button">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+              Ver Recibo
+            </button>
+<button class="neu-btn py-2.5 px-3 rounded-2xl text-xs font-bold text-slate-700 hover:text-slate-900 flex items-center justify-center gap-1.5" type="button">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+              Repetir Viaje
+            </button>
+</div>
+</article>
+</section>
+<!-- END: RidesListSection -->
+</main>
+<!-- END: MainContent -->
+<!-- BEGIN: ReceiptModalPreview -->
+<!-- Accessible Modal for Receipt Display -->
+<div class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 hidden transition-opacity" id="receipt-modal">
+<div class="bg-white w-full max-w-md rounded-t-[32px] sm:rounded-[32px] p-6 space-y-4 shadow-2xl animate-in slide-in-from-bottom duration-200">
+<!-- Modal Handle/Header -->
+<div class="flex items-center justify-between border-b border-slate-100 pb-3">
+<div class="flex items-center gap-2">
+<div class="w-7 h-7 rounded-xl bg-purple-100 text-[#6C47FF] flex items-center justify-center font-black text-xs">
+              D
+            </div>
+<div>
+<h3 class="text-sm font-extrabold text-slate-900">Recibo Digital Drivip</h3>
+<p class="text-[10px] text-emerald-600 font-semibold">100% Directo • 0% Comisiones</p>
+</div>
+</div>
+<button class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center hover:bg-slate-200" onclick="document.getElementById('receipt-modal').classList.add('hidden')" type="button">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M6 18L18 6M6 6l12 12" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</div>
+<!-- Receipt Content Body -->
+<div class="neu-pressed rounded-2xl p-4 space-y-3 text-xs">
+<div class="flex justify-between items-center text-slate-500">
+<span>Fecha y Hora</span>
+<span class="font-semibold text-slate-800">Ayer, 6:45 PM</span>
+</div>
+<div class="flex justify-between items-center text-slate-500">
+<span>Conductor</span>
+<span class="font-semibold text-slate-800">José Rivera (Corolla)</span>
+</div>
+<div class="flex justify-between items-center text-slate-500">
+<span>Ruta</span>
+<span class="font-semibold text-slate-800">Altamira ➔ CCCT</span>
+</div>
+<div class="flex justify-between items-center text-slate-500">
+<span>Método de Pago</span>
+<span class="font-semibold text-purple-700">Pago Móvil Directo Chofer</span>
+</div>
+<div class="flex justify-between items-center text-slate-500">
+<span>Referencia Bancaria</span>
+<span class="font-mono font-bold text-slate-800">#849201</span>
+</div>
+<div class="pt-2 border-t border-slate-200/80 flex justify-between items-baseline">
+<span class="font-bold text-slate-900">Monto Total Pagado</span>
+<div class="text-right">
+<div class="text-base font-extrabold text-slate-900 font-mono">$8.50 USD</div>
+<div class="text-[11px] font-mono text-slate-500">Bs. 493.00 (Tasa BCV)</div>
+</div>
+</div>
+</div>
+<!-- Callout Banner -->
+<div class="p-3 bg-emerald-50 rounded-xl border border-emerald-100 flex items-center gap-2">
+<svg class="w-5 h-5 text-emerald-600 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<p class="text-[11px] text-emerald-800 leading-tight">
+            Este servicio no cobró comisiones corporativas. El 100% del dinero fue a tu chofer.
+          </p>
+</div>
+<!-- Sharing / Download Actions -->
+<div class="grid grid-cols-2 gap-2 pt-1">
+<button class="neu-btn py-3 px-4 rounded-2xl text-xs font-bold text-slate-800 bg-white border border-slate-200 flex items-center justify-center gap-2" type="button">
+<svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+            PDF / Guardar
+          </button>
+<button class="py-3 px-4 rounded-2xl text-xs font-bold text-white bg-[#25D366] hover:bg-[#1ebd5a] shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2" type="button">
+<svg class="w-4 h-4 fill-current" viewbox="0 0 24 24">
+<path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z"></path>
+</svg>
+            WhatsApp
+          </button>
+</div>
+</div>
+</div>
+<!-- END: ReceiptModalPreview -->
+<!-- BEGIN: BottomNavigation -->
+<nav aria-label="Navegación inferior" class="fixed bottom-0 left-0 right-0 max-w-md mx-auto z-40 bg-[#f4f6f8]/95 backdrop-blur-md border-t border-slate-200/60 px-6 py-2">
+<div class="flex items-center justify-between relative">
+<!-- En Vivo -->
+<a class="flex flex-col items-center gap-1 text-slate-400 hover:text-purple-600 transition" href="#">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" stroke-linecap="round" stroke-linejoin="round"></path>
+<path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="text-[10px] font-medium">En Vivo</span>
+</a>
+<!-- Choferes -->
+<a class="flex flex-col items-center gap-1 text-slate-400 hover:text-purple-600 transition" href="#">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="text-[10px] font-medium">Choferes</span>
+</a>
+<!-- Center Plus FAB -->
+<div class="-mt-6">
+<button aria-label="Pedir Nuevo Viaje" class="w-13 h-13 p-3.5 rounded-full bg-gradient-to-tr from-purple-700 to-orange-500 text-white shadow-lg shadow-purple-500/30 flex items-center justify-center transform active:scale-95 transition" type="button">
+<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24">
+<line x1="12" x2="12" y1="5" y2="19"></line>
+<line x1="5" x2="19" y1="12" y2="12"></line>
+</svg>
+</button>
+</div>
+<!-- Historial (Active) -->
+<a class="flex flex-col items-center gap-1 text-[#6C47FF] transition" href="#">
+<svg class="w-5 h-5" fill="currentColor" viewbox="0 0 24 24">
+<path d="M19 3H18V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"></path>
+</svg>
+<span class="text-[10px] font-bold">Historial</span>
+</a>
+<!-- Menú -->
+<a class="flex flex-col items-center gap-1 text-slate-400 hover:text-purple-600 transition" href="#">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<line x1="3" x2="21" y1="12" y2="12"></line>
+<line x1="3" x2="21" y1="6" y2="6"></line>
+<line x1="3" x2="21" y1="18" y2="18"></line>
+</svg>
+<span class="text-[10px] font-medium">Menú</span>
+</a>
+</div>
+</nav>
+<!-- END: BottomNavigation -->
+</div>
+<!-- END: MobileDeviceFrame -->
+<!-- Script for Modal dismissal on backdrop tap -->
+<script data-purpose="modal-handlers">
+    document.addEventListener('DOMContentLoaded', () => {
+      const modal = document.getElementById('receipt-modal');
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+          modal.classList.add('hidden');
+        }
+      });
+    });
+  </script>
+</body></html>

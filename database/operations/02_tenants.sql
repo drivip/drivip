@@ -1,0 +1,210 @@
+-- =============================================
+-- MODULO: TENANTS (Conductores / Lineas)
+-- Fuente: packages/supabase/src/useTenant.ts,
+--         packages/supabase/src/useTenantActions.ts,
+--         packages/supabase/src/useTenantDetail.ts,
+--         packages/supabase/src/useSuscripciones.ts
+-- Tabla: tenants
+-- =============================================
+
+-- =============================================
+-- OPERACION 1: useTenant (Buscar tenant por slug)
+-- Archivo: packages/supabase/src/useTenant.ts:26-38
+-- =============================================
+-- JavaScript:
+--   supabase.from("tenants").select("*").eq("slug", slug).single()
+--
+-- SQL equivalente:
+--   SELECT * FROM tenants WHERE slug = $1 LIMIT 1;
+--
+-- Parametros:
+--   - slug: TEXT (parte local del email, ej: "carlosmendoza")
+--
+-- Retorna:
+--   - Un registro Tenant o null
+--   - Error si no existe
+--
+-- Usado por: DriverApp (conductor), AddConductor (cliente)
+
+-- =============================================
+-- OPERACION 2: useTenants (Listar todos los tenants)
+-- Archivo: packages/supabase/src/useTenant.ts:53-62
+-- =============================================
+-- JavaScript:
+--   supabase.from("tenants").select("*").order("created_at", { ascending: false })
+--
+-- SQL equivalente:
+--   SELECT * FROM tenants ORDER BY created_at DESC;
+--
+-- Retorna:
+--   - Array de Tenant[] (todos los tenants, ordenados del mas reciente)
+--
+-- Usado por: Panel SuperAdmin (TenantManager)
+
+-- =============================================
+-- OPERACION 3: useTenantDetail (Detalle completo de tenant)
+-- Archivo: packages/supabase/src/useTenantDetail.ts:34-40
+-- =============================================
+-- JavaScript (5 consultas en paralelo):
+--   Promise.all([
+--     supabase.from("tenants").select("*").eq("id", tenantId).single(),
+--     supabase.from("carreras").select("*").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(20),
+--     supabase.from("plugins_activos").select("*").eq("tenant_id", tenantId),
+--     supabase.from("tenant_banners").select("*").eq("tenant_id", tenantId).order("created_at", { ascending: false }),
+--     supabase.from("tenant_notificaciones").select("*").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(50),
+--   ])
+--
+-- SQL equivalente:
+--   -- Query 1:
+--   SELECT * FROM tenants WHERE id = $1 LIMIT 1;
+--   -- Query 2:
+--   SELECT * FROM carreras WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT 20;
+--   -- Query 3:
+--   SELECT * FROM plugins_activos WHERE tenant_id = $1;
+--   -- Query 4:
+--   SELECT * FROM tenant_banners WHERE tenant_id = $1 ORDER BY created_at DESC;
+--   -- Query 5:
+--   SELECT * FROM tenant_notificaciones WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT 50;
+--
+-- Parametros:
+--   - tenantId: UUID (id del tenant)
+--
+-- Retorna:
+--   - tenant, carrerasRecientes[], plugins[], banners[], notificaciones[]
+--
+-- NOTA: Es la operacion mas costosa del frontend (5 queries simultaneas)
+
+-- =============================================
+-- OPERACION 4: togglePausa (Pausar/despausar tenant)
+-- Archivo: packages/supabase/src/useTenantActions.ts:5-11
+-- =============================================
+-- JavaScript:
+--   supabase.from("tenants").update({ pausado, pausado_motivo: pausado ? (motivo ?? null) : null }).eq("id", tenantId)
+--
+-- SQL equivalente:
+--   UPDATE tenants
+--   SET pausado = $1, pausado_motivo = $2
+--   WHERE id = $3;
+--
+-- Parametros:
+--   - pausado: BOOLEAN (true = pausar, false = reactivar)
+--   - motivo: TEXT | null (razon de la pausa, solo si pausado=true)
+--   - tenantId: UUID
+--
+-- Usado por: SuperAdmin (PanicButton, TenantDetailPanel)
+
+-- =============================================
+-- OPERACION 5: cambiarPlan (Cambiar plan de suscripcion)
+-- Archivo: packages/supabase/src/useTenantActions.ts:13-19
+-- =============================================
+-- JavaScript:
+--   supabase.from("tenants").update({ plan }).eq("id", tenantId)
+--
+-- SQL equivalente:
+--   UPDATE tenants SET plan = $1 WHERE id = $2;
+--
+-- Parametros:
+--   - plan: TEXT ('estandar' | 'profesional')
+--   - tenantId: UUID
+--
+-- Usado por: SuperAdmin (PlanManager)
+
+-- =============================================
+-- OPERACION 6: toggleModulo (Habilitar/deshabilitar modulos)
+-- Archivo: packages/supabase/src/useTenantActions.ts:21-27
+-- =============================================
+-- JavaScript:
+--   supabase.from("tenants").update({ modulos_activos: modulosActivos }).eq("id", tenantId)
+--
+-- SQL equivalente:
+--   UPDATE tenants SET modulos_activos = $1 WHERE id = $2;
+--
+-- Parametros:
+--   - modulosActivos: TEXT[] (array de modulos habilitados)
+--   - tenantId: UUID
+--
+-- Valores posibles del array:
+--   'dashboard', 'carreras', 'pagos', 'perfil', 'qr', 'config',
+--   'delivery', 'b2b', 'banners', 'notificaciones', 'reportes'
+
+-- =============================================
+-- OPERACION 7: actualizarVehiculo (Actualizar datos del vehiculo)
+-- Archivo: packages/supabase/src/useTenantActions.ts:29-38
+-- =============================================
+-- JavaScript:
+--   supabase.from("tenants").update(vehiculo).eq("id", tenantId)
+--   // vehiculo = { vehiculo_tipo?, vehiculo_placa?, vehiculo_modelo?, vehiculo_color? }
+--
+-- SQL equivalente:
+--   UPDATE tenants
+--   SET vehiculo_tipo = $1, vehiculo_placa = $2, vehiculo_modelo = $3, vehiculo_color = $4
+--   WHERE id = $5;
+--
+-- Parametros:
+--   - vehiculo_tipo: TEXT ('moto' | 'carro' | 'camioneta') | null
+--   - vehiculo_placa: TEXT | null
+--   - vehiculo_modelo: TEXT | null (marca del vehiculo)
+--   - vehiculo_color: TEXT | null
+--   - tenantId: UUID
+--
+-- NOTA: Solo actualiza los campos proporcionados (parcial update)
+
+-- =============================================
+-- OPERACION 8: toggleActivo (Activar/desactivar suscripcion)
+-- Archivo: packages/supabase/src/useTenantActions.ts:40-46
+-- =============================================
+-- JavaScript:
+--   supabase.from("tenants").update({ suscripcion_activa: activo }).eq("id", tenantId)
+--
+-- SQL equivalente:
+--   UPDATE tenants SET suscripcion_activa = $1 WHERE id = $2;
+--
+-- Parametros:
+--   - activo: BOOLEAN
+--   - tenantId: UUID
+--
+-- Usado por: SuperAdmin (boton activar/desactivar conductor)
+
+-- =============================================
+-- OPERACION 9: verificarSuscripcion (Aprobar/rechazar pago)
+-- Archivo: packages/supabase/src/useSuscripciones.ts:58-81
+-- =============================================
+-- JavaScript:
+--   // Paso 1: Actualizar suscripcion
+--   supabase.from("suscripciones").update({
+--     estado: aprobado ? "verificado" : "rechazado",
+--     verificado_por: verificadoPor,
+--     fecha_inicio: now,           // solo si aprobado
+--     fecha_fin: now + 30 dias,    // solo si aprobado
+--   }).eq("id", id)
+--
+--   // Paso 2: Si aprobar, activar tenant
+--   supabase.from("tenants").update({
+--     suscripcion_activa: true,
+--     fecha_vencimiento: fecha_fin,
+--   }).eq("id", sub.tenant_id)
+--
+-- SQL equivalente:
+--   -- Transaccion:
+--   BEGIN;
+--   UPDATE suscripciones
+--   SET estado = $1, verificado_por = $2, fecha_inicio = $3, fecha_fin = $4
+--   WHERE id = $5;
+--
+--   -- Solo si aprobado:
+--   UPDATE tenants
+--   SET suscripcion_activa = true, fecha_vencimiento = $4
+--   WHERE id = (SELECT tenant_id FROM suscripciones WHERE id = $5);
+--   COMMIT;
+--
+-- Parametros:
+--   - id: UUID (id de la suscripcion)
+--   - aprobado: BOOLEAN (true = verificar, false = rechazar)
+--   - verificadoPor: TEXT (email del admin, ej: "admin@drivip.app")
+--
+-- Logica:
+--   - Si aprobado: estado = "verificado", fecha_inicio = ahora, fecha_fin = ahora + 30 dias
+--   - Si rechazado: estado = "rechazado"
+--   - Si aprobado: tambien actualiza tenants.suscripcion_activa = true
+--
+-- Usado por: SuperAdmin (verificacion manual de pagos)

@@ -1,0 +1,63 @@
+-- =============================================
+-- MODULO: PLUGINS_ACTIVOS (Plugins habilitados por tenant)
+-- Fuente: packages/supabase/src/usePlugins.ts
+-- Tabla: plugins_activos
+-- =============================================
+
+-- =============================================
+-- OPERACION 1: usePlugins (Listar plugins del tenant)
+-- Archivo: packages/supabase/src/usePlugins.ts:12-21
+-- =============================================
+-- JavaScript:
+--   supabase.from("plugins_activos")
+--     .select("*")
+--     .eq("tenant_id", tenantId)
+--
+-- SQL equivalente:
+--   SELECT * FROM plugins_activos WHERE tenant_id = $1;
+--
+-- Parametros:
+--   - tenantId: UUID (id del tenant)
+--
+-- Retorna:
+--   - Array de PluginActivo[] (plugins del tenant con su estado)
+--
+-- Usado por: DriverApp (mostrar modulos disponibles), SuperAdmin (PluginCatalogGrid)
+
+-- =============================================
+-- OPERACION 2: togglePlugin (Activar/deshabilitar plugin)
+-- Archivo: packages/supabase/src/usePlugins.ts:26-49
+-- =============================================
+-- JavaScript:
+--   supabase.from("plugins_activos").upsert({
+--     tenant_id: tenantId,
+--     plugin_nombre: pluginNombre,
+--     activo,
+--     configuracion: {},
+--     activado_at: activo ? new Date().toISOString() : undefined,
+--     desactivado_at: !activo ? new Date().toISOString() : undefined,
+--   }, { onConflict: "tenant_id,plugin_nombre" })
+--
+-- SQL equivalente:
+--   INSERT INTO plugins_activos (
+--     tenant_id, plugin_nombre, activo, configuracion, activado_at, desactivado_at
+--   ) VALUES ($1, $2, $3, '{}', $4, $5)
+--   ON CONFLICT (tenant_id, plugin_nombre)
+--   DO UPDATE SET
+--     activo = EXCLUDED.activo,
+--     configuracion = EXCLUDED.configuracion,
+--     activado_at = EXCLUDED.activado_at,
+--     desactivado_at = EXCLUDED.desactivado_at;
+--
+-- Parametros:
+--   - tenantId: UUID
+--   - pluginNombre: TEXT (nombre del plugin, ej: 'delivery', 'b2b')
+--   - activo: BOOLEAN (true = activar, false = desactivar)
+--
+-- Logica UPSERT:
+--   - Si no existe registro: INSERT
+--   - Si ya existe (mismo tenant_id + plugin_nombre): UPDATE
+--   - Si activo=true: activado_at = ahora, desactivado_at = null
+--   - Si activo=false: desactivado_at = ahora
+--
+-- Usado por: SuperAdmin (habilitar/deshabilitar modulos por tenant)

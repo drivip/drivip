@@ -1,0 +1,107 @@
+-- =============================================
+-- MODULO: AUTH (Autenticacion)
+-- Fuente: packages/supabase/src/useAuth.ts
+-- Tabla: auth.users (Supabase Auth - interna)
+-- =============================================
+
+-- =============================================
+-- OPERACION 1: signIn (Iniciar sesion)
+-- Archivo: packages/supabase/src/useAuth.ts:57
+-- =============================================
+-- JavaScript:
+--   const { error } = await supabase.auth.signInWithPassword({ email, password });
+--
+-- SQL equivalente (Supabase maneja internamente):
+--   Supabase Auth ejecuta: SELECT * FROM auth.users WHERE email = $1
+--   Verifica hash de password con crypt()
+--   Retorna JWT con user metadata y app_metadata
+--
+-- Parametros:
+--   - email: TEXT (email del usuario)
+--   - password: TEXT (contrasena en texto plano, hasheada internamente)
+--
+-- Retorna:
+--   - user: { id, email, app_metadata, user_metadata, ... }
+--   - session: { access_token, refresh_token, expires_in, ... }
+--   - error: string | null
+--
+-- Errores posibles:
+--   - "Invalid login credentials" - email o password incorrectos
+--   - "Email not confirmed" - email no verificado
+
+-- =============================================
+-- OPERACION 2: signUp (Registrar usuario)
+-- Archivo: packages/supabase/src/useAuth.ts:67
+-- =============================================
+-- JavaScript:
+--   const { error } = await supabase.auth.signUp({ email, password });
+--
+-- SQL equivalente (Supabase maneja internamente):
+--   Supabase Auth ejecuta:
+--     INSERT INTO auth.users (
+--       instance_id, id, aud, role, email, encrypted_password,
+--       email_confirmed_at, created_at, updated_at, confirmation_token,
+--       recovery_token, email_change_token_current, email_change
+--     ) VALUES (...)
+--
+-- Parametros:
+--   - email: TEXT (email del usuario - debe ser unico)
+--   - password: TEXT (minimo 6 caracteres)
+--
+-- Retorna:
+--   - user: { id, email, ... } (recien creado)
+--   - session: null (requiere confirmacion de email)
+--   - error: string | null
+--
+-- Errores posibles:
+--   - "User already registered" - email ya existe
+--   - "Password should be at least 6 characters" - password muy corto
+--
+-- NOTA: Despues de signUp, el frontend DEBE crear registros en:
+--   - profiles (para clientes) con id = auth.users.id
+--   - tenants (para conductores) con datos del formulario
+
+-- =============================================
+-- OPERACION 3: signOut (Cerrar sesion)
+-- Archivo: packages/supabase/src/useAuth.ts:76
+-- =============================================
+-- JavaScript:
+--   await supabase.auth.signOut();
+--
+-- SQL equivalente:
+--   Supabase Auth invalida el refresh_token actual
+--   DELETE FROM auth.refresh_tokens WHERE session_id = $1
+--
+-- No retorna errores significativos
+
+-- =============================================
+-- OPERACION 4: getSession (Obtener sesion actual)
+-- Archivo: packages/supabase/src/useAuth.ts:28
+-- =============================================
+-- JavaScript:
+--   const { data: { session } } = await supabase.auth.getSession();
+--
+-- SQL equivalente:
+--   SELECT * FROM auth.sessions WHERE id = $1 AND expires_at > NOW()
+--   SELECT * FROM auth.users WHERE id = sessions.user_id
+--
+-- Retorna:
+--   - session: { user, access_token, refresh_token, ... } | null
+--
+-- NOTA: Se ejecuta al cargar la app para verificar si hay sesion activa
+
+-- =============================================
+-- OPERACION 5: onAuthStateChange (Escuchar cambios de sesion)
+-- Archivo: packages/supabase/src/AuthProvider.tsx (usa useAuth)
+-- =============================================
+-- JavaScript:
+--   const { data: { subscription } } = supabase.auth.onAuthStateChange(
+--     (_event, session) => { setState({ user: session?.user ?? null, session }); }
+--   );
+--
+-- Implementacion interna de Supabase:
+--   - Escucha eventos: SIGNED_IN, SIGNED_OUT, TOKEN_REFRESHED, USER_UPDATED
+--   - Actualiza el state de React cuando cambia la sesion
+--   - Retorna funcion para desuscribirse: subscription.unsubscribe()
+--
+-- No es una operacion SQL directa, es un listener en tiempo real

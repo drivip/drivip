@@ -1,0 +1,33 @@
+export type TenantType = "conductor";
+
+export type VehiculoTipo = "moto" | "carro" | "camioneta";
+
+export interface Tenant {
+  id: string;
+  slug: string;
+  type: TenantType;
+  nombre: string;
+  email: string | null;
+  telefono: string | null;
+  logo_url: string | null;
+  color_primario: string;
+  color_secundario: string;
+  suscripcion_activa: boolean;
+  plan: string;
+  fecha_vencimiento: string | null;
+  cedula: string | null;
+  ciudad: string | null;
+  direccion: string | null;
+  vehiculo_tipo: VehiculoTipo | null;
+  vehiculo_placa: string | null;
+  vehiculo_modelo: string | null;
+  vehiculo_color: string | null;
+  calificacion: number | null;
+  total_clientes: number;
+  total_carreras: number;
+  pausado: boolean;
+  pausado_motivo: string | null;
+  modulos_activos: string[];
+  created_at: string;
+  updated_at: string;
+}
