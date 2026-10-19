@@ -1,3 +1,4 @@
+import { PushNotificationCard } from "@drivip/supabase";
 import { useScrollLock } from "../../hooks/useScrollLock";
 
 interface GridMenuDrawerProps {
@@ -118,6 +119,8 @@ export default function GridMenuDrawer({
               </div>
             </button>
           </div>
+
+          <PushNotificationCard />
         </div>
 
         {/* Footer Drawer: WhatsApp Soporte Directo */}

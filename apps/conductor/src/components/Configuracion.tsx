@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PushNotificationCard } from "@drivip/supabase";
 
 interface Toggle {
   label: string;
@@ -60,6 +61,8 @@ export default function Configuracion({ isPaused }: ConfiguracionProps) {
           </div>
         ))}
       </div>
+
+      <PushNotificationCard disabled={isPaused} />
 
       <div className="bg-white rounded-3xl p-4 lg:p-5 shadow-xl shadow-slate-200/60 border border-slate-100 space-y-1">
         <p className="text-[10px] lg:text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">General</p>

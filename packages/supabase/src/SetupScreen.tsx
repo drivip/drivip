@@ -41,12 +41,12 @@ VITE_SUPABASE_ANON_KEY=eyJ...tu-anon-key`}
         <div className="bg-surface-container-high rounded-xl p-4">
           <span className="text-[12px] font-mono text-on-surface-variant uppercase">URLs de las apps</span>
           <div className="mt-2 space-y-1 text-[12px] font-mono text-on-surface">
-            <div>Home: <span className="text-primary">localhost:3000</span></div>
-            <div>Conductor: <span className="text-primary">localhost:3001</span></div>
-            <div>Linea: <span className="text-primary">localhost:3002</span></div>
-            <div>SuperAdmin: <span className="text-primary">localhost:3003</span></div>
-            <div>Cliente: <span className="text-primary">localhost:3004</span></div>
-            <div>Comercio: <span className="text-primary">localhost:3005</span></div>
+            <div>Home: <span className="text-primary">drivip-home.pages.dev</span></div>
+            <div>Conductor: <span className="text-primary">drivip-conductor.pages.dev</span></div>
+            <div>Linea: <span className="text-primary">drivip-linea.pages.dev</span></div>
+            <div>SuperAdmin: <span className="text-primary">drivip-superadmin.pages.dev</span></div>
+            <div>Cliente: <span className="text-primary">drivip-cliente.pages.dev</span></div>
+            <div>Comercio: <span className="text-primary">drivip-comercio.pages.dev</span></div>
           </div>
         </div>
       </div>

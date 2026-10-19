@@ -13,3 +13,7 @@ live-css.css
 tailwind-output.css
 inspect*.js
 check-*.js
+
+# Supabase CLI local state
+supabase/.temp/
+supabase/.branches/

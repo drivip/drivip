@@ -12,5 +12,8 @@ export { useTenantDetail } from "./useTenantDetail";
 export { useTenantActions } from "./useTenantActions";
 export { useTenantBanners } from "./useTenantBanners";
 export { useTenantNotificaciones } from "./useTenantNotificaciones";
+export { usePushNotifications } from "./usePushNotifications";
+export { PushNotificationCard } from "./PushNotificationCard";
+export type { PushPermission, UsePushNotificationsOptions } from "./usePushNotifications";
 export { useClientes, useClienteDetail } from "./useClientes";
 export type { ClienteConRed, RedConductorEntry } from "./useClientes";

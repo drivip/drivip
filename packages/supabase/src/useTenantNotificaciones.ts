@@ -40,6 +40,16 @@ export function useTenantNotificaciones(tenantId: string | null) {
 
     if (!error && data) {
       setNotificaciones((prev) => [data as TenantNotificacion, ...prev]);
+      void supabase.functions
+        .invoke("send-push", {
+          body: {
+            tenant_id: notif.tenant_id,
+            title: notif.titulo,
+            body: notif.mensaje,
+            url: "/",
+          },
+        })
+        .catch(() => undefined);
     }
     return !error;
   }, []);

@@ -18,7 +18,7 @@ function LandingPage({ onShowAuth }: { onShowAuth: (mode: "login" | "register") 
             <a href="#planes" className="hover:text-slate-900 transition">Planes</a>
           </div>
           <div className="flex items-center gap-2">
-            <a href="http://localhost:3004" className="px-4 py-2 rounded-xl text-[12px] font-bold text-slate-500 hover:text-slate-900 transition">Soy Cliente</a>
+            <a href="https://drivip-cliente.pages.dev" className="px-4 py-2 rounded-xl text-[12px] font-bold text-slate-500 hover:text-slate-900 transition">Soy Cliente</a>
             <button onClick={() => onShowAuth("login")} className="px-4 py-2 rounded-xl text-[12px] font-bold text-purple-700 bg-purple-50 border border-purple-100 hover:bg-purple-100 active:scale-95 transition">Iniciar Sesión</button>
             <button onClick={() => onShowAuth("register")} className="px-4 py-2 rounded-xl text-[12px] font-bold text-white bg-purple-700 shadow-md active:scale-95 transition">Registrarse</button>
           </div>
@@ -205,8 +205,8 @@ function LandingPage({ onShowAuth }: { onShowAuth: (mode: "login" | "register") 
             <img src="/logo.png" alt="Drivip" className="h-7 w-auto" />
           </div>
           <div className="flex items-center gap-6 text-[11px] font-semibold text-slate-400">
-            <a href="http://localhost:3000" className="hover:text-slate-900 transition">Inicio</a>
-            <a href="http://localhost:3004" className="hover:text-slate-900 transition">Soy Cliente</a>
+            <a href="https://drivip-home.pages.dev" className="hover:text-slate-900 transition">Inicio</a>
+            <a href="https://drivip-cliente.pages.dev" className="hover:text-slate-900 transition">Soy Cliente</a>
             <a href="#" className="hover:text-slate-900 transition">Términos</a>
             <a href="#" className="hover:text-slate-900 transition">Privacidad</a>
           </div>
@@ -264,7 +264,7 @@ function LoginScreen({ onSwitchToRegister }: { onSwitchToRegister: () => void })
         <button onClick={onSwitchToRegister} className="w-full text-center text-[12px] text-purple-600 font-bold">
           No tengo cuenta — Registrarme gratis
         </button>
-        <a href="http://localhost:3000" className="block text-center text-[11px] text-slate-400 hover:text-slate-600">← Volver a Drivip</a>
+        <a href="https://drivip-home.pages.dev" className="block text-center text-[11px] text-slate-400 hover:text-slate-600">← Volver a Drivip</a>
       </div>
     </div>
   );
@@ -508,7 +508,7 @@ function RegisterScreen({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
         <button onClick={onSwitchToLogin} className="w-full text-center text-[12px] text-purple-600 font-bold mt-3">
           Ya tengo cuenta — Iniciar sesión
         </button>
-        <a href="http://localhost:3000" className="block text-center text-[11px] text-slate-400 hover:text-slate-600 mt-2">← Volver a Drivip</a>
+        <a href="https://drivip-home.pages.dev" className="block text-center text-[11px] text-slate-400 hover:text-slate-600 mt-2">← Volver a Drivip</a>
       </div>
     </div>
   );
@@ -593,7 +593,7 @@ function PendingValidationScreen({ nombre, apellido, cedula, plan }: { nombre: s
         <a href="/conductor" className="block w-full py-3 rounded-xl bg-slate-100 text-slate-700 text-[13px] font-bold text-center hover:bg-slate-200 active:scale-[0.98] transition">
           Ir al panel de todos modos
         </a>
-        <a href="http://localhost:3000" className="block text-center text-[11px] text-slate-400 hover:text-slate-600 mt-4">← Volver a Drivip</a>
+        <a href="https://drivip-home.pages.dev" className="block text-center text-[11px] text-slate-400 hover:text-slate-600 mt-4">← Volver a Drivip</a>
       </div>
     </div>
   );
