@@ -1,12 +1,15 @@
 import { useState, useEffect } from "react";
+import type { TarifasTenant } from "@drivip/types";
+import { calcularTarifaKm, formatearUsd, formatearBs, TASA_BCV_REFERENCIA, DEFAULT_TARIFA_BASE, DEFAULT_TARIFA_POR_KM } from "@drivip/types";
 
 interface RouteCalculatorProps {
   onOpenMap: () => void;
   onOpenOriginMap?: () => void;
-  fareUsd: string;
-  fareBs: string;
+  distanceKm: number;
   distance: string;
-  onRequestRide: () => void;
+  tarifas?: TarifasTenant | null;
+  tasa?: number | null;
+  onRequestRide: (detalle: { precioUsd: number; metodoPago: "usd" | "bs" | "pmovil" }) => void;
   onToggleSchedule: (mode: "now" | "schedule") => void;
   origin?: string;
   destination?: string;
@@ -16,9 +19,10 @@ interface RouteCalculatorProps {
 export default function RouteCalculator({
   onOpenMap,
   onOpenOriginMap,
-  fareUsd,
-  fareBs,
+  distanceKm,
   distance,
+  tarifas,
+  tasa,
   onRequestRide,
   onToggleSchedule,
   origin: originProp,
@@ -31,6 +35,27 @@ export default function RouteCalculator({
   const [stops, setStops] = useState<string[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<"usd" | "bs" | "pmovil">("usd");
   const [showPagoMovil, setShowPagoMovil] = useState(false);
+  const [zonaId, setZonaId] = useState<string>("");
+
+  useEffect(() => {
+    const zonas = tarifas?.zonas ?? [];
+    if (zonas.length === 0) {
+      setZonaId("");
+      return;
+    }
+    setZonaId((prev) => (zonas.some((z) => z.id === prev) ? prev : zonas[0].id));
+  }, [tarifas]);
+
+  const zonaSeleccionada = tarifas?.zonas.find((z) => z.id === zonaId) ?? tarifas?.zonas[0];
+
+  const precioUsd = tarifas
+    ? tarifas.modo === "zona"
+      ? Number(zonaSeleccionada?.precio ?? 0)
+      : calcularTarifaKm(tarifas.base, tarifas.por_km, distanceKm)
+    : calcularTarifaKm(DEFAULT_TARIFA_BASE, DEFAULT_TARIFA_POR_KM, distanceKm);
+
+  const fareUsd = formatearUsd(precioUsd);
+  const fareBs = formatearBs(precioUsd, tasa ?? undefined);
 
   useEffect(() => {
     if (originProp !== undefined) setOrigin(originProp);
@@ -193,6 +218,40 @@ export default function RouteCalculator({
         </button>
       )}
 
+      {/* Zona de tarifa fija (si el conductor cobra por zona) */}
+      {tarifas?.modo === "zona" && (
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-xs lg:text-sm">
+            <span className="font-bold text-slate-700">Zona del viaje</span>
+            <span className="text-[10px] lg:text-[11px] text-purple-600 font-semibold bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
+              Precio fijo
+            </span>
+          </div>
+          {tarifas.zonas.length > 0 ? (
+            <div className="grid grid-cols-2 gap-2">
+              {tarifas.zonas.map((zona) => (
+                <button
+                  key={zona.id}
+                  onClick={() => setZonaId(zona.id)}
+                  className={`p-3 rounded-2xl flex items-center justify-between transition text-left shadow-sm ${
+                    zonaId === zona.id
+                      ? "border-2 border-purple-600 bg-purple-50/60 text-purple-900"
+                      : "border border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+                  }`}
+                >
+                  <span className="text-xs lg:text-sm font-bold truncate">{zona.nombre}</span>
+                  <span className="text-xs lg:text-sm font-black flex-shrink-0 ml-2">{formatearUsd(Number(zona.precio))}</span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200 text-[11px] lg:text-xs text-amber-800">
+              El conductor aún no ha configurado sus zonas ni precios.
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Tarifa Calculada Directa */}
       <div className="p-3.5 lg:p-5 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 text-white shadow-lg flex items-center justify-between">
         <div>
@@ -201,15 +260,22 @@ export default function RouteCalculator({
               <path d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
             </svg>
             <span>{distance}</span>
+            {tarifas?.nombre && <span className="text-slate-400">• {tarifas.nombre}</span>}
           </div>
           <div className="flex items-baseline gap-1 mt-0.5">
             <span className="text-2xl lg:text-3xl font-black text-white">{fareUsd}</span>
             <span className="text-xs lg:text-sm font-bold text-slate-300">USD</span>
           </div>
+          <span className="text-[10px] lg:text-[11px] text-slate-400">
+            {tarifas?.modo === "zona" ? `Tarifa fija ${zonaSeleccionada ? `• ${zonaSeleccionada.nombre}` : ""}` : "Base + $/km"}
+          </span>
         </div>
         <div className="text-right">
           <span className="text-[10px] lg:text-[11px] uppercase font-bold tracking-wider text-slate-400 block">Tasa Oficial BCV</span>
           <span className="text-sm lg:text-base font-extrabold text-amber-400">{fareBs}</span>
+          <span className="text-[10px] lg:text-[11px] text-slate-400 block">
+            {`${(tasa ?? TASA_BCV_REFERENCIA).toFixed(2)} Bs/USD`}
+          </span>
         </div>
       </div>
 
@@ -262,7 +328,7 @@ export default function RouteCalculator({
       {/* Botón Principal de Solicitud */}
       <button
         className="w-full py-4 lg:py-5 px-5 rounded-2xl bg-gradient-to-r from-purple-700 via-indigo-600 to-purple-800 text-white font-black text-sm lg:text-base tracking-wide shadow-lg shadow-purple-600/30 flex items-center justify-between active:scale-[0.98] transition"
-        onClick={onRequestRide}
+        onClick={() => onRequestRide({ precioUsd, metodoPago: paymentMethod })}
       >
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MOCK_PLUGINS_ADMIN } from "../mockData/adminMockData";
+import { usePluginsCatalogo } from "@drivip/supabase";
 
 function Toast({ message, onClose }: { message: string; onClose: () => void }) {
   if (!message) return null;
@@ -14,20 +14,40 @@ function Toast({ message, onClose }: { message: string; onClose: () => void }) {
 }
 
 export default function PluginCatalogGrid() {
-  const [plugins, setPlugins] = useState(MOCK_PLUGINS_ADMIN);
+  const { plugins, loading, togglePlugin, crearPlugin } = usePluginsCatalogo();
   const [toast, setToast] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ nombre: "", descripcion: "", icono: "extension" });
 
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(""), 2500);
   };
 
-  const togglePlugin = (id: string, nombre: string) => {
-    setPlugins((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, activo: !p.activo } : p))
-    );
-    const plugin = plugins.find((p) => p.id === id);
-    showToast(`${nombre} ${plugin?.activo ? "desactivado" : "activado"}`);
+  const handleToggle = async (id: string, nombre: string, activo: boolean) => {
+    const { error } = await togglePlugin(id, !activo);
+    showToast(error ? "No se pudo actualizar" : `${nombre} ${activo ? "desactivado" : "activado"}`);
+  };
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.nombre.trim()) return;
+    setSaving(true);
+    const { error } = await crearPlugin({
+      id: form.nombre,
+      nombre: form.nombre,
+      descripcion: form.descripcion,
+      icono: form.icono,
+    });
+    setSaving(false);
+    if (error) {
+      showToast("No se pudo crear el plugin");
+      return;
+    }
+    setForm({ nombre: "", descripcion: "", icono: "extension" });
+    setShowForm(false);
+    showToast("Plugin creado");
   };
 
   return (
@@ -36,12 +56,47 @@ export default function PluginCatalogGrid() {
       <div className="flex items-center justify-between">
         <h2 className="text-base lg:text-lg font-black text-slate-900">Catalogo de Plugins</h2>
         <button
-          onClick={() => showToast("Abriendo catalogo de plugins...")}
+          onClick={() => setShowForm((v) => !v)}
           className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-violet-500 to-purple-700 text-white text-[10px] font-bold active:scale-95 transition shadow-md"
         >
-          + Nuevo Plugin
+          {showForm ? "Cancelar" : "+ Nuevo Plugin"}
         </button>
       </div>
+
+      {showForm && (
+        <form onSubmit={handleCreate} className="bg-white rounded-2xl p-4 space-y-3 border border-slate-100">
+          <input
+            value={form.nombre}
+            onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+            placeholder="Nombre del plugin"
+            className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-[12px]"
+          />
+          <input
+            value={form.descripcion}
+            onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
+            placeholder="Descripción"
+            className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-[12px]"
+          />
+          <input
+            value={form.icono}
+            onChange={(e) => setForm({ ...form, icono: e.target.value })}
+            placeholder="Ícono (Material Symbols)"
+            className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-[12px]"
+          />
+          <button type="submit" disabled={saving} className="w-full py-2 rounded-xl bg-emerald-600 text-white text-[12px] font-bold disabled:opacity-60">
+            {saving ? "Guardando..." : "Guardar Plugin"}
+          </button>
+        </form>
+      )}
+
+      {loading && <p className="text-center text-[12px] text-slate-400 py-6">Cargando catálogo...</p>}
+
+      {!loading && plugins.length === 0 && (
+        <div className="bg-white rounded-2xl p-8 text-center border border-slate-100">
+          <p className="text-[12px] text-slate-500">No hay plugins en el catálogo</p>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {plugins.map((p) => (
           <div key={p.id} className="bg-white rounded-2xl p-4 space-y-3 border border-slate-100" style={{ boxShadow: "4px 4px 10px #d9dde2, -4px -4px 10px #ffffff" }}>
@@ -52,11 +107,11 @@ export default function PluginCatalogGrid() {
                 </div>
                 <div>
                   <span className="text-[13px] lg:text-[14px] font-bold text-slate-900">{p.nombre}</span>
-                  <p className="text-[11px] lg:text-[12px] text-slate-500">{p.descripcion}</p>
+                  <p className="text-[11px] lg:text-[12px] text-slate-500">{p.descripcion ?? "Sin descripción"}</p>
                 </div>
               </div>
               <button
-                onClick={() => togglePlugin(p.id, p.nombre)}
+                onClick={() => handleToggle(p.id, p.nombre, p.activo)}
                 className={`relative w-11 h-6 rounded-full transition-colors ${p.activo ? "bg-emerald-500" : "bg-slate-300"}`}
               >
                 <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${p.activo ? "translate-x-5" : ""}`} />

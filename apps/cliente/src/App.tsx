@@ -1,6 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { AuthProvider, useAuthContext, supabase, useTenantBySlug } from "@drivip/supabase";
+import {
+  AuthProvider, useAuthContext, supabase, useTenantBySlug, useRedCliente, useTarifasTenant,
+  useTasaCambio, useConductoresRed, useMisCarreras, crearCarreraCliente, calificarCarrera,
+  cancelarCarrera, useDireccionesCliente, useReservasCliente, enviarPushCarrera,
+} from "@drivip/supabase";
+import { TASA_BCV_REFERENCIA } from "@drivip/types";
+import { useCarreraRealtime } from "./hooks/useCarreraRealtime";
+import { useConductorLocation } from "./hooks/useConductorLocation";
+import { toDriver } from "./lib/driverMapper";
 import PassengerHeader from "./components/passenger/PassengerHeader";
 import HeroWelcomeCard from "./components/passenger/HeroWelcomeCard";
 import RouteCalculator from "./components/passenger/RouteCalculator";
@@ -16,14 +24,14 @@ import AuthModal from "./components/passenger/AuthModal";
 import Toast from "./components/passenger/Toast";
 import AddConductor from "./components/passenger/AddConductor";
 
-import {
-  MOCK_DRIVERS,
-  MOCK_TRIPS,
-  MOCK_ADDRESSES,
-  MOCK_RESERVATIONS,
-  MOCK_PASSENGER,
-} from "./mockData/passengerMockData";
-import type { PassengerScreen, Driver } from "./types/passenger";
+import type { PassengerScreen, Driver, TripHistory as TripHistoryType, SavedAddress, Reservation } from "./types/passenger";
+import type { Carrera, MetodoPago } from "@drivip/types";
+
+const METODO_PAGO_MAP: Record<"usd" | "bs" | "pmovil", MetodoPago> = {
+  usd: "efectivo",
+  bs: "efectivo",
+  pmovil: "pago_movil",
+};
 
 const bottomNavItems = [
   { id: "home", label: "En Vivo", icon: "map" },
@@ -451,22 +459,87 @@ function PostRegisterScreen() {
 /* ==================== PASSENGER APP ==================== */
 function PassengerApp() {
   const { user, signOut } = useAuthContext();
+  const { contactos } = useRedCliente(user?.id ?? "");
+  const conductorTenantId = contactos[0]?.conductor_tenant_id ?? null;
+  const { tarifas } = useTarifasTenant(conductorTenantId);
+  const { tasa } = useTasaCambio();
+  const { conductores } = useConductoresRed();
+  const drivers = useMemo(() => conductores.map(toDriver), [conductores]);
+  const { carreras: misCarreras, refetch: refetchCarreras } = useMisCarreras(user?.id);
+  const { direcciones, crearDireccion, eliminarDireccion, marcarPredeterminada } = useDireccionesCliente(user?.id);
+  const { reservas, crearReserva, cancelarReserva } = useReservasCliente(user?.id);
+
+  const savedAddresses = useMemo<SavedAddress[]>(() => {
+    const meta: Record<string, { iconBg: string; iconColor: string }> = {
+      home: { iconBg: "bg-purple-50 border-purple-100 text-purple-600", iconColor: "text-purple-600" },
+      business: { iconBg: "bg-blue-50 border-blue-100 text-blue-600", iconColor: "text-blue-600" },
+      shopping_bag: { iconBg: "bg-amber-50 border-amber-100 text-amber-600", iconColor: "text-amber-600" },
+      flight: { iconBg: "bg-sky-50 border-sky-100 text-sky-600", iconColor: "text-sky-600" },
+      local_hospital: { iconBg: "bg-emerald-50 border-emerald-100 text-emerald-600", iconColor: "text-emerald-600" },
+    };
+    return direcciones.map((d) => {
+      const m = meta[d.icono] ?? meta.home;
+      return {
+        id: d.id,
+        name: d.alias,
+        address: d.direccion,
+        reference: d.referencia ?? undefined,
+        icon: d.icono,
+        iconBg: m.iconBg,
+        iconColor: m.iconColor,
+        isDefault: d.predeterminada,
+      };
+    });
+  }, [direcciones]);
+
+  const passengerReservations = useMemo<Reservation[]>(() => {
+    return reservas
+      .filter((r) => r.estado !== "cancelada")
+      .map((r) => {
+        const fecha = new Date(r.fecha_hora);
+        return {
+          id: r.id,
+          title: "Reserva programada",
+          dateLabel: fecha.toLocaleDateString("es-VE", { weekday: "long", day: "numeric", month: "long" }),
+          dayShort: fecha.toLocaleDateString("es-VE", { weekday: "short" }).slice(0, 3).toUpperCase(),
+          dayNum: String(fecha.getDate()),
+          time: fecha.toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit" }),
+          origin: r.origen,
+          destination: r.destino,
+          priceUsd: r.precio_usd ?? 0,
+          paymentMethods: ["Efectivo", "Pago Móvil"],
+          status: r.estado === "confirmada" ? "confirmed" : "pending",
+        };
+      });
+  }, [reservas]);
+
   const [screen, setScreen] = useState<PassengerScreen>("home");
   const [menuOpen, setMenuOpen] = useState(false);
   const [mapModalOpen, setMapModalOpen] = useState(false);
   const [mapPointType, setMapPointType] = useState<"origin" | "destination">("destination");
   const [ratingModalOpen, setRatingModalOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
-  const [selectedDriver, setSelectedDriver] = useState<Driver>(MOCK_DRIVERS[0]);
+  const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
-  const [showTripTracker, setShowTripTracker] = useState(false);
+  const [activeCarrera, setActiveCarrera] = useState<Carrera | null>(null);
 
   const [origin, setOrigin] = useState("Mi ubicación actual");
   const [originCoords, setOriginCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [destination, setDestination] = useState("Aeropuerto Internacional Simón Bolívar");
+  const [destination, setDestination] = useState("");
+  const [destinationCoords, setDestinationCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [stops, setStops] = useState<{ lat: number; lng: number; address: string }[]>([]);
-  const [routeKm, setRouteKm] = useState(38.4);
-  const [routeMin, setRouteMin] = useState(42);
+  const [routeKm, setRouteKm] = useState(0);
+  const [routeMin, setRouteMin] = useState(0);
+
+  const showToast = useCallback((msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3100);
+  }, []);
+
+  useEffect(() => {
+    if (selectedDriver || drivers.length === 0) return;
+    setSelectedDriver(drivers[0]);
+  }, [drivers, selectedDriver]);
 
   useEffect(() => {
     if (originCoords) return;
@@ -480,15 +553,98 @@ function PassengerApp() {
         { enableHighAccuracy: true, timeout: 5000 }
       );
     } else { setOriginCoords({ lat: 10.491, lng: -66.881 }); }
-  }, []);
+  }, [originCoords]);
 
-  const showToast = (msg: string) => { setToastMsg(msg); setTimeout(() => setToastMsg(null), 3100); };
+  useCarreraRealtime(activeCarrera?.id ?? null, setActiveCarrera);
+  const { location: conductorLocation } = useConductorLocation(activeCarrera?.tenant_id ?? null);
 
-  const handleRequestRide = (driver?: Driver) => {
-    const d = driver || MOCK_DRIVERS[0];
+  const trips = useMemo<TripHistoryType[]>(() => misCarreras.map((c) => {
+    const d = drivers.find((x) => x.id === c.tenant_id);
+    const created = new Date(c.created_at);
+    return {
+      id: c.id,
+      date: created.toLocaleDateString("es-VE", { day: "2-digit", month: "short" }),
+      time: created.toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit" }),
+      type: c.estado === "completada" ? "Completado" : c.estado,
+      origin: c.origen_direccion ?? "Origen",
+      destination: c.destino_direccion ?? "Destino",
+      driverName: d?.name ?? "Conductor",
+      driverInitials: d?.initials ?? "C",
+      driverVehicle: d?.vehicle ?? "",
+      driverRating: d?.rating ?? 5,
+      priceUsd: c.precio ?? 0,
+      priceBs: Math.round((c.precio ?? 0) * (tasa ?? TASA_BCV_REFERENCIA) * 100) / 100,
+      paymentMethod: c.metodo_pago === "pago_movil" ? "Pago Móvil" : c.metodo_pago === "transferencia" ? "Transferencia" : "Efectivo",
+      driverColor: d?.color ?? "bg-gradient-to-br from-purple-500 to-indigo-600 text-white",
+    };
+  }), [misCarreras, drivers, tasa]);
+
+  const activeDriver = useMemo(
+    () => drivers.find((d) => d.id === activeCarrera?.tenant_id) ?? selectedDriver,
+    [drivers, activeCarrera, selectedDriver]
+  );
+
+  const handleRequestRide = async (
+    driverArg?: Driver | null,
+    detalle?: { precioUsd: number; metodoPago: "usd" | "bs" | "pmovil" }
+  ) => {
+    const d = driverArg ?? selectedDriver ?? drivers[0] ?? null;
+    if (!d) { showToast("Agrega un conductor a tu círculo primero"); setScreen("drivers"); return; }
     setSelectedDriver(d);
-    setShowTripTracker(true);
+    if (!originCoords || !destinationCoords) {
+      showToast("Elige tu destino en el mapa para continuar");
+      setMapPointType("destination");
+      setMapModalOpen(true);
+      return;
+    }
+    const carrera = await crearCarreraCliente({
+      conductor_tenant_id: d.id,
+      origen_lat: originCoords.lat,
+      origen_lng: originCoords.lng,
+      origen_direccion: origin,
+      destino_lat: destinationCoords.lat,
+      destino_lng: destinationCoords.lng,
+      destino_direccion: destination,
+      distancia_km: routeKm,
+      duracion_min: routeMin,
+      precio: detalle?.precioUsd ?? 0,
+      metodo_pago: METODO_PAGO_MAP[detalle?.metodoPago ?? "usd"],
+    });
+    if (!carrera) { showToast("No se pudo enviar la solicitud. Intenta de nuevo."); return; }
+    setActiveCarrera(carrera);
+    void enviarPushCarrera({
+      carrera_id: carrera.id,
+      title: "Nueva solicitud de viaje",
+      body: `${origin} a ${destination}`,
+      tag: `carrera-${carrera.id}`,
+      data: { carrera_id: carrera.id },
+    });
     showToast(`Solicitud enviada a ${d.name}`);
+  };
+
+  const handleCancelTrip = async () => {
+    if (!activeCarrera) return;
+    const cancelada = activeCarrera;
+    const ok = await cancelarCarrera(cancelada.id);
+    if (ok) {
+      void enviarPushCarrera({
+        carrera_id: cancelada.id,
+        title: "Viaje cancelado",
+        body: "El cliente cancelo la solicitud.",
+        tag: `carrera-${cancelada.id}`,
+        data: { carrera_id: cancelada.id },
+      });
+    }
+    setActiveCarrera(null);
+    showToast("Viaje cancelado");
+  };
+
+  const handleSubmitRating = async (rating: number, comment?: string) => {
+    if (activeCarrera) await calificarCarrera(activeCarrera.id, rating, comment);
+    setRatingModalOpen(false);
+    setActiveCarrera(null);
+    refetchCarreras();
+    showToast("¡Gracias por calificar!");
   };
 
   const handleBottomNav = (id: string) => {
@@ -531,6 +687,7 @@ function PassengerApp() {
     setOriginCoords({ lat: o.lat, lng: o.lng });
     setStops(s);
     setDestination(d.address);
+    setDestinationCoords({ lat: d.lat, lng: d.lng });
     setRouteKm(km);
     setRouteMin(min);
     setMapModalOpen(false);
@@ -538,6 +695,7 @@ function PassengerApp() {
   };
 
   const profileInitial = user?.email?.charAt(0)?.toUpperCase() ?? "U";
+  const passengerName = (user?.user_metadata?.nombre as string | undefined)?.trim() || user?.email?.split("@")[0] || "Cliente";
   const hasHeader = screen === "home";
   const hasBottomNav = screen === "home";
 
@@ -565,7 +723,7 @@ function PassengerApp() {
                 <div className="space-y-4">
                   <HeroWelcomeCard
                     onDriversClick={() => setScreen("drivers")}
-                    driverCount={MOCK_DRIVERS.length}
+                    driverCount={drivers.length}
                   />
                   <RouteCalculator
                     onOpenMap={() => handleOpenMap("destination")}
@@ -573,21 +731,26 @@ function PassengerApp() {
                     origin={origin}
                     destination={destination}
                     stops={stops.map((s) => s.address)}
-                    fareUsd={`$${(2 + routeKm * 0.5).toFixed(0)}`}
-                    fareBs={`Bs. ${((2 + routeKm * 0.5) * 36.5).toFixed(0)}`}
+                    distanceKm={routeKm}
+                    tarifas={tarifas}
+                    tasa={tasa}
                     distance={`${routeKm.toFixed(1)} km • ~${routeMin < 60 ? Math.round(routeMin) + " min" : Math.floor(routeMin / 60) + "h " + Math.round(routeMin % 60) + "m"}`}
-                    onRequestRide={() => handleRequestRide()}
+                    onRequestRide={(detalle) => handleRequestRide(selectedDriver, detalle)}
                     onToggleSchedule={(mode) => {
                       if (mode === "schedule") showToast("Programar recogida: el chofer te confirmará por WhatsApp");
                     }}
                   />
                 </div>
                 <div className="space-y-4">
-                  {showTripTracker && (
+                  {activeCarrera && activeDriver && (
                     <LiveTripTracker
-                      driver={selectedDriver}
+                      carrera={activeCarrera}
+                      driver={activeDriver}
+                      tasa={tasa}
+                      conductorLocation={conductorLocation}
                       onCallDriver={() => showToast("Llamando al chofer...")}
                       onRateTrip={() => setRatingModalOpen(true)}
+                      onCancelTrip={handleCancelTrip}
                     />
                   )}
                 </div>
@@ -597,25 +760,42 @@ function PassengerApp() {
 
           {screen === "drivers" && (
             <DriversList
-              drivers={MOCK_DRIVERS}
+              drivers={drivers}
               onBack={() => setScreen("home")}
               onRequestRide={(driver) => {
-                handleRequestRide(driver);
+                setSelectedDriver(driver);
                 setScreen("home");
+                showToast("Configura tu ruta y solicita la carrera");
               }}
             />
           )}
 
           {screen === "history" && (
-            <TripHistory trips={MOCK_TRIPS} onBack={() => setScreen("home")} />
+            <TripHistory trips={trips} onBack={() => setScreen("home")} />
           )}
 
           {screen === "addresses" && (
-            <SavedAddresses addresses={MOCK_ADDRESSES} onBack={() => setScreen("home")} />
+            <SavedAddresses
+              addresses={savedAddresses}
+              onBack={() => setScreen("home")}
+              onCreate={crearDireccion}
+              onDelete={eliminarDireccion}
+              onSetDefault={marcarPredeterminada}
+              onRequestRide={(address) => {
+                setDestination(address);
+                setScreen("home");
+                showToast(`Destino: ${address}`);
+              }}
+            />
           )}
 
           {screen === "reservations" && (
-            <Reservations reservations={MOCK_RESERVATIONS} onBack={() => setScreen("home")} />
+            <Reservations
+              reservations={passengerReservations}
+              onBack={() => setScreen("home")}
+              onCreate={crearReserva}
+              onCancel={cancelarReserva}
+            />
           )}
 
           {screen === "profile" && (
@@ -625,7 +805,7 @@ function PassengerApp() {
                 <div className="w-20 h-20 rounded-full bg-purple-100 flex items-center justify-center">
                   <span className="text-2xl font-bold text-purple-700">{profileInitial}</span>
                 </div>
-                <span className="text-lg font-bold text-slate-900">{user?.email?.split("@")[0] ?? "Usuario"}</span>
+                <span className="text-lg font-bold text-slate-900">{passengerName}</span>
                 <span className="text-xs text-slate-500 font-mono">{user?.email}</span>
                 <button
                   onClick={signOut}
@@ -707,7 +887,7 @@ function PassengerApp() {
             onDriversClick={() => setScreen("drivers")}
             onHistoryClick={() => setScreen("history")}
             onReservationsClick={() => setScreen("reservations")}
-            passengerName={MOCK_PASSENGER.name}
+            passengerName={passengerName}
           />
 
           <MapPickerModal
@@ -735,13 +915,9 @@ function PassengerApp() {
 
           <RatingModal
             isOpen={ratingModalOpen}
-            driverName={selectedDriver.name}
+            driverName={activeDriver?.name ?? "Conductor"}
             onClose={() => setRatingModalOpen(false)}
-            onSubmit={(rating, comment) => {
-              setRatingModalOpen(false);
-              setShowTripTracker(false);
-              showToast(`Calificación ${rating}/5 enviada a ${selectedDriver.name}`);
-            }}
+            onSubmit={handleSubmitRating}
           />
 
           <AuthModal

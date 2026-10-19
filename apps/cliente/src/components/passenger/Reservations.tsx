@@ -1,11 +1,48 @@
+import { useState } from "react";
 import type { Reservation } from "../../types/passenger";
+
+interface NuevaReservaInput {
+  origen: string;
+  destino: string;
+  fecha_hora: string;
+  notas?: string;
+  precio_usd?: number | null;
+}
 
 interface ReservationsProps {
   reservations: Reservation[];
   onBack: () => void;
+  onCreate?: (input: NuevaReservaInput) => Promise<{ error: string | null }>;
+  onCancel?: (id: string) => Promise<{ error: string | null }>;
 }
 
-export default function Reservations({ reservations, onBack }: ReservationsProps) {
+export default function Reservations({ reservations, onBack, onCreate, onCancel }: ReservationsProps) {
+  const [showForm, setShowForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [form, setForm] = useState<NuevaReservaInput>({
+    origen: "",
+    destino: "",
+    fecha_hora: "",
+    notas: "",
+    precio_usd: null,
+  });
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!onCreate || !form.origen.trim() || !form.destino.trim() || !form.fecha_hora) return;
+    setSaving(true);
+    setFormError(null);
+    const { error } = await onCreate(form);
+    setSaving(false);
+    if (error) {
+      setFormError(error);
+      return;
+    }
+    setForm({ origen: "", destino: "", fecha_hora: "", notas: "", precio_usd: null });
+    setShowForm(false);
+  };
+
   return (
     <div className="min-h-screen bg-[#f4f6f8]">
       {/* TopHeader */}
@@ -22,7 +59,7 @@ export default function Reservations({ reservations, onBack }: ReservationsProps
             <span className="text-xs lg:text-sm font-semibold text-slate-500">Drivip VIP</span>
           </div>
         </div>
-        <button aria-label="Nueva Reserva" className="h-10 lg:h-12 px-3 lg:px-4 rounded-2xl bg-white border border-white flex items-center gap-1 text-slate-800 active:scale-95 transition-transform" style={{ boxShadow: "6px 6px 14px rgba(166, 180, 200, 0.25), -6px -6px 14px rgba(255, 255, 255, 0.9)" }}>
+        <button aria-label="Nueva Reserva" onClick={() => setShowForm(true)} className="h-10 lg:h-12 px-3 lg:px-4 rounded-2xl bg-white border border-white flex items-center gap-1 text-slate-800 active:scale-95 transition-transform" style={{ boxShadow: "6px 6px 14px rgba(166, 180, 200, 0.25), -6px -6px 14px rgba(255, 255, 255, 0.9)" }}>
           <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24">
             <path d="M12 4v16m8-8H4" />
           </svg>
@@ -40,7 +77,7 @@ export default function Reservations({ reservations, onBack }: ReservationsProps
           </button>
           <button className="flex-1 py-2.5 lg:py-3 px-3 rounded-xl text-xs lg:text-sm font-semibold text-slate-500 flex items-center justify-center gap-1.5 transition-all hover:text-slate-700">
             <span>Pasadas</span>
-            <span className="px-1.5 py-0.2 text-slate-400 text-[11px] lg:text-xs font-medium">5</span>
+
           </button>
         </nav>
 
@@ -181,7 +218,7 @@ export default function Reservations({ reservations, onBack }: ReservationsProps
                     </svg>
                     <span className="truncate">Modificar</span>
                   </button>
-                  <button className="py-2.5 px-2 rounded-xl bg-red-50 text-red-600 text-xs lg:text-sm font-bold border border-red-100 flex items-center justify-center gap-1 active:scale-95 transition-transform hover:bg-red-100">
+                  <button onClick={() => { void onCancel?.(res.id); }} className="py-2.5 px-2 rounded-xl bg-red-50 text-red-600 text-xs lg:text-sm font-bold border border-red-100 flex items-center justify-center gap-1 active:scale-95 transition-transform hover:bg-red-100">
                     <svg className="w-3.5 h-3.5 text-red-500" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24">
                       <path d="M6 18L18 6M6 6l12 12" />
                     </svg>
@@ -201,6 +238,14 @@ export default function Reservations({ reservations, onBack }: ReservationsProps
             </article>
           ))}
         </div>
+
+        {reservations.length === 0 && (
+          <div className="bg-white rounded-3xl p-8 text-center border border-dashed border-slate-200">
+            <span className="material-symbols-outlined text-[40px] text-slate-300">event</span>
+            <p className="text-sm font-semibold text-slate-500 mt-2">No tienes reservas programadas</p>
+            <p className="text-xs text-slate-400 mt-1">Programa una carrera con fecha y hora.</p>
+          </div>
+        )}
 
         {/* Info Card */}
         <section className="rounded-3xl p-4 lg:p-5 bg-[#f4f6f8] border border-white/80 relative" style={{ boxShadow: "6px 6px 14px rgba(166, 180, 200, 0.25), -6px -6px 14px rgba(255, 255, 255, 0.9)" }}>
@@ -222,7 +267,7 @@ export default function Reservations({ reservations, onBack }: ReservationsProps
 
       {/* Floating CTA */}
       <div className="fixed bottom-20 lg:bottom-6 left-1/2 -translate-x-1/2 w-full max-w-3xl lg:max-w-5xl px-4 pointer-events-none z-30">
-        <button className="w-full py-4 lg:py-5 px-5 rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-600 to-orange-500 text-white font-bold text-sm lg:text-base shadow-xl shadow-purple-600/30 flex items-center justify-between active:scale-98 transition-transform pointer-events-auto border border-white/20">
+        <button onClick={() => setShowForm(true)} className="w-full py-4 lg:py-5 px-5 rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-600 to-orange-500 text-white font-bold text-sm lg:text-base shadow-xl shadow-purple-600/30 flex items-center justify-between active:scale-98 transition-transform pointer-events-auto border border-white/20">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 lg:w-10 lg:h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
               <svg className="w-4 h-4 lg:w-5 lg:h-5 text-white" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24">
@@ -239,6 +284,48 @@ export default function Reservations({ reservations, onBack }: ReservationsProps
           </div>
         </button>
       </div>
+
+      {showForm && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <form onSubmit={handleCreate} className="bg-white rounded-3xl p-5 w-full max-w-md space-y-3 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-black text-slate-900">Programar reserva</h3>
+              <button type="button" onClick={() => setShowForm(false)} className="w-8 h-8 rounded-xl bg-slate-100 text-slate-500">✕</button>
+            </div>
+            <input
+              value={form.origen}
+              onChange={(e) => setForm({ ...form, origen: e.target.value })}
+              placeholder="Origen"
+              required
+              className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm"
+            />
+            <input
+              value={form.destino}
+              onChange={(e) => setForm({ ...form, destino: e.target.value })}
+              placeholder="Destino"
+              required
+              className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm"
+            />
+            <input
+              type="datetime-local"
+              value={form.fecha_hora}
+              onChange={(e) => setForm({ ...form, fecha_hora: e.target.value })}
+              required
+              className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm"
+            />
+            <input
+              value={form.notas ?? ""}
+              onChange={(e) => setForm({ ...form, notas: e.target.value })}
+              placeholder="Notas para el chofer (opcional)"
+              className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm"
+            />
+            {formError && <p className="text-xs text-red-600">{formError}</p>}
+            <button type="submit" disabled={saving} className="w-full py-3 rounded-xl bg-gradient-to-r from-purple-700 to-indigo-700 text-white text-sm font-bold disabled:opacity-60">
+              {saving ? "Guardando..." : "Confirmar reserva"}
+            </button>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,12 +1,22 @@
 import { useState } from "react";
-import { MOCK_CLIENTS } from "../mockData/driverMockData";
+import { useClientesTenant } from "@drivip/supabase";
 
-export default function MisClientes() {
+function initialsOf(nombre: string): string {
+  return nombre.trim().split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join("").toUpperCase() || "C";
+}
+
+export default function MisClientes({ tenantId }: { tenantId?: string | null }) {
   const [search, setSearch] = useState("");
+  const { clientes, loading } = useClientesTenant(tenantId);
 
-  const filtered = MOCK_CLIENTS.filter((c) =>
-    c.nombre.toLowerCase().includes(search.toLowerCase()) || c.telefono.includes(search)
-  );
+  const filtered = clientes.filter((c) => {
+    const q = search.toLowerCase();
+    return (
+      c.nombre.toLowerCase().includes(q) ||
+      (c.telefono ?? "").includes(search) ||
+      (c.email ?? "").toLowerCase().includes(q)
+    );
+  });
 
   return (
     <div className="px-4 py-4 space-y-4 lg:px-8 lg:py-6 max-w-2xl mx-auto w-full">
@@ -23,29 +33,39 @@ export default function MisClientes() {
         />
       </div>
 
+      {loading && (
+        <p className="text-center text-xs text-slate-400 py-6">Cargando clientes...</p>
+      )}
+
+      {!loading && filtered.length === 0 && (
+        <div className="bg-white rounded-3xl p-8 shadow-xl shadow-slate-200/60 border border-slate-100 flex flex-col items-center gap-2 text-center">
+          <span className="material-symbols-outlined text-[40px] text-slate-300">group</span>
+          <p className="text-sm font-semibold text-slate-500">
+            {clientes.length === 0 ? "Aún no tienes clientes registrados" : "Sin resultados"}
+          </p>
+          <p className="text-xs text-slate-400">
+            {clientes.length === 0 ? "Aparecerán cuando te soliciten una carrera." : "Prueba con otro nombre o teléfono."}
+          </p>
+        </div>
+      )}
+
       <div className="space-y-3">
         {filtered.map((cliente) => (
           <div key={cliente.id} className="bg-white rounded-3xl p-4 lg:p-5 shadow-xl shadow-slate-200/60 border border-slate-100 flex items-center gap-3">
             <div className="relative flex-shrink-0">
               <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 text-white flex items-center justify-center shadow-md">
-                <span className="text-sm font-bold">{cliente.nombre.split(" ").map(n => n[0]).join("")}</span>
+                <span className="text-sm font-bold">{initialsOf(cliente.nombre)}</span>
               </div>
-              {cliente.favorito && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-amber-400 rounded-full flex items-center justify-center border-2 border-white shadow-sm">
-                  <svg className="w-3 h-3 text-white fill-white" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-                </span>
-              )}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm lg:text-base font-bold text-slate-900 truncate">{cliente.nombre}</p>
-              <p className="text-[11px] lg:text-xs text-slate-500">{cliente.telefono}</p>
+              <p className="text-[11px] lg:text-xs text-slate-500 truncate">{cliente.telefono ?? cliente.email ?? "Sin contacto"}</p>
             </div>
             <div className="text-right flex-shrink-0">
-              <p className="text-xs lg:text-sm font-black text-slate-900">{cliente.carreras} viajes</p>
-              <div className="flex items-center gap-0.5 justify-end">
-                <svg className="w-3 h-3 text-amber-400 fill-amber-400" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-                <span className="text-[10px] lg:text-[11px] font-bold text-slate-600">{cliente.calificacion}</span>
-              </div>
+              <p className="text-xs lg:text-sm font-black text-slate-900">{cliente.total_carreras} viajes</p>
+              <p className="text-[10px] lg:text-[11px] text-slate-400">
+                {new Date(cliente.created_at).toLocaleDateString("es-VE")}
+              </p>
             </div>
           </div>
         ))}

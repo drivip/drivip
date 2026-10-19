@@ -10,6 +10,7 @@ const corsHeaders = {
 interface PushPayload {
   tenant_id?: string;
   user_ids?: string[];
+  carrera_id?: string;
   title: string;
   body: string;
   url?: string;
@@ -60,23 +61,70 @@ Deno.serve(async (req: Request) => {
   }
 
   if (!payload?.title || !payload?.body) return json({ error: "title_and_body_required" }, 400);
-  if (!payload.tenant_id && !(payload.user_ids && payload.user_ids.length)) {
+  if (!payload.carrera_id && !payload.tenant_id && !(payload.user_ids && payload.user_ids.length)) {
     return json({ error: "target_required" }, 400);
   }
 
   const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
 
   const { data: isSuper } = await userClient.rpc("is_superadmin");
-  let allowed = isSuper === true;
-  if (!allowed && payload.tenant_id) {
-    const callerTenant = (caller.app_metadata as Record<string, unknown> | undefined)?.tenant_id;
-    allowed = Boolean(callerTenant) && callerTenant === payload.tenant_id;
+  const superadmin = isSuper === true;
+
+  let callerTenant =
+    ((caller.app_metadata as Record<string, unknown> | undefined)?.tenant_id as string | undefined) ?? null;
+  if (!callerTenant) {
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", caller.id)
+      .maybeSingle();
+    callerTenant = (profile?.tenant_id as string | undefined) ?? null;
   }
-  if (!allowed) return json({ error: "forbidden" }, 403);
+
+  let targetTenant = payload.tenant_id ?? null;
+  let targetUsers = payload.user_ids ?? null;
+
+  if (payload.carrera_id) {
+    const { data: carrera, error: carreraError } = await admin
+      .from("carreras")
+      .select("id, cliente_id, tenant_id")
+      .eq("id", payload.carrera_id)
+      .maybeSingle();
+
+    if (carreraError) return json({ error: "carrera_lookup_failed" }, 500);
+    if (!carrera) return json({ error: "carrera_not_found" }, 404);
+
+    const isClient = carrera.cliente_id === caller.id;
+    const isDriver = Boolean(callerTenant) && callerTenant === carrera.tenant_id;
+
+    if (!superadmin && !isClient && !isDriver) {
+      return json({ error: "forbidden" }, 403);
+    }
+
+    if (isClient) {
+      targetTenant = carrera.tenant_id as string;
+      targetUsers = null;
+    } else if (isDriver) {
+      targetTenant = null;
+      targetUsers = carrera.cliente_id ? [carrera.cliente_id as string] : [];
+    } else if (!targetTenant && !targetUsers?.length) {
+      targetTenant = carrera.tenant_id as string;
+    }
+  } else {
+    let allowed = superadmin;
+    if (!allowed && payload.tenant_id) {
+      allowed = Boolean(callerTenant) && callerTenant === payload.tenant_id;
+    }
+    if (!allowed) return json({ error: "forbidden" }, 403);
+  }
+
+  if (!targetTenant && (!targetUsers || targetUsers.length === 0)) {
+    return json({ error: "target_required" }, 400);
+  }
 
   let query = admin.from("push_subscriptions").select("id, endpoint, p256dh, auth");
-  if (payload.tenant_id) query = query.eq("tenant_id", payload.tenant_id);
-  if (payload.user_ids && payload.user_ids.length) query = query.in("user_id", payload.user_ids);
+  if (targetTenant) query = query.eq("tenant_id", targetTenant);
+  if (targetUsers && targetUsers.length) query = query.in("user_id", targetUsers);
 
   const { data: subs, error: subsError } = await query;
   if (subsError) return json({ error: "fetch_failed", detail: subsError.message }, 500);

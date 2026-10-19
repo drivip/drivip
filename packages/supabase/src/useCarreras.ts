@@ -32,6 +32,37 @@ export function useCarreras(conductorId?: string) {
     return () => { cancelled = true; };
   }, [conductorId]);
 
+  // Mantiene la lista sincronizada cuando el cliente crea o actualiza
+  // una carrera (nuevas solicitudes, aceptadas, completadas, etc.).
+  useEffect(() => {
+    if (!conductorId) return;
+
+    const channel = supabase
+      .channel(`carreras-live-${conductorId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "carreras", filter: `conductor_id=eq.${conductorId}` },
+        (payload) => {
+          if (payload.eventType === "DELETE") {
+            const old = payload.old as { id?: string };
+            setState((s) => ({ ...s, carreras: s.carreras.filter((c) => c.id !== old.id) }));
+            return;
+          }
+          const row = payload.new as Carrera;
+          setState((s) => {
+            const exists = s.carreras.some((c) => c.id === row.id);
+            const carreras = exists
+              ? s.carreras.map((c) => (c.id === row.id ? row : c))
+              : [row, ...s.carreras];
+            return { ...s, carreras, error: null };
+          });
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [conductorId]);
+
   const createCarrera = useCallback(async (carrera: Omit<Carrera, "id" | "created_at">) => {
     const { data, error } = await supabase
       .from("carreras")

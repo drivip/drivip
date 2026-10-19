@@ -1,10 +1,10 @@
 import { useState, useCallback, useEffect } from "react";
 import type { Carrera } from "@drivip/types";
+import { CarreraChat } from "@drivip/supabase";
 import StatusHeroCard from "./driver/StatusHeroCard";
 import DriverMapView from "./driver/DriverMapView";
 import IncomingOrderModal from "./driver/IncomingOrderModal";
 import EndTripConfirmation from "./driver/EndTripConfirmation";
-import { MOCK_DAILY_REPORT } from "../mockData/driverMockData";
 
 interface Props {
   onNavigate: (module: string) => void;
@@ -13,7 +13,9 @@ interface Props {
   onToggleOnline: () => void;
   onAcceptCarrera: (id: string) => void;
   onRejectCarrera: (id: string) => void;
+  onStartCarrera: (id: string) => void;
   onCompleteCarrera: (id: string) => void;
+  onArrivedAtPickup?: (id: string) => void;
   carreraActiva: string | null;
   domain: string;
   profileName: string;
@@ -30,7 +32,9 @@ export default function ChoferDashboard({
   onToggleOnline,
   onAcceptCarrera,
   onRejectCarrera,
+  onStartCarrera,
   onCompleteCarrera,
+  onArrivedAtPickup,
   carreraActiva,
   domain,
   profileName,
@@ -52,6 +56,12 @@ export default function ChoferDashboard({
     .reduce((sum, c) => sum + (c.precio ?? 0), 0);
 
   const carrerasCompletadas = carrerasHoy.filter((c) => c.estado === "completada").length;
+
+  const carrerasCalificadas = carreras.filter((c) => c.calificacion != null);
+  const ratingPromedio = carrerasCalificadas.length
+    ? carrerasCalificadas.reduce((sum, c) => sum + (c.calificacion ?? 0), 0) / carrerasCalificadas.length
+    : 0;
+
   const carreraPendiente = carreras.find((c) => c.estado === "pendiente" && c.id !== carreraActiva);
   const carreraEnCurso = carreraActiva ? carreras.find((c) => c.id === carreraActiva) : null;
 
@@ -100,13 +110,15 @@ export default function ChoferDashboard({
 
   const handleArrivedAtPickup = useCallback(() => {
     setRidePhase("at_pickup");
-  }, []);
+    if (carreraActiva) onArrivedAtPickup?.(carreraActiva);
+  }, [carreraActiva, onArrivedAtPickup]);
 
   const handleArrivedAtDestination = useCallback(() => {
     setRidePhase("at_destination");
   }, []);
 
   const handlePickupConfirmed = () => {
+    if (carreraActiva) onStartCarrera(carreraActiva);
     setRidePhase("in_trip");
   };
 
@@ -156,8 +168,8 @@ export default function ChoferDashboard({
             onStatusChange={handleStatusChange}
             dailyEarnings={ingresosHoy}
             dailyRides={carrerasCompletadas}
-            rating={MOCK_DAILY_REPORT.calificacionPromedio}
-            onlineTime={MOCK_DAILY_REPORT.horasOnline}
+            rating={ratingPromedio}
+            onlineTime="-"
           />
         </div>
       )}
@@ -252,8 +264,13 @@ export default function ChoferDashboard({
               className="w-full py-3 rounded-xl bg-gradient-to-r from-purple-700 to-indigo-600 text-white text-sm font-black active:scale-[0.98] transition flex items-center justify-center gap-2 shadow-lg shadow-purple-600/30"
             >
               <span className="material-symbols-outlined text-[18px]">person_add</span>
-              Recogí al Pasajero
+              Recogi al Pasajero
             </button>
+            {carreraActiva && (
+              <div className="mt-2">
+                <CarreraChat carreraId={carreraActiva} rol="conductor" />
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -281,6 +298,11 @@ export default function ChoferDashboard({
               <span className="material-symbols-outlined text-[18px]">check_circle</span>
               Finalizar Viaje
             </button>
+            {carreraActiva && (
+              <div className="mt-2">
+                <CarreraChat carreraId={carreraActiva} rol="conductor" />
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -302,6 +324,10 @@ export default function ChoferDashboard({
             </button>
           </div>
         </div>
+      )}
+
+      {ridePhase === "going_to_pickup" && carreraActiva && (
+        <CarreraChat carreraId={carreraActiva} rol="conductor" floating />
       )}
 
       <button

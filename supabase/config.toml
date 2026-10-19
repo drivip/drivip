@@ -20,3 +20,8 @@ additional_redirect_urls = [
 
 [functions.send-push]
 verify_jwt = true
+
+# Tasa BCV: se invoca desde cron (pg_cron/pg_net) o manualmente.
+# La proteccion se hace con el secreto CRON_SECRET (header x-cron-secret).
+[functions.update-bcv-rate]
+verify_jwt = false

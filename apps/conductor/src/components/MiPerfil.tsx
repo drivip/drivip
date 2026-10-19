@@ -3,21 +3,23 @@ import { MOCK_DRIVER_PROFILE } from "../mockData/driverMockData";
 
 interface MiPerfilProps {
   tenant?: Tenant | null;
+  demo?: boolean;
 }
 
-export default function MiPerfil({ tenant }: MiPerfilProps) {
-  const p = MOCK_DRIVER_PROFILE;
+export default function MiPerfil({ tenant, demo = false }: MiPerfilProps) {
+  const p = demo ? MOCK_DRIVER_PROFILE : null;
 
-  const nombre = tenant?.nombre || p.nombre;
-  const telefono = tenant?.telefono || p.telefono;
-  const email = tenant?.email || p.email;
-  const plan = tenant?.plan || p.plan;
-  const calificacion = tenant?.calificacion ?? p.calificacion;
-  const totalResenas = tenant?.total_carreras || p.totalResenas;
-  const vehiculoTipo = tenant?.vehiculo_tipo || p.vehiculo.tipo;
-  const vehiculoPlaca = tenant?.vehiculo_placa || p.vehiculo.placa;
-  const vehiculoModelo = tenant?.vehiculo_modelo || p.vehiculo.modelo;
-  const vehiculoColor = tenant?.vehiculo_color || p.vehiculo.color;
+  const nombre = tenant?.nombre || p?.nombre || "Conductor";
+  const cedula = tenant?.cedula || p?.cedula || null;
+  const telefono = tenant?.telefono || p?.telefono || null;
+  const email = tenant?.email || p?.email || null;
+  const plan = tenant?.plan || p?.plan || "estandar";
+  const calificacion = tenant?.calificacion ?? p?.calificacion ?? null;
+  const totalResenas = tenant?.total_carreras ?? p?.totalResenas ?? 0;
+  const vehiculoTipo = tenant?.vehiculo_tipo || p?.vehiculo.tipo || null;
+  const vehiculoPlaca = tenant?.vehiculo_placa || p?.vehiculo.placa || null;
+  const vehiculoModelo = tenant?.vehiculo_modelo || p?.vehiculo.modelo || null;
+  const vehiculoColor = tenant?.vehiculo_color || p?.vehiculo.color || null;
   const ciudad = tenant?.ciudad || null;
   const direccion = tenant?.direccion || null;
 
@@ -36,17 +38,17 @@ export default function MiPerfil({ tenant }: MiPerfilProps) {
         </div>
         <div className="text-center">
           <h2 className="text-lg lg:text-xl font-black text-slate-900">{nombre}</h2>
-          <p className="text-[11px] lg:text-xs text-slate-500">{tenant?.slug || p.cedula}</p>
+          <p className="text-[11px] lg:text-xs text-slate-500">{cedula || "Sin cédula registrada"}</p>
         </div>
         <div className="flex items-center gap-4">
           <div className="text-center">
-            <p className="text-lg lg:text-xl font-black text-slate-900">{calificacion?.toFixed(1) ?? "-"}</p>
+            <p className="text-lg lg:text-xl font-black text-slate-900">{calificacion != null ? calificacion.toFixed(1) : "-"}</p>
             <p className="text-[10px] lg:text-[11px] text-slate-500">Rating</p>
           </div>
           <div className="w-px h-8 bg-slate-200" />
           <div className="text-center">
             <p className="text-lg lg:text-xl font-black text-slate-900">{totalResenas}</p>
-            <p className="text-[10px] lg:text-[11px] text-slate-500">{tenant ? "Carreras" : "Resenas"}</p>
+            <p className="text-[10px] lg:text-[11px] text-slate-500">Carreras</p>
           </div>
           <div className="w-px h-8 bg-slate-200" />
           <div className="text-center">
@@ -58,11 +60,12 @@ export default function MiPerfil({ tenant }: MiPerfilProps) {
 
       <div className="bg-white rounded-3xl p-4 lg:p-5 shadow-xl shadow-slate-200/60 border border-slate-100 space-y-1">
         {[
+          { icon: "badge", label: "Cédula", value: cedula },
           { icon: "phone", label: "Telefono", value: telefono },
           { icon: "mail", label: "Email", value: email },
           { icon: "location_city", label: "Ciudad", value: ciudad },
           { icon: "home", label: "Direccion", value: direccion },
-          { icon: "directions_car", label: "Vehiculo", value: `${vehiculoColor} ${vehiculoModelo}` },
+          { icon: "directions_car", label: "Vehiculo", value: [vehiculoColor, vehiculoModelo].filter(Boolean).join(" ") || null },
           { icon: "pin", label: "Placa", value: vehiculoPlaca },
           { icon: "category", label: "Tipo", value: vehiculoTipo },
         ].map((item) => (

@@ -8,6 +8,26 @@ export interface RedCliente {
   agregado_at: string;
 }
 
+/** Conductor (tenant) que pertenece a la red del cliente. */
+export interface ConductorRed {
+  conductor_tenant_id: string;
+  slug: string;
+  nombre: string;
+  logo_url: string | null;
+  ciudad: string | null;
+  telefono: string | null;
+  vehiculo_tipo: string | null;
+  vehiculo_placa: string | null;
+  vehiculo_modelo: string | null;
+  vehiculo_color: string | null;
+  calificacion: number | null;
+  pausado: boolean;
+  suscripcion_activa: boolean;
+  apodo: string | null;
+  favorito: boolean;
+  agregado_at: string;
+}
+
 export interface Cliente {
   id: string;
   tenant_id: string;

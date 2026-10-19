@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { AuthProvider, useAuthContext, useTenants, useSuscripciones, useCarreras, useClientes } from "@drivip/supabase";
+import { AuthProvider, useAuthContext, supabase, useTenants, useSuscripciones, useCarreras, useClientes } from "@drivip/supabase";
 import LoginScreen from "./components/LoginScreen";
 import AdminAppShell from "./components/layout/AdminAppShell";
 import type { AdminModule } from "./components/layout/AdminSidebar";
@@ -61,6 +61,76 @@ function AdminDashboardView() {
     if (ok) showToast("Suscripcion rechazada");
   };
 
+  const ingresos = carreras
+    .filter((c) => c.estado === "completada")
+    .reduce((sum, c) => sum + (c.precio ?? 0), 0);
+
+  const carrerasPorTenant = tenants
+    .map((t) => ({
+      nombre: t.nombre,
+      total: carreras.filter((c) => c.tenant_id === t.id).length,
+    }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 8);
+
+  const exportarCSV = () => {
+    const header = ["id", "fecha", "tenant_id", "origen", "destino", "precio_usd", "metodo_pago", "estado"];
+    const rows = carreras.map((c) => [
+      c.id,
+      c.created_at,
+      c.tenant_id,
+      c.origen_direccion ?? "",
+      c.destino_direccion ?? "",
+      String(c.precio ?? 0),
+      c.metodo_pago ?? "",
+      c.estado,
+    ]);
+    const csv = [header, ...rows]
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `carreras-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast("Reporte CSV exportado");
+  };
+
+  const exportarRespaldo = async () => {
+    const [tenantsRes, carrerasRes, clientesRes, suscripcionesRes] = await Promise.all([
+      supabase.from("tenants").select("*"),
+      supabase.from("carreras").select("*"),
+      supabase.from("clientes").select("*"),
+      supabase.from("suscripciones").select("*"),
+    ]);
+    if (tenantsRes.error || carrerasRes.error || clientesRes.error || suscripcionesRes.error) {
+      showToast("No se pudo generar el respaldo");
+      return;
+    }
+    const payload = {
+      generado_at: new Date().toISOString(),
+      tenants: tenantsRes.data,
+      carreras: carrerasRes.data,
+      clientes: clientesRes.data,
+      suscripciones: suscripcionesRes.data,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `respaldo-drivip-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast("Respaldo exportado");
+  };
+
+  const recalcularMetricas = async () => {
+    const { error } = await supabase.rpc("recalcular_metricas_tenants");
+    showToast(error ? "No se pudieron recalcular las métricas" : "Métricas recalculadas");
+  };
+
   const renderModule = () => {
     switch (activeModule) {
       case "dashboard":
@@ -84,7 +154,7 @@ function AdminDashboardView() {
       case "plugins":
         return <PluginCatalogGrid />;
       case "promociones":
-        return <BannerManager />;
+        return <BannerManager tenants={tenants} />;
       case "b2b":
         return <DeliveryB2BControl />;
       case "security":
@@ -147,26 +217,33 @@ function AdminDashboardView() {
           <div className="px-4 lg:px-8 py-4 lg:py-6 space-y-4 pb-24 lg:pb-6">
             <h2 className="text-base lg:text-lg font-black text-slate-900">Mantenimiento</h2>
             <div className="bg-white rounded-2xl p-4 space-y-2 border border-slate-100" style={{ boxShadow: "4px 4px 10px #d9dde2, -4px -4px 10px #ffffff" }}>
-              {[
-                { icon: "backup", label: "Respaldo manual", desc: "Crear respaldo de la base de datos", toast: "Respaldando base de datos..." },
-                { icon: "restore", label: "Restaurar respaldo", desc: "Restaurar desde un respaldo anterior", toast: "Restaurando respaldo..." },
-                { icon: "build", label: "Reparar datos", desc: "Reparar registros huerfanos", toast: "Reparando datos..." },
-                { icon: "replay", label: "Reindexar", desc: "Reindexar tablas para optimizar", toast: "Reindexando tablas..." },
-              ].map((item) => (
-                <button
-                  key={item.label}
-                  onClick={() => showToast(item.toast)}
-                  className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 active:scale-[0.98] transition text-left"
-                >
-                  <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
-                    <span className="material-symbols-outlined text-[18px] text-slate-600">{item.icon}</span>
-                  </div>
-                  <div>
-                    <span className="text-[12px] lg:text-[13px] text-slate-900 font-medium block">{item.label}</span>
-                    <span className="text-[10px] lg:text-[11px] text-slate-500">{item.desc}</span>
-                  </div>
-                </button>
-              ))}
+              <button
+                onClick={recalcularMetricas}
+                className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 active:scale-[0.98] transition text-left"
+              >
+                <div className="w-9 h-9 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                  <span className="material-symbols-outlined text-[18px] text-emerald-600">calculate</span>
+                </div>
+                <div>
+                  <span className="text-[12px] lg:text-[13px] text-slate-900 font-medium block">Recalcular métricas</span>
+                  <span className="text-[10px] lg:text-[11px] text-slate-500">Actualiza totales de carreras y clientes por tenant</span>
+                </div>
+              </button>
+              <button
+                onClick={exportarRespaldo}
+                className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 active:scale-[0.98] transition text-left"
+              >
+                <div className="w-9 h-9 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                  <span className="material-symbols-outlined text-[18px] text-blue-600">download</span>
+                </div>
+                <div>
+                  <span className="text-[12px] lg:text-[13px] text-slate-900 font-medium block">Exportar respaldo JSON</span>
+                  <span className="text-[10px] lg:text-[11px] text-slate-500">Descarga tenants, carreras, clientes y suscripciones</span>
+                </div>
+              </button>
+              <p className="text-[10px] lg:text-[11px] text-slate-400 px-3 pt-2">
+                Restauración, reindexado y políticas de respaldo automático se gestionan desde el panel de Supabase.
+              </p>
             </div>
           </div>
         );
@@ -174,25 +251,36 @@ function AdminDashboardView() {
         return (
           <div className="px-4 lg:px-8 py-4 lg:py-6 space-y-4 pb-24 lg:pb-6">
             <h2 className="text-base lg:text-lg font-black text-slate-900">Reportes</h2>
-            <div className="bg-white rounded-2xl p-4 space-y-2 border border-slate-100" style={{ boxShadow: "4px 4px 10px #d9dde2, -4px -4px 10px #ffffff" }}>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               {[
-                { icon: "payments", label: "Ingresos por periodo", toast: "Generando reporte de ingresos..." },
-                { icon: "local_taxi", label: "Carreras por tenant", toast: "Generando reporte de carreras..." },
-                { icon: "trending_up", label: "Crecimiento de usuarios", toast: "Generando reporte de usuarios..." },
-                { icon: "download", label: "Exportar CSV/PDF", toast: "Exportando datos..." },
-              ].map((item) => (
-                <button
-                  key={item.label}
-                  onClick={() => showToast(item.toast)}
-                  className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 active:scale-[0.98] transition text-left"
-                >
-                  <div className="w-9 h-9 rounded-lg bg-cyan-100 flex items-center justify-center flex-shrink-0">
-                    <span className="material-symbols-outlined text-[18px] text-cyan-600">{item.icon}</span>
-                  </div>
-                  <span className="text-[12px] lg:text-[13px] text-slate-900 font-medium">{item.label}</span>
-                </button>
+                { label: "Ingresos", value: `$${ingresos.toFixed(2)}`, icon: "payments" },
+                { label: "Carreras", value: String(carreras.length), icon: "local_taxi" },
+                { label: "Clientes", value: String(clientes.length), icon: "group" },
+                { label: "Conductores", value: String(tenants.length), icon: "two_wheeler" },
+              ].map((card) => (
+                <div key={card.label} className="bg-white rounded-2xl p-4 border border-slate-100" style={{ boxShadow: "4px 4px 10px #d9dde2, -4px -4px 10px #ffffff" }}>
+                  <span className="material-symbols-outlined text-[18px] text-cyan-600">{card.icon}</span>
+                  <p className="text-[18px] lg:text-[20px] font-black text-slate-900 mt-1">{card.value}</p>
+                  <p className="text-[10px] lg:text-[11px] text-slate-500">{card.label}</p>
+                </div>
               ))}
             </div>
+            <div className="bg-white rounded-2xl p-4 space-y-2 border border-slate-100" style={{ boxShadow: "4px 4px 10px #d9dde2, -4px -4px 10px #ffffff" }}>
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Carreras por conductor</span>
+              {carrerasPorTenant.length === 0 && <p className="text-[12px] text-slate-400 py-2">Sin datos</p>}
+              {carrerasPorTenant.map((row) => (
+                <div key={row.nombre} className="flex items-center justify-between py-1.5 text-[12px] lg:text-[13px]">
+                  <span className="text-slate-700 truncate">{row.nombre}</span>
+                  <span className="font-mono font-bold text-slate-900">{row.total}</span>
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={exportarCSV}
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold text-[12px] lg:text-[13px] active:scale-[0.98] transition shadow-lg shadow-blue-600/30"
+            >
+              Exportar carreras a CSV
+            </button>
           </div>
         );
       case "respaldos":
@@ -200,12 +288,15 @@ function AdminDashboardView() {
           <div className="px-4 lg:px-8 py-4 lg:py-6 space-y-4 pb-24 lg:pb-6">
             <h2 className="text-base lg:text-lg font-black text-slate-900">Respaldos</h2>
             <div className="bg-white rounded-2xl p-4 border border-slate-100 space-y-3" style={{ boxShadow: "4px 4px 10px #d9dde2, -4px -4px 10px #ffffff" }}>
-              <p className="text-[12px] lg:text-[13px] text-slate-500">Los respaldos se realizan automaticamente cada 24 horas. Ultimo respaldo: 10/09/2026 03:00 AM</p>
+              <p className="text-[12px] lg:text-[13px] text-slate-500">
+                Los respaldos automáticos son administrados por Supabase según el plan del proyecto. Puedes descargar
+                una copia de los datos accesibles desde el panel.
+              </p>
               <button
-                onClick={() => showToast("Respaldando base de datos...")}
+                onClick={exportarRespaldo}
                 className="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-500 to-blue-600 text-white font-bold text-[12px] lg:text-[13px] active:scale-[0.98] transition shadow-lg shadow-blue-600/30"
               >
-                Crear respaldo ahora
+                Descargar respaldo JSON
               </button>
             </div>
           </div>
@@ -215,13 +306,15 @@ function AdminDashboardView() {
           <div className="px-4 lg:px-8 py-4 lg:py-6 space-y-4 pb-24 lg:pb-6">
             <h2 className="text-base lg:text-lg font-black text-slate-900">Soporte</h2>
             <div className="bg-white rounded-2xl p-4 space-y-3 border border-slate-100" style={{ boxShadow: "4px 4px 10px #d9dde2, -4px -4px 10px #ffffff" }}>
-              <p className="text-[12px] lg:text-[13px] text-slate-500">Tickets abiertos: 2</p>
-              <button
-                onClick={() => showToast("Abriendo panel de tickets...")}
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-orange-400 to-red-500 text-white font-bold text-[12px] lg:text-[13px] active:scale-[0.98] transition shadow-lg shadow-red-500/30"
+              <p className="text-[12px] lg:text-[13px] text-slate-500">
+                Escríbenos para reportar incidencias o solicitar cambios en la plataforma.
+              </p>
+              <a
+                href="mailto:soporte@drivip.app"
+                className="block text-center w-full py-3 rounded-xl bg-gradient-to-r from-orange-400 to-red-500 text-white font-bold text-[12px] lg:text-[13px] active:scale-[0.98] transition shadow-lg shadow-red-500/30"
               >
-                Ver tickets
-              </button>
+                soporte@drivip.app
+              </a>
             </div>
           </div>
         );

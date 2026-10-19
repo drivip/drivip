@@ -3,12 +3,15 @@ import { MOCK_DRIVER_PROFILE } from "../mockData/driverMockData";
 
 interface MiPlanProps {
   tenant?: Tenant | null;
+  demo?: boolean;
 }
 
-export default function MiPlan({ tenant }: MiPlanProps) {
-  const plan = tenant?.plan || MOCK_DRIVER_PROFILE.plan;
-  const activo = tenant?.suscripcion_activa ?? MOCK_DRIVER_PROFILE.suscripcionActiva;
-  const vencimiento = tenant?.fecha_vencimiento || MOCK_DRIVER_PROFILE.fechaVencimiento;
+export default function MiPlan({ tenant, demo = false }: MiPlanProps) {
+  const p = demo ? MOCK_DRIVER_PROFILE : null;
+  const plan = tenant?.plan || p?.plan || "estandar";
+  const activo = tenant?.suscripcion_activa ?? p?.suscripcionActiva ?? false;
+  const vencimiento = tenant?.fecha_vencimiento || p?.fechaVencimiento || null;
+  const precio = plan === "profesional" ? "$20" : "$10";
 
   return (
     <div className="px-4 py-4 space-y-4 lg:px-8 lg:py-6 max-w-2xl mx-auto w-full">
@@ -25,7 +28,7 @@ export default function MiPlan({ tenant }: MiPlanProps) {
               {activo ? "ACTIVO" : "INACTIVO"}
             </span>
           </div>
-          <p className="text-3xl lg:text-4xl font-black">$10<span className="text-base lg:text-lg font-bold opacity-70">/mes</span></p>
+          <p className="text-3xl lg:text-4xl font-black">{precio}<span className="text-base lg:text-lg font-bold opacity-70">/mes</span></p>
           <p className="text-[11px] lg:text-xs text-white/70 mt-1">
             {activo ? `Renovacion automatica` : "Sin suscripcion activa"}
             {vencimiento && ` · Vence: ${new Date(vencimiento).toLocaleDateString("es-VE")}`}

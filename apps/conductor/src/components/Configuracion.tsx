@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { PushNotificationCard } from "@drivip/supabase";
+import { PushNotificationCard, useAuthContext } from "@drivip/supabase";
 
 interface Toggle {
   label: string;
@@ -8,9 +8,11 @@ interface Toggle {
 
 interface ConfiguracionProps {
   isPaused?: boolean;
+  tenantId?: string | null;
 }
 
-export default function Configuracion({ isPaused }: ConfiguracionProps) {
+export default function Configuracion({ isPaused, tenantId }: ConfiguracionProps) {
+  const { signOut } = useAuthContext();
   const [notifToggles, setNotifToggles] = useState<Toggle[]>([
     { label: "Nueva carrera", checked: true },
     { label: "Mensajes del cliente", checked: true },
@@ -62,7 +64,7 @@ export default function Configuracion({ isPaused }: ConfiguracionProps) {
         ))}
       </div>
 
-      <PushNotificationCard disabled={isPaused} />
+      <PushNotificationCard disabled={isPaused} tenantId={tenantId} />
 
       <div className="bg-white rounded-3xl p-4 lg:p-5 shadow-xl shadow-slate-200/60 border border-slate-100 space-y-1">
         <p className="text-[10px] lg:text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">General</p>
@@ -99,7 +101,10 @@ export default function Configuracion({ isPaused }: ConfiguracionProps) {
       </div>
 
       <div className="bg-white rounded-3xl p-4 lg:p-5 shadow-xl shadow-slate-200/60 border border-slate-100">
-        <button className="w-full py-3 rounded-2xl bg-red-50 border border-red-200 text-red-600 font-bold text-sm active:scale-[0.98] transition">
+        <button
+          onClick={() => { void signOut(); }}
+          className="w-full py-3 rounded-2xl bg-red-50 border border-red-200 text-red-600 font-bold text-sm active:scale-[0.98] transition"
+        >
           Cerrar Sesion
         </button>
       </div>

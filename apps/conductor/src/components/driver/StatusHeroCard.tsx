@@ -62,19 +62,19 @@ export default function StatusHeroCard({
 
       <div className="grid grid-cols-4 gap-2 pt-2 border-t border-slate-100">
         <div className="flex flex-col items-center">
-          <span className="text-lg lg:text-xl font-black text-slate-900">${dailyEarnings > 0 ? dailyEarnings.toFixed(0) : "42"}</span>
+          <span className="text-lg lg:text-xl font-black text-slate-900">${dailyEarnings.toFixed(2)}</span>
           <span className="text-[10px] lg:text-[11px] text-slate-500 font-medium">Ganancias</span>
         </div>
         <div className="flex flex-col items-center">
-          <span className="text-lg lg:text-xl font-black text-slate-900">{dailyRides || 8}</span>
+          <span className="text-lg lg:text-xl font-black text-slate-900">{dailyRides}</span>
           <span className="text-[10px] lg:text-[11px] text-slate-500 font-medium">Carreras</span>
         </div>
         <div className="flex flex-col items-center">
-          <span className="text-lg lg:text-xl font-black text-slate-900">{rating}</span>
+          <span className="text-lg lg:text-xl font-black text-slate-900">{rating > 0 ? rating.toFixed(1) : "-"}</span>
           <span className="text-[10px] lg:text-[11px] text-slate-500 font-medium">Rating</span>
         </div>
         <div className="flex flex-col items-center">
-          <span className="text-lg lg:text-xl font-black text-slate-900">{onlineTime}</span>
+          <span className="text-lg lg:text-xl font-black text-slate-900">{onlineTime || "-"}</span>
           <span className="text-[10px] lg:text-[11px] text-slate-500 font-medium">En Ruta</span>
         </div>
       </div>

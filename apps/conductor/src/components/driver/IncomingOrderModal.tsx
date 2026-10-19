@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import type { Carrera } from "@drivip/types";
+import { formatearBs, TASA_BCV_REFERENCIA } from "@drivip/types";
+import { useTasaCambio } from "@drivip/supabase";
 import { MapLibreView, haversineKm, fetchRoute } from "@drivip/maps";
 
 const VOYAGER_STYLE = "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json";
@@ -21,6 +23,7 @@ export default function IncomingOrderModal({ isOpen, onAccept, onReject, carrera
   const [showRejectOptions, setShowRejectOptions] = useState(false);
   const [routePreview, setRoutePreview] = useState<[number, number][] | null>(null);
   const [distanceKm, setDistanceKm] = useState(carrera.distancia_km ?? 0);
+  const { tasa } = useTasaCambio();
 
   const originCoords: [number, number] = [carrera.origen_lat, carrera.origen_lng];
   const destCoords: [number, number] | null = carrera.destino_lat && carrera.destino_lng
@@ -94,7 +97,7 @@ export default function IncomingOrderModal({ isOpen, onAccept, onReject, carrera
             <div className="text-right">
               <p className="text-xl font-black text-slate-900">${(carrera.precio ?? 0).toFixed(2)}</p>
               <p className="text-[10px] font-bold text-purple-600">
-                Bs. {((carrera.precio ?? 0) * 58).toFixed(2)}
+                {formatearBs(carrera.precio ?? 0, tasa ?? TASA_BCV_REFERENCIA)}
               </p>
             </div>
           </div>

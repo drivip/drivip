@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { cn, HamburgerMenu, type MenuItem } from "@drivip/ui";
-import { AuthProvider, useAuthContext, useTenants, APP_URLS } from "@drivip/supabase";
+import { AuthProvider, useAuthContext, supabase, useMiTenant, useProductos, usePedidosComercio, APP_URLS } from "@drivip/supabase";
+import type { PedidoComercioEstado } from "@drivip/types";
 import PedidosActivos from "./components/PedidosActivos";
 import ResumenHoy from "./components/ResumenHoy";
 import Cuadratura from "./components/Cuadratura";
@@ -20,20 +21,101 @@ const navItems: { id: Module; icon: string; label: string }[] = [
   { id: "config", icon: "settings", label: "Config" },
 ];
 
+function slugify(nombre: string): string {
+  return nombre
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40) || "comercio";
+}
+
 function LoginScreen() {
-  const { signIn, signUp, loading, error } = useAuthContext();
+  const { signIn, loading, error } = useAuthContext();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [nombre, setNombre] = useState("");
+  const [telefono, setTelefono] = useState("");
   const [isRegister, setIsRegister] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isRegister) {
-      await signUp(email, password);
-    } else {
+    setLocalError(null);
+
+    if (!isRegister) {
       await signIn(email, password);
+      return;
     }
+
+    if (!nombre.trim()) {
+      setLocalError("Ingresa el nombre del comercio");
+      return;
+    }
+
+    setSubmitting(true);
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: window.location.origin,
+        data: { rol: "comercio", nombre: nombre.trim(), telefono },
+      },
+    });
+
+    if (authError) {
+      setLocalError(authError.message);
+      setSubmitting(false);
+      return;
+    }
+
+    const user = authData?.user;
+    if (!user) {
+      setLocalError("No se pudo crear la cuenta. Intenta de nuevo.");
+      setSubmitting(false);
+      return;
+    }
+
+    const slug = `${slugify(nombre)}-${Math.floor(Math.random() * 9000 + 1000)}`;
+    const tenantId = crypto.randomUUID();
+
+    const { error: tenantError } = await supabase.from("tenants").insert({
+      id: tenantId,
+      slug,
+      type: "comercio",
+      nombre: nombre.trim(),
+      email,
+      telefono,
+      suscripcion_activa: false,
+    });
+
+    if (tenantError) {
+      setLocalError("Error al crear el comercio. Intenta de nuevo.");
+      setSubmitting(false);
+      return;
+    }
+
+    const { error: profileError } = await supabase.from("profiles").insert({
+      id: user.id,
+      tenant_id: tenantId,
+      rol: "comercio",
+      nombre: nombre.trim(),
+      telefono,
+      activo: true,
+    });
+
+    if (profileError) {
+      setLocalError("Error al vincular tu cuenta. Intenta de nuevo.");
+      setSubmitting(false);
+      return;
+    }
+
+    setSubmitting(false);
   };
+
+  const busy = loading || submitting;
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-surface p-4">
@@ -49,6 +131,31 @@ function LoginScreen() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {isRegister && (
+            <>
+              <div>
+                <label className="text-[11px] font-mono text-on-surface-variant uppercase">Nombre del comercio</label>
+                <input
+                  type="text"
+                  value={nombre}
+                  onChange={(e) => setNombre(e.target.value)}
+                  className="w-full mt-1 bg-surface-container-high rounded-xl px-4 py-3 text-[14px] text-on-surface placeholder-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-primary-container"
+                  placeholder="Panadería El Trigal"
+                  required
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-mono text-on-surface-variant uppercase">Teléfono</label>
+                <input
+                  type="tel"
+                  value={telefono}
+                  onChange={(e) => setTelefono(e.target.value)}
+                  className="w-full mt-1 bg-surface-container-high rounded-xl px-4 py-3 text-[14px] text-on-surface placeholder-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-primary-container"
+                  placeholder="0412-0000000"
+                />
+              </div>
+            </>
+          )}
           <div>
             <label className="text-[11px] font-mono text-on-surface-variant uppercase">Email</label>
             <input
@@ -71,15 +178,15 @@ function LoginScreen() {
               required
             />
           </div>
-          {error && (
-            <p className="text-[12px] text-error">{error}</p>
+          {(localError || error) && (
+            <p className="text-[12px] text-error">{localError ?? error}</p>
           )}
           <button
             type="submit"
-            disabled={loading}
+            disabled={busy}
             className="w-full py-3 rounded-xl bg-secondary text-on-secondary font-semibold text-[14px] disabled:opacity-50"
           >
-            {loading ? "Procesando..." : isRegister ? "Crear cuenta" : "Ingresar"}
+            {busy ? "Procesando..." : isRegister ? "Crear cuenta" : "Ingresar"}
           </button>
         </form>
 
@@ -94,22 +201,27 @@ function LoginScreen() {
   );
 }
 
-const MOCK_TENANTS_COMERCIO = [
-  { id: "tc1", nombre: "Panadería El Trigal", slug: "panaderia-trigal", email: "", created_at: "2026-03-01" },
-];
-
-function ComercioApp({ demo }: { demo?: boolean }) {
+function ComercioApp() {
   const { user, signOut } = useAuthContext();
   const [activeModule, setActiveModule] = useState<Module>("dashboard");
   const [menuOpen, setMenuOpen] = useState(false);
-  const { tenants } = useTenants();
+  const { tenant, loading: tenantLoading } = useMiTenant(user?.id);
+  const { productos, loading: productosLoading, crearProducto, actualizarProducto, eliminarProducto } = useProductos(tenant?.id);
+  const { pedidos, loading: pedidosLoading, crearPedido, actualizarEstado } = usePedidosComercio(tenant?.id);
 
-  const effectiveTenants = demo ? MOCK_TENANTS_COMERCIO : tenants;
-  const comercioTenant = effectiveTenants.find((t) => t.email === user?.email) ?? effectiveTenants[0];
-  const comercioNombre = demo ? "Panadería El Trigal" : (comercioTenant?.nombre ?? user?.email?.split("@")[0] ?? "Comercio");
+  const [productForm, setProductForm] = useState({ nombre: "", precio: "", stock: "" });
+  const [productError, setProductError] = useState<string | null>(null);
+  const [savingProduct, setSavingProduct] = useState(false);
+  const [pedidoForm, setPedidoForm] = useState({ cliente_nombre: "", telefono: "", direccion_entrega: "", total: "" });
+  const [pedidoError, setPedidoError] = useState<string | null>(null);
+  const [savingPedido, setSavingPedido] = useState(false);
+  const [notifs, setNotifs] = useState({ nuevo: true, entregado: true, stock: false });
+
+  const comercioNombre = tenant?.nombre ?? user?.email?.split("@")[0] ?? "Comercio";
 
   const handleNavigate = (module: string) => {
     setActiveModule(module as Module);
+    setMenuOpen(false);
   };
 
   const menuItems: MenuItem[] = [
@@ -118,42 +230,181 @@ function ComercioApp({ demo }: { demo?: boolean }) {
     { icon: "inventory_2", label: "Productos", onClick: () => handleNavigate("productos") },
     { icon: "analytics", label: "Reportes", onClick: () => handleNavigate("reportes") },
     { icon: "settings", label: "Config", onClick: () => handleNavigate("config") },
-    { icon: "help", label: "Ayuda", onClick: () => {} },
   ];
 
+  const handleCreateProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const precio = Number(productForm.precio);
+    const stock = Number(productForm.stock);
+    if (!productForm.nombre.trim() || !Number.isFinite(precio) || !Number.isFinite(stock)) {
+      setProductError("Completa nombre, precio y stock");
+      return;
+    }
+    setSavingProduct(true);
+    setProductError(null);
+    const { error } = await crearProducto({ nombre: productForm.nombre, precio, stock });
+    setSavingProduct(false);
+    if (error) {
+      setProductError(error);
+      return;
+    }
+    setProductForm({ nombre: "", precio: "", stock: "" });
+  };
+
+  const handleCreatePedido = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const total = Number(pedidoForm.total);
+    if (!pedidoForm.cliente_nombre.trim() || !Number.isFinite(total)) {
+      setPedidoError("Completa cliente y total");
+      return;
+    }
+    setSavingPedido(true);
+    setPedidoError(null);
+    const { error } = await crearPedido({
+      cliente_nombre: pedidoForm.cliente_nombre,
+      telefono: pedidoForm.telefono,
+      direccion_entrega: pedidoForm.direccion_entrega,
+      total,
+      items: [],
+    });
+    setSavingPedido(false);
+    if (error) {
+      setPedidoError(error);
+      return;
+    }
+    setPedidoForm({ cliente_nombre: "", telefono: "", direccion_entrega: "", total: "" });
+  };
+
+  const handleUpdateEstado = async (id: string, estado: PedidoComercioEstado) => {
+    return actualizarEstado(id, estado);
+  };
+
+  const ventasTotales = pedidos.filter((p) => p.estado !== "cancelado").reduce((sum, p) => sum + Number(p.total), 0);
+  const entregados = pedidos.filter((p) => p.estado === "entregado").length;
+
   const renderModule = () => {
+    if (tenantLoading) {
+      return <p className="px-4 py-8 text-center text-[12px] text-on-surface-variant">Cargando comercio...</p>;
+    }
+
+    if (!tenant) {
+      return (
+        <div className="px-4 py-10 text-center space-y-2">
+          <span className="material-symbols-outlined text-[40px] text-on-surface-variant">storefront</span>
+          <p className="text-[13px] text-on-surface">No encontramos tu comercio</p>
+          <p className="text-[11px] text-on-surface-variant">Cierra sesión y vuelve a registrarte.</p>
+          <button onClick={signOut} className="px-4 py-2 rounded-xl bg-secondary text-on-secondary text-[12px] font-semibold">
+            Cerrar sesión
+          </button>
+        </div>
+      );
+    }
+
     switch (activeModule) {
       case "dashboard":
         return (
           <div className="px-4 py-4 space-y-5 pb-24 lg:pb-4">
-            <PedidosActivos />
-            <ResumenHoy />
-            <Cuadratura />
+            <PedidosActivos pedidos={pedidos} loading={pedidosLoading} onUpdateEstado={handleUpdateEstado} />
+            <ResumenHoy pedidos={pedidos} />
+            <Cuadratura pedidos={pedidos} />
           </div>
         );
       case "pedidos":
         return (
           <div className="px-4 py-4 space-y-4 pb-24 lg:pb-4">
             <h2 className="text-[18px] text-on-surface font-semibold font-display">Todos los Pedidos</h2>
-            <PedidosActivos expanded />
+            <form onSubmit={handleCreatePedido} className="bg-surface-container rounded-xl p-4 space-y-3">
+              <span className="text-[11px] font-mono text-on-surface-variant uppercase">Nuevo pedido</span>
+              <input
+                value={pedidoForm.cliente_nombre}
+                onChange={(e) => setPedidoForm({ ...pedidoForm, cliente_nombre: e.target.value })}
+                placeholder="Cliente"
+                className="w-full bg-surface-container-high rounded-xl px-4 py-2.5 text-[13px] text-on-surface"
+              />
+              <input
+                value={pedidoForm.telefono}
+                onChange={(e) => setPedidoForm({ ...pedidoForm, telefono: e.target.value })}
+                placeholder="Teléfono"
+                className="w-full bg-surface-container-high rounded-xl px-4 py-2.5 text-[13px] text-on-surface"
+              />
+              <input
+                value={pedidoForm.direccion_entrega}
+                onChange={(e) => setPedidoForm({ ...pedidoForm, direccion_entrega: e.target.value })}
+                placeholder="Dirección de entrega"
+                className="w-full bg-surface-container-high rounded-xl px-4 py-2.5 text-[13px] text-on-surface"
+              />
+              <input
+                value={pedidoForm.total}
+                onChange={(e) => setPedidoForm({ ...pedidoForm, total: e.target.value })}
+                placeholder="Total USD"
+                inputMode="decimal"
+                className="w-full bg-surface-container-high rounded-xl px-4 py-2.5 text-[13px] text-on-surface"
+              />
+              {pedidoError && <p className="text-[11px] text-error">{pedidoError}</p>}
+              <button type="submit" disabled={savingPedido} className="w-full py-2.5 rounded-xl bg-secondary text-on-secondary text-[12px] font-bold disabled:opacity-60">
+                {savingPedido ? "Guardando..." : "Crear pedido"}
+              </button>
+            </form>
+            <PedidosActivos pedidos={pedidos} loading={pedidosLoading} expanded onUpdateEstado={handleUpdateEstado} />
           </div>
         );
       case "productos":
         return (
           <div className="px-4 py-4 space-y-4 pb-24 lg:pb-4">
             <h2 className="text-[18px] text-on-surface font-semibold font-display">Productos</h2>
+            <form onSubmit={handleCreateProduct} className="bg-surface-container rounded-xl p-4 space-y-3">
+              <input
+                value={productForm.nombre}
+                onChange={(e) => setProductForm({ ...productForm, nombre: e.target.value })}
+                placeholder="Nombre del producto"
+                className="w-full bg-surface-container-high rounded-xl px-4 py-2.5 text-[13px] text-on-surface"
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  value={productForm.precio}
+                  onChange={(e) => setProductForm({ ...productForm, precio: e.target.value })}
+                  placeholder="Precio USD"
+                  inputMode="decimal"
+                  className="w-full bg-surface-container-high rounded-xl px-4 py-2.5 text-[13px] text-on-surface"
+                />
+                <input
+                  value={productForm.stock}
+                  onChange={(e) => setProductForm({ ...productForm, stock: e.target.value })}
+                  placeholder="Stock"
+                  inputMode="numeric"
+                  className="w-full bg-surface-container-high rounded-xl px-4 py-2.5 text-[13px] text-on-surface"
+                />
+              </div>
+              {productError && <p className="text-[11px] text-error">{productError}</p>}
+              <button type="submit" disabled={savingProduct} className="w-full py-2.5 rounded-xl bg-secondary text-on-secondary text-[12px] font-bold disabled:opacity-60">
+                {savingProduct ? "Guardando..." : "Agregar producto"}
+              </button>
+            </form>
+
+            {productosLoading && <p className="text-center text-[12px] text-on-surface-variant py-4">Cargando productos...</p>}
+            {!productosLoading && productos.length === 0 && (
+              <p className="text-center text-[12px] text-on-surface-variant py-4">No hay productos registrados</p>
+            )}
+
             <div className="bg-surface-container rounded-xl p-4 space-y-3">
-              {[
-                { nombre: "Pan integral", precio: "$1.50", stock: 45 },
-                { nombre: "Croissant", precio: "$2.00", stock: 30 },
-                { nombre: "Medialuna", precio: "$1.75", stock: 25 },
-              ].map((p) => (
-                <div key={p.nombre} className="flex items-center justify-between py-2 border-b border-outline-variant/30 last:border-0">
+              {productos.map((p) => (
+                <div key={p.id} className="flex items-center justify-between py-2 border-b border-outline-variant/30 last:border-0">
                   <div>
                     <span className="text-[13px] text-on-surface">{p.nombre}</span>
                     <span className="text-[11px] text-on-surface-variant block">Stock: {p.stock}</span>
                   </div>
-                  <span className="font-mono text-[14px] text-primary font-bold">{p.precio}</span>
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono text-[14px] text-primary font-bold">${Number(p.precio).toFixed(2)}</span>
+                    <button
+                      onClick={() => { void actualizarProducto(p.id, { activo: !p.activo }); }}
+                      className={`text-[10px] font-mono px-2 py-1 rounded-lg ${p.activo ? "bg-primary/10 text-primary" : "bg-surface-variant text-on-surface-variant"}`}
+                    >
+                      {p.activo ? "Activo" : "Inactivo"}
+                    </button>
+                    <button onClick={() => { void eliminarProducto(p.id); }} className="text-[10px] font-bold text-error">
+                      Eliminar
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -163,18 +414,27 @@ function ComercioApp({ demo }: { demo?: boolean }) {
         return (
           <div className="px-4 py-4 space-y-4 pb-24 lg:pb-4">
             <h2 className="text-[18px] text-on-surface font-semibold font-display">Reportes</h2>
-            <div className="bg-surface-container rounded-xl p-4 space-y-3">
-              {[
-                { icon: "payments", label: "Ingresos por periodo" },
-                { icon: "shopping_bag", label: "Pedidos por dia" },
-                { icon: "trending_up", label: "Productos mas vendidos" },
-                { icon: "download", label: "Exportar CSV" },
-              ].map((item) => (
-                <button key={item.label} className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-surface-container-high transition-colors text-left">
-                  <span className="material-symbols-outlined text-[20px] text-primary">{item.icon}</span>
-                  <span className="text-[13px] text-on-surface">{item.label}</span>
-                </button>
-              ))}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-surface-container rounded-xl p-4">
+                <span className="text-[11px] text-on-surface-variant font-mono uppercase">Ventas</span>
+                <p className="font-mono text-[20px] text-primary font-bold mt-1">${ventasTotales.toFixed(2)}</p>
+              </div>
+              <div className="bg-surface-container rounded-xl p-4">
+                <span className="text-[11px] text-on-surface-variant font-mono uppercase">Entregados</span>
+                <p className="font-mono text-[20px] text-primary font-bold mt-1">{entregados}</p>
+              </div>
+            </div>
+            <div className="bg-surface-container rounded-xl p-4 space-y-2">
+              <span className="text-[11px] text-on-surface-variant font-mono uppercase">Pedidos por estado</span>
+              {(["pendiente", "preparando", "en_camino", "entregado", "cancelado"] as PedidoComercioEstado[]).map((estado) => {
+                const count = pedidos.filter((p) => p.estado === estado).length;
+                return (
+                  <div key={estado} className="flex items-center justify-between py-1.5 text-[12px]">
+                    <span className="text-on-surface capitalize">{estado.replace("_", " ")}</span>
+                    <span className="font-mono text-on-surface-variant">{count}</span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         );
@@ -182,36 +442,33 @@ function ComercioApp({ demo }: { demo?: boolean }) {
         return (
           <div className="px-4 py-4 space-y-4 pb-24 lg:pb-4">
             <h2 className="text-[18px] text-on-surface font-semibold font-display">Configuracion</h2>
+            <div className="bg-surface-container rounded-xl p-4 space-y-2">
+              <span className="font-mono text-[11px] text-on-surface-variant uppercase">Datos del comercio</span>
+              <div className="flex justify-between text-[13px] text-on-surface"><span>Nombre</span><span>{tenant.nombre}</span></div>
+              <div className="flex justify-between text-[13px] text-on-surface"><span>Email</span><span>{tenant.email ?? "—"}</span></div>
+              <div className="flex justify-between text-[13px] text-on-surface"><span>Teléfono</span><span>{tenant.telefono ?? "—"}</span></div>
+              <div className="flex justify-between text-[13px] text-on-surface"><span>Ciudad</span><span>{tenant.ciudad ?? "—"}</span></div>
+              <div className="flex justify-between text-[13px] text-on-surface"><span>Estado</span><span>{tenant.suscripcion_activa ? "Activo" : "Pendiente"}</span></div>
+            </div>
             <div className="bg-surface-container rounded-xl p-4 space-y-3">
               <span className="font-mono text-[11px] text-on-surface-variant uppercase">Notificaciones</span>
               {[
-                { label: "Nuevo pedido", on: true },
-                { label: "Pedido entregado", on: true },
-                { label: "Sin stock", on: false },
+                { key: "nuevo" as const, label: "Nuevo pedido" },
+                { key: "entregado" as const, label: "Pedido entregado" },
+                { key: "stock" as const, label: "Sin stock" },
               ].map((n) => (
-                <div key={n.label} className="flex items-center justify-between py-2">
+                <div key={n.key} className="flex items-center justify-between py-2">
                   <span className="text-[13px] text-on-surface">{n.label}</span>
-                  <div className={cn("w-10 h-6 rounded-full relative cursor-pointer", n.on ? "bg-primary-container" : "bg-surface-variant")}>
-                    <div className={cn("absolute top-0.5 w-5 h-5 rounded-full transition-transform", n.on ? "left-5 bg-on-primary" : "left-0.5 bg-outline")} />
-                  </div>
+                  <button
+                    onClick={() => setNotifs((prev) => ({ ...prev, [n.key]: !prev[n.key] }))}
+                    className={cn("w-10 h-6 rounded-full relative transition-colors", notifs[n.key] ? "bg-primary-container" : "bg-surface-variant")}
+                  >
+                    <div className={cn("absolute top-0.5 w-5 h-5 rounded-full transition-transform", notifs[n.key] ? "left-5 bg-on-primary" : "left-0.5 bg-outline")} />
+                  </button>
                 </div>
               ))}
               <div className="border-t border-outline-variant/30 pt-3">
-                <span className="font-mono text-[11px] text-on-surface-variant uppercase">General</span>
-              </div>
-              <div className="flex items-center justify-between py-2">
-                <span className="text-[13px] text-on-surface">Datos del comercio</span>
-                <span className="material-symbols-outlined text-[18px] text-on-surface-variant">chevron_right</span>
-              </div>
-              <div className="flex items-center justify-between py-2">
-                <span className="text-[13px] text-on-surface">Horario de atencion</span>
-                <span className="material-symbols-outlined text-[18px] text-on-surface-variant">chevron_right</span>
-              </div>
-              <div className="border-t border-outline-variant/30 pt-3">
-                <button
-                  onClick={signOut}
-                  className="w-full py-3 rounded-xl bg-error/20 text-error text-[13px] font-semibold"
-                >
+                <button onClick={signOut} className="w-full py-3 rounded-xl bg-error/20 text-error text-[13px] font-semibold">
                   Cerrar sesion
                 </button>
               </div>
@@ -219,19 +476,12 @@ function ComercioApp({ demo }: { demo?: boolean }) {
           </div>
         );
       default:
-        return (
-          <div className="px-4 py-4 space-y-5 pb-24 lg:pb-4">
-            <PedidosActivos />
-            <ResumenHoy />
-            <Cuadratura />
-          </div>
-        );
+        return null;
     }
   };
 
   return (
     <div className="flex h-screen overflow-hidden bg-surface">
-      {/* Desktop sidebar */}
       <aside className="hidden lg:flex flex-col w-[260px] bg-surface-container-low border-r border-outline-variant/30">
         <div className="flex items-center h-16 px-4 border-b border-outline-variant/30">
           <div className="flex items-center gap-2">
@@ -272,13 +522,10 @@ function ComercioApp({ demo }: { demo?: boolean }) {
               </div>
               <div className="flex flex-col min-w-0">
                 <span className="text-[12px] text-on-surface font-medium truncate">{comercioNombre}</span>
-                <span className="font-mono text-[10px] text-on-surface-variant truncate">{APP_URLS.comercio}/{comercioTenant?.slug ?? "comercio"}</span>
+                <span className="font-mono text-[10px] text-on-surface-variant truncate">{APP_URLS.comercio}/{tenant?.slug ?? "comercio"}</span>
               </div>
             </div>
-            <button
-              onClick={signOut}
-              className="mt-2 w-full py-2 rounded-lg bg-secondary/20 text-secondary text-[11px] font-semibold"
-            >
+            <button onClick={signOut} className="mt-2 w-full py-2 rounded-lg bg-secondary/20 text-secondary text-[11px] font-semibold">
               Cerrar sesion
             </button>
           </div>
@@ -286,7 +533,6 @@ function ComercioApp({ demo }: { demo?: boolean }) {
       </aside>
 
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-        {/* Mobile header */}
         <header className="h-16 flex items-center justify-between px-4 border-b border-outline-variant/30 bg-surface-container-lowest/50 backdrop-blur-sm lg:hidden">
           <div className="flex items-center gap-3">
             <button
@@ -298,14 +544,7 @@ function ComercioApp({ demo }: { demo?: boolean }) {
             <span className="text-[16px] font-bold text-on-surface font-display">{comercioNombre}</span>
           </div>
           <div className="flex items-center gap-2">
-            <button className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-surface-container-high transition-colors relative">
-              <span className="material-symbols-outlined text-[22px] text-on-surface">notifications</span>
-              <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-secondary" />
-            </button>
-            <button
-              onClick={signOut}
-              className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-surface-container-high transition-colors"
-            >
+            <button onClick={signOut} className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-surface-container-high transition-colors">
               <span className="material-symbols-outlined text-[22px] text-on-surface">logout</span>
             </button>
           </div>
@@ -314,7 +553,6 @@ function ComercioApp({ demo }: { demo?: boolean }) {
         <main className="flex-1 overflow-y-auto">{renderModule()}</main>
       </div>
 
-      {/* Mobile bottom nav */}
       <nav className="fixed bottom-0 w-full z-40 lg:hidden bg-surface-container-lowest/90 backdrop-blur-xl shadow-[0_-1px_12px_rgba(0,0,0,0.5)]">
         <div className="grid grid-cols-5 items-center h-16 px-1">
           {navItems.map((item) => {
@@ -336,7 +574,6 @@ function ComercioApp({ demo }: { demo?: boolean }) {
         </div>
       </nav>
 
-      {/* Hamburger menu */}
       <HamburgerMenu
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
@@ -379,5 +616,5 @@ function AppContent() {
     return <LoginScreen />;
   }
 
-  return <ComercioApp demo={!configured} />;
+  return <ComercioApp />;
 }

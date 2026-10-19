@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AuthProvider, useAuthContext, supabase, conductorInviteUrl } from "@drivip/supabase";
+import { AuthProvider, useAuthContext, supabase, conductorInviteUrl, registrarReferido } from "@drivip/supabase";
 import DriverApp from "./pages/DriverApp";
 
 /* ==================== LANDING PAGE ==================== */
@@ -319,11 +319,13 @@ function RegisterScreen({ onSwitchToLogin, onRegistered }: { onSwitchToLogin: ()
     const base = `${form.nombre.toLowerCase().replace(/\s+/g, "")}${form.apellido.toLowerCase().replace(/\s+/g, "")}`;
     const suffix = Math.floor(Math.random() * 9000 + 1000);
     const slug = `${base}${suffix}`;
+    const tenantId = crypto.randomUUID();
 
     const { error: tenantError } = await supabase.from("tenants").insert({
+      id: tenantId,
       slug,
       type: "conductor",
-      nombre: form.nombre,
+      nombre: `${form.nombre} ${form.apellido}`.trim(),
       email: form.email,
       telefono: form.telefono,
       cedula: form.cedula,
@@ -341,14 +343,26 @@ function RegisterScreen({ onSwitchToLogin, onRegistered }: { onSwitchToLogin: ()
       return;
     }
 
-    await supabase.from("profiles").insert({
+    const { error: profileError } = await supabase.from("profiles").insert({
       id: user.id,
+      tenant_id: tenantId,
       rol: "conductor",
       nombre: form.nombre,
       apellido: form.apellido,
       telefono: form.telefono,
       activo: true,
     });
+
+    if (profileError) {
+      setFormError("Error al vincular tu cuenta con el perfil de conductor. Intenta de nuevo.");
+      setSubmitting(false);
+      return;
+    }
+
+    const codigoRef = new URLSearchParams(window.location.search).get("ref");
+    if (codigoRef) {
+      await registrarReferido(codigoRef);
+    }
 
     setSubmitting(false);
     onRegistered({ nombre: form.nombre, apellido: form.apellido, cedula: form.cedula, plan: form.plan, slug });

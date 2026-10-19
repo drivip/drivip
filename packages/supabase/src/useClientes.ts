@@ -110,6 +110,39 @@ export function useClientes() {
   return { ...state, refetch };
 }
 
+/** Clientes registrados en el tenant del conductor (panel del conductor). */
+export function useClientesTenant(tenantId: string | null | undefined) {
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [loading, setLoading] = useState(Boolean(tenantId));
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchAll = useCallback(async () => {
+    if (!tenantId) {
+      setClientes([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    const { data, error: queryError } = await supabase
+      .from("clientes")
+      .select("*")
+      .eq("tenant_id", tenantId)
+      .order("created_at", { ascending: false });
+    if (queryError) {
+      setError(queryError.message);
+      setClientes([]);
+    } else {
+      setClientes((data as Cliente[]) ?? []);
+      setError(null);
+    }
+    setLoading(false);
+  }, [tenantId]);
+
+  useEffect(() => { void fetchAll(); }, [fetchAll]);
+
+  return { clientes, loading, error, refetch: fetchAll };
+}
+
 export function useClienteDetail(clienteId: string | null) {
   const [cliente, setCliente] = useState<ClienteConRed | null>(null);
   const [loading, setLoading] = useState(true);

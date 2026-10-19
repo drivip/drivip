@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { cn } from "@drivip/ui";
-import { useAuthContext, useCarreras, useRealtimeCarreras, useUbicaciones, useTenant, APP_URLS } from "@drivip/supabase";
+import { useAuthContext, useCarreras, useUbicaciones, useMiTenant, APP_URLS, enviarPushCarrera } from "@drivip/supabase";
 import DriverHeader from "../components/driver/DriverHeader";
 import DriverFullGridMenu from "../components/driver/DriverFullGridMenu";
 import ChoferDashboard from "../components/ChoferDashboard";
@@ -54,24 +54,14 @@ export default function DriverApp({ demo }: { demo?: boolean }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
   const [carreraActiva, setCarreraActiva] = useState<string | null>(null);
+  const arrivedNotifiedRef = useRef<Set<string>>(new Set());
 
-  const { tenant } = useTenant(user?.email?.split("@")[0] ?? null);
+  const { tenant, refetch: refetchTenant } = useMiTenant(demo ? null : user?.id);
   const { carreras, updateCarreraEstado } = useCarreras(tenant?.id);
   const { reportarUbicacion } = useUbicaciones(tenant?.id ?? "");
 
   const effectiveCarreras = demo ? MOCK_CARRERAS_CONDUCTOR : carreras;
   const isPaused = !demo && !!tenant?.pausado;
-
-  const onCarreraCallbackRef = useRef<(carrera: any) => void>(() => {});
-  onCarreraCallbackRef.current = (carrera: any) => {
-    if (carrera.estado === "pendiente" && !carreraActiva) {
-      setCarreraActiva(carrera.id);
-    }
-  };
-
-  useRealtimeCarreras(tenant?.id ?? "", useCallback((carrera: any) => {
-    onCarreraCallbackRef.current(carrera);
-  }, []));
 
   useEffect(() => {
     if (!isOnline || !tenant?.id) return;
@@ -101,17 +91,69 @@ export default function DriverApp({ demo }: { demo?: boolean }) {
   };
 
   const acceptCarrera = async (id: string) => {
-    await updateCarreraEstado(id, "aceptada");
-    setCarreraActiva(id);
+    const ok = await updateCarreraEstado(id, "aceptada");
+    if (ok) {
+      setCarreraActiva(id);
+      void enviarPushCarrera({
+        carrera_id: id,
+        title: "Solicitud aceptada",
+        body: "Tu conductor acepto el viaje y va en camino al punto de recogida.",
+        tag: `carrera-${id}`,
+        data: { carrera_id: id },
+      });
+    }
   };
 
   const rejectCarrera = async (id: string) => {
-    await updateCarreraEstado(id, "cancelada");
+    const ok = await updateCarreraEstado(id, "cancelada");
+    if (ok) {
+      void enviarPushCarrera({
+        carrera_id: id,
+        title: "Solicitud no aceptada",
+        body: "El conductor no pudo tomar tu solicitud. Elige otro conductor de tu red.",
+        tag: `carrera-${id}`,
+        data: { carrera_id: id },
+      });
+    }
     setCarreraActiva(null);
   };
 
+  const startCarrera = async (id: string) => {
+    const ok = await updateCarreraEstado(id, "en_curso");
+    if (ok) {
+      void enviarPushCarrera({
+        carrera_id: id,
+        title: "Viaje iniciado",
+        body: "El conductor marco el inicio del viaje. Buen camino.",
+        tag: `carrera-${id}`,
+        data: { carrera_id: id },
+      });
+    }
+  };
+
+  const notifyArrivedAtPickup = (id: string) => {
+    if (arrivedNotifiedRef.current.has(id)) return;
+    arrivedNotifiedRef.current.add(id);
+    void enviarPushCarrera({
+      carrera_id: id,
+      title: "Tu conductor llego",
+      body: "El conductor esta en el punto de recogida.",
+      tag: `carrera-${id}`,
+      data: { carrera_id: id },
+    });
+  };
+
   const completeCarrera = async (id: string) => {
-    await updateCarreraEstado(id, "completada");
+    const ok = await updateCarreraEstado(id, "completada");
+    if (ok) {
+      void enviarPushCarrera({
+        carrera_id: id,
+        title: "Viaje completado",
+        body: "Llegaste a tu destino. Califica tu viaje.",
+        tag: `carrera-${id}`,
+        data: { carrera_id: id },
+      });
+    }
     setCarreraActiva(null);
   };
 
@@ -141,7 +183,9 @@ export default function DriverApp({ demo }: { demo?: boolean }) {
           onToggleOnline={() => !isPaused && setIsOnline(!isOnline)}
           onAcceptCarrera={acceptCarrera}
           onRejectCarrera={rejectCarrera}
+          onStartCarrera={startCarrera}
           onCompleteCarrera={completeCarrera}
+          onArrivedAtPickup={notifyArrivedAtPickup}
           carreraActiva={carreraActiva}
           domain={domain}
           profileName={profile.name}
@@ -160,10 +204,10 @@ export default function DriverApp({ demo }: { demo?: boolean }) {
           </div>
 
           <main className="pt-[calc(4rem+env(safe-area-inset-top,0px))] pb-[calc(5rem+env(safe-area-inset-bottom,0px))] h-[100dvh] overflow-y-auto lg:pt-0 lg:pb-0">
-            {activeModule === "clientes" && <MisClientes />}
-            {activeModule === "aliados" && <MisAliados />}
-            {activeModule === "precios" && <MisPrecios />}
-            {activeModule === "pagos" && <MisPagos />}
+            {activeModule === "clientes" && <MisClientes tenantId={tenant?.id} />}
+            {activeModule === "aliados" && <MisAliados tenantId={tenant?.id} />}
+            {activeModule === "precios" && <MisPrecios tenant={tenant} demo={demo} onSaved={refetchTenant} />}
+            {activeModule === "pagos" && <MisPagos carreras={effectiveCarreras} tenant={tenant} tenantId={tenant?.id} />}
             {activeModule === "carreras" && (
               <Carreras
                 carreras={effectiveCarreras}
@@ -172,17 +216,17 @@ export default function DriverApp({ demo }: { demo?: boolean }) {
                 onComplete={completeCarrera}
               />
             )}
-            {activeModule === "historial" && <Historial />}
-            {activeModule === "perfil" && <MiPerfil tenant={demo ? null : tenant} />}
-            {activeModule === "plan" && <MiPlan tenant={demo ? null : tenant} />}
-            {activeModule === "referidos" && <Referidos />}
-            {activeModule === "config" && <Configuracion isPaused={isPaused} />}
+            {activeModule === "historial" && <Historial carreras={effectiveCarreras} tenantId={tenant?.id} />}
+            {activeModule === "perfil" && <MiPerfil tenant={tenant} demo={demo} />}
+            {activeModule === "plan" && <MiPlan tenant={tenant} demo={demo} />}
+            {activeModule === "referidos" && <Referidos tenant={tenant} />}
+            {activeModule === "config" && <Configuracion isPaused={isPaused} tenantId={tenant?.id} />}
             {activeModule === "qr" && (
               <QRSection profileSlug={profile.slug} profileName={profile.name} isOnline={isOnline && !isPaused} />
             )}
-            {activeModule === "reportes" && <Historial />}
-            {activeModule === "rutas" && <MisPrecios />}
-            {activeModule === "tarifas" && <MisPrecios />}
+            {activeModule === "reportes" && <Historial carreras={effectiveCarreras} tenantId={tenant?.id} />}
+            {activeModule === "rutas" && <MisPrecios tenant={tenant} demo={demo} onSaved={refetchTenant} />}
+            {activeModule === "tarifas" && <MisPrecios tenant={tenant} demo={demo} onSaved={refetchTenant} />}
           </main>
 
           <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-lg border-t border-slate-200/80 px-4 py-2 lg:hidden">

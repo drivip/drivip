@@ -1,4 +1,6 @@
-export type TenantType = "conductor";
+import type { TarifaModo } from "./tarifa";
+
+export type TenantType = "conductor" | "comercio";
 
 export type VehiculoTipo = "moto" | "carro" | "camioneta";
 
@@ -28,6 +30,10 @@ export interface Tenant {
   pausado: boolean;
   pausado_motivo: string | null;
   modulos_activos: string[];
+  codigo_referido?: string | null;
+  tarifa_modo: TarifaModo;
+  tarifa_base: number;
+  tarifa_por_km: number;
   created_at: string;
   updated_at: string;
 }
