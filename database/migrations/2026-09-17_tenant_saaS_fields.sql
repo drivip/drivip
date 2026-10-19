@@ -50,17 +50,19 @@ CREATE INDEX IF NOT EXISTS idx_tenant_notif_tenant ON tenant_notificaciones(tena
 -- 4. RLS Policies para las nuevas tablas
 ALTER TABLE tenant_banners ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "tenant_banners_tenant_isolation" ON tenant_banners;
 CREATE POLICY "tenant_banners_tenant_isolation"
 ON tenant_banners FOR ALL
-USING (tenant_id = auth.tenant_id())
-WITH CHECK (tenant_id = auth.tenant_id());
+USING (tenant_id = public.tenant_id())
+WITH CHECK (tenant_id = public.tenant_id());
 
 ALTER TABLE tenant_notificaciones ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "tenant_notif_tenant_isolation" ON tenant_notificaciones;
 CREATE POLICY "tenant_notif_tenant_isolation"
 ON tenant_notificaciones FOR ALL
-USING (tenant_id = auth.tenant_id())
-WITH CHECK (tenant_id = auth.tenant_id());
+USING (tenant_id = public.tenant_id())
+WITH CHECK (tenant_id = public.tenant_id());
 
 -- 5. Migrar datos existentes (opcional)
 -- Si ya tienes conductores con datos de vehiculo en otra tabla, copiarlos aqui:

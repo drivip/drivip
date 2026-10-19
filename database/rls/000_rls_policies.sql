@@ -5,10 +5,12 @@
 -- =============================================
 
 -- =============================================
--- FUNCION HELPER: auth.tenant_id()
+-- FUNCION HELPER: public.tenant_id()
 -- Fuente: seguridad.md
+-- Nota: se define en el esquema public porque el rol postgres
+--       no tiene permiso CREATE sobre el esquema auth de Supabase.
 -- =============================================
-CREATE OR REPLACE FUNCTION auth.tenant_id()
+CREATE OR REPLACE FUNCTION public.tenant_id()
 RETURNS UUID
 LANGUAGE sql
 SECURITY DEFINER
@@ -38,7 +40,7 @@ ALTER TABLE audit_log ENABLE ROW LEVEL SECURITY;
 -- =============================================
 CREATE POLICY "tenant_select_own"
 ON tenants FOR SELECT
-USING (id = auth.tenant_id());
+USING (id = public.tenant_id());
 
 -- =============================================
 -- PROFILES
@@ -63,8 +65,8 @@ WITH CHECK (id = auth.uid());
 -- =============================================
 CREATE POLICY "carreras_tenant_isolation"
 ON carreras FOR ALL
-USING (tenant_id = auth.tenant_id())
-WITH CHECK (tenant_id = auth.tenant_id());
+USING (tenant_id = public.tenant_id())
+WITH CHECK (tenant_id = public.tenant_id());
 
 -- =============================================
 -- UBICACIONES
@@ -73,8 +75,8 @@ WITH CHECK (tenant_id = auth.tenant_id());
 -- =============================================
 CREATE POLICY "ubicaciones_conductor_isolation"
 ON ubicaciones FOR ALL
-USING (conductor_id = auth.tenant_id())
-WITH CHECK (conductor_id = auth.tenant_id());
+USING (conductor_id = public.tenant_id())
+WITH CHECK (conductor_id = public.tenant_id());
 
 -- =============================================
 -- CLIENTES
@@ -82,8 +84,8 @@ WITH CHECK (conductor_id = auth.tenant_id());
 -- =============================================
 CREATE POLICY "clientes_tenant_isolation"
 ON clientes FOR ALL
-USING (tenant_id = auth.tenant_id())
-WITH CHECK (tenant_id = auth.tenant_id());
+USING (tenant_id = public.tenant_id())
+WITH CHECK (tenant_id = public.tenant_id());
 
 -- =============================================
 -- PLUGINS_ACTIVOS
@@ -91,8 +93,8 @@ WITH CHECK (tenant_id = auth.tenant_id());
 -- =============================================
 CREATE POLICY "plugins_tenant_isolation"
 ON plugins_activos FOR ALL
-USING (tenant_id = auth.tenant_id())
-WITH CHECK (tenant_id = auth.tenant_id());
+USING (tenant_id = public.tenant_id())
+WITH CHECK (tenant_id = public.tenant_id());
 
 -- =============================================
 -- RED_CLIENTE
@@ -109,8 +111,8 @@ WITH CHECK (cliente_id = auth.uid());
 -- =============================================
 CREATE POLICY "suscripciones_tenant_isolation"
 ON suscripciones FOR ALL
-USING (tenant_id = auth.tenant_id())
-WITH CHECK (tenant_id = auth.tenant_id());
+USING (tenant_id = public.tenant_id())
+WITH CHECK (tenant_id = public.tenant_id());
 
 -- =============================================
 -- TENANT_BANNERS
@@ -118,8 +120,8 @@ WITH CHECK (tenant_id = auth.tenant_id());
 -- =============================================
 CREATE POLICY "tenant_banners_tenant_isolation"
 ON tenant_banners FOR ALL
-USING (tenant_id = auth.tenant_id())
-WITH CHECK (tenant_id = auth.tenant_id());
+USING (tenant_id = public.tenant_id())
+WITH CHECK (tenant_id = public.tenant_id());
 
 -- =============================================
 -- TENANT_NOTIFICACIONES
@@ -127,8 +129,8 @@ WITH CHECK (tenant_id = auth.tenant_id());
 -- =============================================
 CREATE POLICY "tenant_notif_tenant_isolation"
 ON tenant_notificaciones FOR ALL
-USING (tenant_id = auth.tenant_id())
-WITH CHECK (tenant_id = auth.tenant_id());
+USING (tenant_id = public.tenant_id())
+WITH CHECK (tenant_id = public.tenant_id());
 
 -- =============================================
 -- AUDIT_LOG
@@ -136,5 +138,5 @@ WITH CHECK (tenant_id = auth.tenant_id());
 -- =============================================
 CREATE POLICY "audit_log_tenant_isolation"
 ON audit_log FOR ALL
-USING (tenant_id = auth.tenant_id())
-WITH CHECK (tenant_id = auth.tenant_id());
+USING (tenant_id = public.tenant_id())
+WITH CHECK (tenant_id = public.tenant_id());

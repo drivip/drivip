@@ -9,11 +9,11 @@
 -- =============================================
 
 -- =============================================
--- FUNCION: auth.is_superadmin()
+-- FUNCION: public.is_superadmin()
 -- Verifica si el usuario tiene role='superadmin'
 -- en app_metadata del JWT de Supabase Auth
 -- =============================================
-CREATE OR REPLACE FUNCTION auth.is_superadmin()
+CREATE OR REPLACE FUNCTION public.is_superadmin()
 RETURNS BOOLEAN
 LANGUAGE sql
 SECURITY DEFINER
@@ -34,8 +34,8 @@ $$;
 DROP POLICY IF EXISTS "clientes_superadmin_all" ON clientes;
 CREATE POLICY "clientes_superadmin_all"
 ON clientes FOR ALL
-USING (auth.is_superadmin() = TRUE)
-WITH CHECK (auth.is_superadmin() = TRUE);
+USING (public.is_superadmin() = TRUE)
+WITH CHECK (public.is_superadmin() = TRUE);
 
 -- =============================================
 -- POLICY: red_cliente_superadmin_all
@@ -46,8 +46,8 @@ WITH CHECK (auth.is_superadmin() = TRUE);
 DROP POLICY IF EXISTS "red_cliente_superadmin_all" ON red_cliente;
 CREATE POLICY "red_cliente_superadmin_all"
 ON red_cliente FOR ALL
-USING (auth.is_superadmin() = TRUE)
-WITH CHECK (auth.is_superadmin() = TRUE);
+USING (public.is_superadmin() = TRUE)
+WITH CHECK (public.is_superadmin() = TRUE);
 
 -- =============================================
 -- POLICY: tenants_superadmin_read
@@ -59,7 +59,7 @@ WITH CHECK (auth.is_superadmin() = TRUE);
 DROP POLICY IF EXISTS "tenants_superadmin_read" ON tenants;
 CREATE POLICY "tenants_superadmin_read"
 ON tenants FOR SELECT
-USING (auth.is_superadmin() = TRUE);
+USING (public.is_superadmin() = TRUE);
 
 -- =============================================
 -- POLICY: suscripciones_superadmin_all
@@ -70,8 +70,8 @@ USING (auth.is_superadmin() = TRUE);
 DROP POLICY IF EXISTS "suscripciones_superadmin_all" ON suscripciones;
 CREATE POLICY "suscripciones_superadmin_all"
 ON suscripciones FOR ALL
-USING (auth.is_superadmin() = TRUE)
-WITH CHECK (auth.is_superadmin() = TRUE);
+USING (public.is_superadmin() = TRUE)
+WITH CHECK (public.is_superadmin() = TRUE);
 
 -- =============================================
 -- POLICY: carreras_superadmin_read
@@ -82,7 +82,7 @@ WITH CHECK (auth.is_superadmin() = TRUE);
 DROP POLICY IF EXISTS "carreras_superadmin_read" ON carreras;
 CREATE POLICY "carreras_superadmin_read"
 ON carreras FOR SELECT
-USING (auth.is_superadmin() = TRUE);
+USING (public.is_superadmin() = TRUE);
 
 -- =============================================
 -- POLICY: profiles_superadmin_read
@@ -94,7 +94,7 @@ USING (auth.is_superadmin() = TRUE);
 DROP POLICY IF EXISTS "profiles_superadmin_read" ON profiles;
 CREATE POLICY "profiles_superadmin_read"
 ON profiles FOR SELECT
-USING (auth.is_superadmin() = TRUE);
+USING (public.is_superadmin() = TRUE);
 
 -- =============================================
 -- POLICY: ubicaciones_superadmin_read
@@ -105,7 +105,7 @@ USING (auth.is_superadmin() = TRUE);
 DROP POLICY IF EXISTS "ubicaciones_superadmin_read" ON ubicaciones;
 CREATE POLICY "ubicaciones_superadmin_read"
 ON ubicaciones FOR SELECT
-USING (auth.is_superadmin() = TRUE);
+USING (public.is_superadmin() = TRUE);
 
 -- =============================================
 -- POLICY: plugins_superadmin_all
@@ -116,8 +116,8 @@ USING (auth.is_superadmin() = TRUE);
 DROP POLICY IF EXISTS "plugins_superadmin_all" ON plugins_activos;
 CREATE POLICY "plugins_superadmin_all"
 ON plugins_activos FOR ALL
-USING (auth.is_superadmin() = TRUE)
-WITH CHECK (auth.is_superadmin() = TRUE);
+USING (public.is_superadmin() = TRUE)
+WITH CHECK (public.is_superadmin() = TRUE);
 
 -- =============================================
 -- POLICY: tenant_banners_superadmin_all
@@ -128,8 +128,8 @@ WITH CHECK (auth.is_superadmin() = TRUE);
 DROP POLICY IF EXISTS "tenant_banners_superadmin_all" ON tenant_banners;
 CREATE POLICY "tenant_banners_superadmin_all"
 ON tenant_banners FOR ALL
-USING (auth.is_superadmin() = TRUE)
-WITH CHECK (auth.is_superadmin() = TRUE);
+USING (public.is_superadmin() = TRUE)
+WITH CHECK (public.is_superadmin() = TRUE);
 
 -- =============================================
 -- POLICY: tenant_notif_superadmin_all
@@ -140,8 +140,8 @@ WITH CHECK (auth.is_superadmin() = TRUE);
 DROP POLICY IF EXISTS "tenant_notif_superadmin_all" ON tenant_notificaciones;
 CREATE POLICY "tenant_notif_superadmin_all"
 ON tenant_notificaciones FOR ALL
-USING (auth.is_superadmin() = TRUE)
-WITH CHECK (auth.is_superadmin() = TRUE);
+USING (public.is_superadmin() = TRUE)
+WITH CHECK (public.is_superadmin() = TRUE);
 
 -- =============================================
 -- POLICY: audit_log_superadmin_read
@@ -152,4 +152,4 @@ WITH CHECK (auth.is_superadmin() = TRUE);
 DROP POLICY IF EXISTS "audit_log_superadmin_read" ON audit_log;
 CREATE POLICY "audit_log_superadmin_read"
 ON audit_log FOR SELECT
-USING (auth.is_superadmin() = TRUE);
+USING (public.is_superadmin() = TRUE);
