@@ -259,6 +259,15 @@ function RegisterScreen({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: form.email,
       password: form.password,
+      options: {
+        emailRedirectTo: window.location.origin,
+        data: {
+          rol: "cliente",
+          nombre: form.nombre,
+          apellido: form.apellido,
+          telefono: form.telefono,
+        },
+      },
     });
 
     if (authError) {
