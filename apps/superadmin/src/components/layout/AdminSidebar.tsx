@@ -1,4 +1,5 @@
 import { cn } from "@drivip/ui";
+import { APP_URLS } from "@drivip/supabase";
 
 export type AdminModule =
   | "dashboard"
@@ -92,7 +93,7 @@ export default function AdminSidebar({ activeModule, onNavigate, onLogout }: Adm
             </div>
             <div className="flex flex-col min-w-0">
               <span className="text-[12px] text-slate-900 font-bold truncate">SuperAdmin</span>
-              <span className="text-[10px] text-slate-500 font-mono truncate">admin.drivip.app</span>
+              <span className="text-[10px] text-slate-500 font-mono truncate">{APP_URLS.superadmin}</span>
             </div>
           </div>
           <button

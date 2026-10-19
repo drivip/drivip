@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { cn, HamburgerMenu, type MenuItem } from "@drivip/ui";
-import { AuthProvider, useAuthContext, useTenants } from "@drivip/supabase";
+import { AuthProvider, useAuthContext, useTenants, APP_URLS } from "@drivip/supabase";
 import PedidosActivos from "./components/PedidosActivos";
 import ResumenHoy from "./components/ResumenHoy";
 import Cuadratura from "./components/Cuadratura";
@@ -272,7 +272,7 @@ function ComercioApp({ demo }: { demo?: boolean }) {
               </div>
               <div className="flex flex-col min-w-0">
                 <span className="text-[12px] text-on-surface font-medium truncate">{comercioNombre}</span>
-                <span className="font-mono text-[10px] text-on-surface-variant truncate">drivip.app/{comercioTenant?.slug ?? "comercio"}</span>
+                <span className="font-mono text-[10px] text-on-surface-variant truncate">{APP_URLS.comercio}/{comercioTenant?.slug ?? "comercio"}</span>
               </div>
             </div>
             <button

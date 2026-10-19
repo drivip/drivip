@@ -1,5 +1,15 @@
 import { useCallback } from "react";
 import { supabase } from "./client";
+import type { MetodoPagoSuscripcion } from "@drivip/types";
+
+export interface RegistrarPagoInput {
+  monto: number;
+  moneda?: string;
+  metodo_pago: MetodoPagoSuscripcion;
+  referencia?: string | null;
+  meses?: number;
+  verificado_por?: string | null;
+}
 
 export function useTenantActions() {
   const togglePausa = useCallback(async (tenantId: string, pausado: boolean, motivo?: string) => {
@@ -45,5 +55,35 @@ export function useTenantActions() {
     return !error;
   }, []);
 
-  return { togglePausa, cambiarPlan, toggleModulo, actualizarVehiculo, toggleActivo };
+  const registrarPago = useCallback(async (tenantId: string, input: RegistrarPagoInput) => {
+    const now = new Date();
+    const fin = new Date(now);
+    fin.setMonth(fin.getMonth() + (input.meses ?? 1));
+
+    const { error: pagoError } = await supabase.from("suscripciones").insert({
+      tenant_id: tenantId,
+      monto: input.monto,
+      moneda: input.moneda ?? "VES",
+      metodo_pago: input.metodo_pago,
+      referencia: input.referencia ?? null,
+      estado: "verificado",
+      verificado_por: input.verificado_por ?? null,
+      fecha_inicio: now.toISOString(),
+      fecha_fin: fin.toISOString(),
+    });
+
+    if (pagoError) return false;
+
+    const { error: tenantError } = await supabase
+      .from("tenants")
+      .update({
+        suscripcion_activa: true,
+        fecha_vencimiento: fin.toISOString(),
+      })
+      .eq("id", tenantId);
+
+    return !tenantError;
+  }, []);
+
+  return { togglePausa, cambiarPlan, toggleModulo, actualizarVehiculo, toggleActivo, registrarPago };
 }

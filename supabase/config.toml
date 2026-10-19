@@ -2,6 +2,7 @@ project_id = "myvhzoaktrpuntbrfwux"
 
 [auth]
 site_url = "https://drivip-home.pages.dev"
+enable_confirmations = false
 additional_redirect_urls = [
   "https://drivip-home.pages.dev/**",
   "https://drivip-conductor.pages.dev/**",
@@ -9,6 +10,10 @@ additional_redirect_urls = [
   "https://drivip-superadmin.pages.dev/**",
   "https://drivip-comercio.pages.dev/**",
   "http://localhost:3000/**",
+  "http://localhost:3001/**",
+  "http://localhost:3003/**",
+  "http://localhost:3004/**",
+  "http://localhost:3005/**",
   "http://localhost:4173/**",
   "http://localhost:5173/**",
 ]

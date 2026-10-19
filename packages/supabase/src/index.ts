@@ -1,8 +1,10 @@
 export { supabase } from "./client";
+export { APP_URLS, conductorInviteUrl } from "./appUrls";
 export { useAuth } from "./useAuth";
 export { AuthProvider, useAuthContext } from "./AuthProvider";
 export { SetupScreen } from "./SetupScreen";
 export { useTenant, useTenants } from "./useTenant";
+export { useTenantBySlug } from "./usePublicTenant";
 export { useCarreras, useRealtimeCarreras } from "./useCarreras";
 export { useUbicaciones, useRealtimeUbicacionConductor } from "./useUbicaciones";
 export { useRedCliente } from "./useRedCliente";

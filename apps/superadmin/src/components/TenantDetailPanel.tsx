@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useTenantDetail, useTenantActions, useTenantBanners, useTenantNotificaciones } from "@drivip/supabase";
+import { useTenantDetail, useTenantActions, useTenantBanners, useTenantNotificaciones, APP_URLS } from "@drivip/supabase";
+import type { MetodoPagoSuscripcion } from "@drivip/types";
 
 type DetailTab = "info" | "clientes" | "pagos" | "modulos" | "promociones" | "monitoreo";
 
@@ -62,6 +63,14 @@ export default function TenantDetailPanel({ tenantId, onBack }: TenantDetailPane
   const [showPlanModal, setShowPlanModal] = useState(false);
   const [showNotifModal, setShowNotifModal] = useState(false);
   const [showBannerModal, setShowBannerModal] = useState(false);
+  const [showPagoModal, setShowPagoModal] = useState(false);
+  const [pagoForm, setPagoForm] = useState<{
+    monto: string;
+    moneda: string;
+    metodo_pago: MetodoPagoSuscripcion;
+    referencia: string;
+    meses: string;
+  }>({ monto: "10", moneda: "VES", metodo_pago: "pago_movil", referencia: "", meses: "1" });
   const [notifForm, setNotifForm] = useState({ titulo: "", mensaje: "", tipo: "info" as const });
   const [bannerForm, setBannerForm] = useState<{ titulo: string; descripcion: string; prioridad: "baja" | "normal" | "alta" }>({ titulo: "", descripcion: "", prioridad: "normal" });
 
@@ -103,6 +112,41 @@ export default function TenantDetailPanel({ tenantId, onBack }: TenantDetailPane
       showToast(`Plan cambiado a ${plan}`);
       setShowPlanModal(false);
       refetch();
+    }
+  };
+
+  const handleToggleActivo = async () => {
+    const ok = await actions.toggleActivo(tenant.id, !tenant.suscripcion_activa);
+    if (ok) {
+      showToast(tenant.suscripcion_activa ? "Conductor desactivado" : "Conductor activado");
+      refetch();
+    } else {
+      showToast("No se pudo actualizar el estado");
+    }
+  };
+
+  const handleRegistrarPago = async () => {
+    const monto = Number(pagoForm.monto);
+    const meses = Number(pagoForm.meses) || 1;
+    if (!monto || monto <= 0) {
+      showToast("Ingresa un monto valido");
+      return;
+    }
+    const ok = await actions.registrarPago(tenant.id, {
+      monto,
+      moneda: pagoForm.moneda,
+      metodo_pago: pagoForm.metodo_pago,
+      referencia: pagoForm.referencia || null,
+      meses,
+      verificado_por: "admin@drivip.app",
+    });
+    if (ok) {
+      showToast("Pago registrado y conductor activado");
+      setShowPagoModal(false);
+      setPagoForm({ monto: "10", moneda: "VES", metodo_pago: "pago_movil", referencia: "", meses: "1" });
+      refetch();
+    } else {
+      showToast("No se pudo registrar el pago");
     }
   };
 
@@ -160,7 +204,7 @@ export default function TenantDetailPanel({ tenantId, onBack }: TenantDetailPane
         </button>
         <div className="flex-1 min-w-0">
           <h2 className="text-base lg:text-lg font-black text-slate-900 truncate">{tenant.nombre}</h2>
-          <p className="text-[10px] text-slate-500 font-mono">{tenant.slug}.drivip.app</p>
+          <p className="text-[10px] text-slate-500 font-mono truncate">{APP_URLS.conductor}</p>
         </div>
         <div className="flex items-center gap-2">
           <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${tenant.suscripcion_activa ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
@@ -210,8 +254,8 @@ export default function TenantDetailPanel({ tenantId, onBack }: TenantDetailPane
                 <p className="text-[13px] font-bold text-slate-900">{tenant.telefono || "-"}</p>
               </div>
               <div>
-                <span className="text-[10px] text-slate-500 font-medium">Dominio</span>
-                <p className="text-[13px] font-bold text-blue-600 font-mono">{tenant.slug}.drivip.app</p>
+                <span className="text-[10px] text-slate-500 font-medium">App</span>
+                <p className="text-[13px] font-bold text-blue-600 font-mono truncate">{APP_URLS.conductor}</p>
               </div>
               <div>
                 <span className="text-[10px] text-slate-500 font-medium">Ciudad</span>
@@ -288,6 +332,14 @@ export default function TenantDetailPanel({ tenantId, onBack }: TenantDetailPane
               Cambiar Plan
             </button>
           </div>
+          <button
+            onClick={handleToggleActivo}
+            className={`w-full py-3 rounded-xl text-[12px] font-bold active:scale-95 transition text-white ${
+              tenant.suscripcion_activa ? "bg-red-500" : "bg-emerald-600"
+            }`}
+          >
+            {tenant.suscripcion_activa ? "Desactivar conductor" : "Activar conductor"}
+          </button>
         </div>
       )}
 
@@ -363,6 +415,14 @@ export default function TenantDetailPanel({ tenantId, onBack }: TenantDetailPane
               </div>
             </div>
           </div>
+
+          <button
+            onClick={() => setShowPagoModal(true)}
+            className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-[12px] font-bold active:scale-95 transition shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2"
+          >
+            <span className="material-symbols-outlined text-[18px]">payments</span>
+            Validar pago y activar
+          </button>
         </div>
       )}
 
@@ -557,6 +617,89 @@ export default function TenantDetailPanel({ tenantId, onBack }: TenantDetailPane
               </button>
             ))}
             <button onClick={() => setShowPlanModal(false)} className="w-full py-2.5 rounded-xl bg-slate-100 text-slate-600 text-[11px] font-bold active:scale-95 transition">Cancelar</button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Registrar Pago */}
+      {showPagoModal && (
+        <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setShowPagoModal(false)}>
+          <div className="bg-white rounded-t-2xl lg:rounded-2xl w-full max-w-md p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-sm font-black text-slate-900">Registrar pago de suscripcion</h3>
+            <p className="text-[11px] text-slate-500 -mt-2">Al guardar, el conductor queda activo y con vencimiento renovado.</p>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Monto</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={pagoForm.monto}
+                  onChange={(e) => setPagoForm((f) => ({ ...f, monto: e.target.value }))}
+                  className="w-full mt-1 bg-slate-50 rounded-xl px-3 py-2.5 text-[12px] text-slate-900 border border-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Moneda</label>
+                <select
+                  value={pagoForm.moneda}
+                  onChange={(e) => setPagoForm((f) => ({ ...f, moneda: e.target.value }))}
+                  className="w-full mt-1 bg-slate-50 rounded-xl px-3 py-2.5 text-[12px] text-slate-900 border border-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                  <option value="VES">VES</option>
+                  <option value="USD">USD</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Metodo de pago</label>
+              <div className="flex gap-2 mt-1">
+                {([
+                  { id: "pago_movil", label: "Pago Movil" },
+                  { id: "transferencia", label: "Transferencia" },
+                  { id: "efectivo", label: "Efectivo" },
+                ] as const).map((m) => (
+                  <button
+                    key={m.id}
+                    onClick={() => setPagoForm((f) => ({ ...f, metodo_pago: m.id }))}
+                    className={`flex-1 py-2 rounded-xl text-[10px] font-bold transition active:scale-95 ${
+                      pagoForm.metodo_pago === m.id ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600"
+                    }`}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Referencia</label>
+                <input
+                  value={pagoForm.referencia}
+                  onChange={(e) => setPagoForm((f) => ({ ...f, referencia: e.target.value }))}
+                  placeholder="Ej: 441920"
+                  className="w-full mt-1 bg-slate-50 rounded-xl px-3 py-2.5 text-[12px] text-slate-900 border border-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Meses</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={pagoForm.meses}
+                  onChange={(e) => setPagoForm((f) => ({ ...f, meses: e.target.value }))}
+                  className="w-full mt-1 bg-slate-50 rounded-xl px-3 py-2.5 text-[12px] text-slate-900 border border-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <button onClick={() => setShowPagoModal(false)} className="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-600 text-[11px] font-bold active:scale-95 transition">Cancelar</button>
+              <button onClick={handleRegistrarPago} className="flex-1 py-2.5 rounded-xl bg-emerald-600 text-white text-[11px] font-bold active:scale-95 transition">Guardar y activar</button>
+            </div>
           </div>
         </div>
       )}

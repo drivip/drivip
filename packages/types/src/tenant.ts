@@ -31,3 +31,20 @@ export interface Tenant {
   created_at: string;
   updated_at: string;
 }
+
+/** Subconjunto publico de un tenant, expuesto por la RPC get_tenant_by_slug. */
+export interface PublicTenant {
+  id: string;
+  slug: string;
+  nombre: string;
+  type: TenantType;
+  logo_url: string | null;
+  ciudad: string | null;
+  vehiculo_tipo: VehiculoTipo | null;
+  vehiculo_placa: string | null;
+  vehiculo_modelo: string | null;
+  vehiculo_color: string | null;
+  calificacion: number | null;
+  pausado: boolean;
+  suscripcion_activa: boolean;
+}

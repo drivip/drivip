@@ -11,7 +11,7 @@ interface DrivipHeaderProps {
 }
 
 export default function DrivipHeader({
-  domain = "josetaxi.drivip.app",
+  domain = "drivip-conductor.pages.dev",
   isOnline = true,
   profileImage,
   profileInitial = "J",

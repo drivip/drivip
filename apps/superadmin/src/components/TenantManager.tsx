@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Tenant } from "@drivip/types";
+import { APP_URLS } from "@drivip/supabase";
 import TenantDetailPanel from "./TenantDetailPanel";
 
 interface TenantManagerProps {
@@ -137,7 +138,7 @@ export default function TenantManager({ tenants, loading }: TenantManagerProps) 
                   </div>
                   <div className="min-w-0">
                     <span className="text-[13px] lg:text-[14px] font-bold text-slate-900 block truncate">{t.nombre}</span>
-                    <span className="text-[10px] text-slate-500 font-mono block truncate">{t.slug}.drivip.app</span>
+                    <span className="text-[10px] text-slate-500 font-mono block truncate">{APP_URLS.conductor}</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">

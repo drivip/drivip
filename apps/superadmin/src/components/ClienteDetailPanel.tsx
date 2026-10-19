@@ -1,4 +1,4 @@
-import { supabase, type ClienteConRed } from "@drivip/supabase";
+import { supabase, APP_URLS, type ClienteConRed } from "@drivip/supabase";
 
 interface ClienteDetailPanelProps {
   cliente: ClienteConRed;
@@ -124,7 +124,7 @@ export default function ClienteDetailPanel({ cliente, onBack, onRemoved }: Clien
                     <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
                       {r.apodo && <span className="font-medium">"{r.apodo}"</span>}
                       <span>·</span>
-                      <span className="font-mono">{r.conductor_slug}.drivip.app</span>
+                      <span className="font-mono truncate">{r.conductor_slug ? `${r.conductor_slug} · ` : ""}{APP_URLS.conductor}</span>
                     </div>
                     <div className="flex items-center gap-1.5 mt-0.5">
                       <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${r.notificaciones_activas ? "bg-emerald-100 text-emerald-600" : "bg-slate-100 text-slate-400"}`}>

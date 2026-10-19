@@ -1,4 +1,4 @@
-export type { Tenant, TenantType, VehiculoTipo } from "./tenant";
+export type { Tenant, TenantType, VehiculoTipo, PublicTenant } from "./tenant";
 export type { Carrera, CarreraEstado, MetodoPago } from "./carrera";
 export type { RedCliente, Cliente } from "./cliente";
 export type { Profile } from "./profile";

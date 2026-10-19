@@ -1,15 +1,16 @@
-import { useState, useEffect } from "react";
-import { useTenant, useRedCliente, useAuthContext } from "@drivip/supabase";
+import { useState, useEffect, useRef } from "react";
+import { useTenantBySlug, useRedCliente, useAuthContext, APP_URLS } from "@drivip/supabase";
 
 interface AddConductorProps {
   slug: string;
   onAdded: () => void;
   onBack: () => void;
+  autoAdd?: boolean;
 }
 
-export default function AddConductor({ slug, onAdded, onBack }: AddConductorProps) {
+export default function AddConductor({ slug, onAdded, onBack, autoAdd = false }: AddConductorProps) {
   const { user } = useAuthContext();
-  const { tenant, loading: tenantLoading, error: tenantError } = useTenant(slug);
+  const { tenant, loading: tenantLoading, error: tenantError } = useTenantBySlug(slug);
   const { agregarContacto, loading: adding } = useRedCliente(user?.id ?? "");
   const [apodo, setApodo] = useState("");
   const [added, setAdded] = useState(false);
@@ -31,6 +32,15 @@ export default function AddConductor({ slug, onAdded, onBack }: AddConductorProp
       setAddError("No se pudo agregar. Puede que ya esté en tu círculo.");
     }
   };
+
+  const autoAddedRef = useRef(false);
+  useEffect(() => {
+    if (!autoAdd || autoAddedRef.current) return;
+    if (!user || !tenant || added || adding || addError) return;
+    autoAddedRef.current = true;
+    void handleAdd();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoAdd, user, tenant, added, adding, addError]);
 
   if (tenantLoading) {
     return (
@@ -105,7 +115,7 @@ export default function AddConductor({ slug, onAdded, onBack }: AddConductorProp
           </button>
           <div>
             <h1 className="text-base font-bold text-slate-900">Agregar Conductor</h1>
-            <p className="text-[11px] text-slate-400">from: {slug}.drivip.app</p>
+            <p className="text-[11px] text-slate-400">desde {APP_URLS.conductor}</p>
           </div>
         </div>
       </header>
@@ -120,7 +130,7 @@ export default function AddConductor({ slug, onAdded, onBack }: AddConductorProp
             </div>
             <div className="flex-1">
               <h2 className="text-lg font-bold text-slate-900">{tenant.nombre}</h2>
-              <p className="text-xs text-slate-500">{slug}.drivip.app</p>
+              <p className="text-xs text-slate-500 font-mono truncate">{APP_URLS.conductor}</p>
               <div className="flex items-center gap-2 mt-1">
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Verificado</span>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">

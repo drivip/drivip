@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { AuthProvider, useAuthContext, supabase } from "@drivip/supabase";
+import { AuthProvider, useAuthContext, supabase, useTenantBySlug } from "@drivip/supabase";
 import PassengerHeader from "./components/passenger/PassengerHeader";
 import HeroWelcomeCard from "./components/passenger/HeroWelcomeCard";
 import RouteCalculator from "./components/passenger/RouteCalculator";
@@ -14,6 +14,7 @@ import SavedAddresses from "./components/passenger/SavedAddresses";
 import Reservations from "./components/passenger/Reservations";
 import AuthModal from "./components/passenger/AuthModal";
 import Toast from "./components/passenger/Toast";
+import AddConductor from "./components/passenger/AddConductor";
 
 import {
   MOCK_DRIVERS,
@@ -245,7 +246,7 @@ function LoginScreen({ onSwitchToRegister }: { onSwitchToRegister: () => void })
 }
 
 /* ==================== REGISTER ==================== */
-function RegisterScreen({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
+function RegisterScreen({ onSwitchToLogin, inviteConductor }: { onSwitchToLogin: () => void; inviteConductor?: string | null }) {
   const [form, setForm] = useState({ nombre: "", apellido: "", email: "", telefono: "", password: "", ciudad: "Caracas", codigo_referido: "" });
   const [step, setStep] = useState<"form" | "success">("form");
   const [formError, setFormError] = useState<string | null>(null);
@@ -319,6 +320,15 @@ function RegisterScreen({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
           </div>
         </div>
 
+        {inviteConductor && (
+          <div className="flex items-start gap-2 bg-purple-50 border border-purple-100 rounded-2xl px-3.5 py-3">
+            <span className="material-symbols-outlined text-[18px] text-purple-600 mt-0.5">person_check</span>
+            <p className="text-[11px] text-purple-800 leading-snug">
+              Te estás registrando con <span className="font-black">{inviteConductor}</span>. Al terminar quedará guardado automáticamente en tu círculo de conductores.
+            </p>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="grid grid-cols-2 gap-2.5">
             <div>
@@ -335,13 +345,13 @@ function RegisterScreen({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
             </div>
           </div>
           <div>
-            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Email</label>
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Correo <span className="text-slate-400 normal-case">(será tu usuario para iniciar sesión)</span></label>
             <input type="email" value={form.email} onChange={(e) => update("email", e.target.value)}
               className="w-full mt-1 bg-slate-50 rounded-xl px-4 py-3 text-[13px] text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-purple-500 border border-slate-200"
               placeholder="cliente@email.com" required />
           </div>
           <div>
-            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Teléfono</label>
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Teléfono / WhatsApp <span className="text-slate-400 normal-case">(para que tu conductor te contacte)</span></label>
             <input type="tel" value={form.telefono} onChange={(e) => update("telefono", e.target.value)}
               className="w-full mt-1 bg-slate-50 rounded-xl px-4 py-3 text-[13px] text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-purple-500 border border-slate-200"
               placeholder="+58 412 1234567" required />
@@ -772,9 +782,34 @@ export default function App() {
   );
 }
 
+function InviteBanner({ conductor }: { conductor: string | null }) {
+  return (
+    <div className="fixed top-0 inset-x-0 z-[80] bg-purple-700 text-white text-center px-4 py-2 text-[11px] font-bold shadow-lg flex items-center justify-center gap-2">
+      <span className="material-symbols-outlined text-[15px]">qr_code_scanner</span>
+      {conductor ? `Te estás uniendo al conductor ${conductor}` : "Buscando conductor..."}
+    </div>
+  );
+}
+
 function AppContent() {
   const { user, loading, configured } = useAuthContext();
   const [authView, setAuthView] = useState<"landing" | "login" | "register">("landing");
+  const [addSlug, setAddSlug] = useState<string | null>(null);
+
+  useEffect(() => {
+    const add = new URLSearchParams(window.location.search).get("add");
+    if (add) {
+      setAddSlug(add);
+      setAuthView("register");
+    }
+  }, []);
+
+  const { tenant: inviteTenant } = useTenantBySlug(addSlug);
+
+  const clearAddParam = () => {
+    setAddSlug(null);
+    window.history.replaceState({}, "", window.location.pathname);
+  };
 
   if (loading) {
     return (
@@ -787,9 +822,25 @@ function AppContent() {
   }
 
   if (!user) {
-    if (authView === "login") return <LoginScreen onSwitchToRegister={() => setAuthView("register")} />;
-    if (authView === "register") return <RegisterScreen onSwitchToLogin={() => setAuthView("login")} />;
-    return <LandingPage onShowAuth={(mode) => setAuthView(mode)} />;
+    const authScreen =
+      authView === "login" ? (
+        <LoginScreen onSwitchToRegister={() => setAuthView("register")} />
+      ) : authView === "register" ? (
+        <RegisterScreen onSwitchToLogin={() => setAuthView("login")} inviteConductor={inviteTenant?.nombre ?? null} />
+      ) : (
+        <LandingPage onShowAuth={(mode) => setAuthView(mode)} />
+      );
+
+    return (
+      <>
+        {addSlug && <InviteBanner conductor={inviteTenant?.nombre ?? null} />}
+        {authScreen}
+      </>
+    );
+  }
+
+  if (addSlug) {
+    return <AddConductor slug={addSlug} autoAdd onAdded={clearAddParam} onBack={clearAddParam} />;
   }
 
   return <PassengerApp />;

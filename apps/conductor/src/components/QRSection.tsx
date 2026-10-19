@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { conductorInviteUrl } from "@drivip/supabase";
 
 interface QRSectionProps {
   profileSlug: string;
@@ -8,7 +9,8 @@ interface QRSectionProps {
 
 export default function QRSection({ profileSlug, profileName, isOnline }: QRSectionProps) {
   const [copied, setCopied] = useState(false);
-  const pwaUrl = `https://${profileSlug}.drivip.app`;
+  const pwaUrl = conductorInviteUrl(profileSlug);
+  const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=320x320&margin=0&data=${encodeURIComponent(pwaUrl)}`;
 
   const copyToClipboard = () => {
     navigator.clipboard?.writeText(pwaUrl).then(() => {
@@ -52,7 +54,7 @@ export default function QRSection({ profileSlug, profileName, isOnline }: QRSect
             <div className="w-12 h-12 rounded-2xl bg-purple-100 flex items-center justify-center border-2 border-white shadow-md">
               <span className="text-base font-bold text-purple-700">{profileName.charAt(0)}</span>
             </div>
-            <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-white" />
+            <span className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white ${isOnline ? "bg-emerald-500" : "bg-slate-400"}`} />
           </div>
           <div className="flex flex-col min-w-0 flex-1 text-left">
             <span className="text-sm lg:text-base font-bold text-slate-900 truncate">{profileName}</span>
@@ -60,67 +62,8 @@ export default function QRSection({ profileSlug, profileName, isOnline }: QRSect
           </div>
         </div>
 
-        <div className="w-full max-w-[220px] aspect-square bg-slate-900 rounded-2xl p-3 flex items-center justify-center mb-4">
-          <svg className="w-full h-full text-white" fill="currentColor" viewBox="0 0 100 100">
-            <rect height="22" rx="2" width="22" x="6" y="6" />
-            <rect fill="#1e293b" height="16" rx="1" width="16" x="9" y="9" />
-            <rect height="10" rx="1" width="10" x="12" y="12" />
-            <rect height="22" rx="2" width="22" x="72" y="6" />
-            <rect fill="#1e293b" height="16" rx="1" width="16" x="75" y="9" />
-            <rect height="10" rx="1" width="10" x="78" y="12" />
-            <rect height="22" rx="2" width="22" x="6" y="72" />
-            <rect fill="#1e293b" height="16" rx="1" width="16" x="9" y="75" />
-            <rect height="10" rx="1" width="10" x="12" y="78" />
-            <rect height="5" width="5" x="32" y="8" />
-            <rect height="4" width="4" x="42" y="8" />
-            <rect height="4" width="6" x="52" y="8" />
-            <rect height="5" width="5" x="62" y="8" />
-            <rect height="6" width="4" x="34" y="16" />
-            <rect height="5" width="5" x="44" y="15" />
-            <rect height="7" width="4" x="56" y="14" />
-            <rect height="4" width="4" x="64" y="16" />
-            <rect height="4" width="6" x="32" y="24" />
-            <rect height="6" width="4" x="42" y="22" />
-            <rect height="4" width="6" x="50" y="24" />
-            <rect height="5" width="5" x="62" y="22" />
-            <rect height="6" width="4" x="8" y="32" />
-            <rect height="4" width="6" x="16" y="34" />
-            <rect height="5" width="5" x="24" y="32" />
-            <rect height="4" width="6" x="72" y="32" />
-            <rect height="6" width="4" x="82" y="34" />
-            <rect height="4" width="4" x="90" y="32" />
-            <rect height="4" width="6" x="8" y="42" />
-            <rect height="6" width="4" x="18" y="40" />
-            <rect height="4" width="5" x="24" y="44" />
-            <rect height="4" width="4" x="74" y="42" />
-            <rect height="5" width="6" x="82" y="40" />
-            <rect height="5" width="4" x="90" y="44" />
-            <rect height="5" width="5" x="8" y="52" />
-            <rect height="6" width="5" x="16" y="50" />
-            <rect height="5" width="4" x="25" y="52" />
-            <rect height="5" width="5" x="72" y="52" />
-            <rect height="6" width="4" x="80" y="50" />
-            <rect height="5" width="6" x="88" y="52" />
-            <rect height="4" width="6" x="8" y="62" />
-            <rect height="5" width="4" x="18" y="60" />
-            <rect height="5" width="5" x="24" y="62" />
-            <rect height="6" width="5" x="74" y="60" />
-            <rect height="4" width="4" x="84" y="62" />
-            <rect height="6" width="4" x="90" y="60" />
-            <rect height="6" width="5" x="32" y="72" />
-            <rect height="4" width="6" x="40" y="74" />
-            <rect height="5" width="4" x="50" y="72" />
-            <rect height="5" width="5" x="58" y="74" />
-            <rect height="6" width="4" x="68" y="72" />
-            <rect height="4" width="6" x="76" y="74" />
-            <rect height="5" width="5" x="86" y="72" />
-            <rect height="4" width="4" x="34" y="82" />
-            <rect height="6" width="5" x="42" y="80" />
-            <rect height="4" width="6" x="52" y="82" />
-            <rect height="6" width="4" x="62" y="80" />
-            <rect height="5" width="5" x="72" y="82" />
-            <rect height="4" width="6" x="82" y="80" />
-          </svg>
+        <div className="w-full max-w-[220px] aspect-square bg-white rounded-2xl p-2 mb-4 border border-slate-200">
+          <img src={qrSrc} alt={`QR de ${profileName}`} className="w-full h-full object-contain" />
         </div>
 
         <div className="w-full bg-slate-50 px-3 py-2.5 rounded-2xl flex items-center justify-between border border-slate-100">
@@ -135,10 +78,15 @@ export default function QRSection({ profileSlug, profileName, isOnline }: QRSect
       </div>
 
       <div className="flex flex-col space-y-2">
-        <button className="w-full py-3.5 lg:py-4 rounded-2xl bg-gradient-to-r from-purple-700 via-indigo-600 to-purple-800 text-white font-black text-sm lg:text-base shadow-lg shadow-purple-600/30 active:scale-[0.98] transition flex items-center justify-center gap-2">
+        <a
+          href={qrSrc}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full py-3.5 lg:py-4 rounded-2xl bg-gradient-to-r from-purple-700 via-indigo-600 to-purple-800 text-white font-black text-sm lg:text-base shadow-lg shadow-purple-600/30 active:scale-[0.98] transition flex items-center justify-center gap-2"
+        >
           <span className="material-symbols-outlined text-[20px]">print</span>
           Descargar Afiche para Vehículo
-        </button>
+        </a>
         <div className="grid grid-cols-2 gap-2">
           <button onClick={copyToClipboard} className="py-3 rounded-2xl bg-white border border-slate-200 text-slate-700 text-xs lg:text-sm font-bold flex items-center justify-center gap-2 active:scale-95 shadow-md">
             <span className="material-symbols-outlined text-[16px] text-purple-600">link</span>

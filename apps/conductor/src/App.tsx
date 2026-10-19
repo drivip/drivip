@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AuthProvider, useAuthContext, supabase } from "@drivip/supabase";
+import { AuthProvider, useAuthContext, supabase, conductorInviteUrl } from "@drivip/supabase";
 import DriverApp from "./pages/DriverApp";
 
 /* ==================== LANDING PAGE ==================== */
@@ -271,7 +271,7 @@ function LoginScreen({ onSwitchToRegister }: { onSwitchToRegister: () => void })
 }
 
 /* ==================== REGISTER ==================== */
-function RegisterScreen({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
+function RegisterScreen({ onSwitchToLogin, onRegistered }: { onSwitchToLogin: () => void; onRegistered: (data: { nombre: string; apellido: string; cedula: string; plan: string; slug: string }) => void }) {
   const { loading: authLoading } = useAuthContext();
   const [form, setForm] = useState({
     nombre: "", apellido: "", cedula: "", email: "", telefono: "", password: "",
@@ -280,7 +280,6 @@ function RegisterScreen({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
   });
   const [foto, setFoto] = useState<File | null>(null);
   const [fotoPreview, setFotoPreview] = useState<string | null>(null);
-  const [step, setStep] = useState<"form" | "success">("form");
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -352,7 +351,7 @@ function RegisterScreen({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
     });
 
     setSubmitting(false);
-    setStep("success");
+    onRegistered({ nombre: form.nombre, apellido: form.apellido, cedula: form.cedula, plan: form.plan, slug });
   };
 
   const update = (field: string, value: string) => setForm((prev) => ({ ...prev, [field]: value }));
@@ -366,8 +365,6 @@ function RegisterScreen({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
       reader.readAsDataURL(file);
     }
   };
-
-  if (step === "success") return <PendingValidationScreen nombre={form.nombre} apellido={form.apellido} cedula={form.cedula} plan={form.plan} />;
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-[#f4f6f8] p-4">
@@ -525,10 +522,11 @@ function RegisterScreen({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
 }
 
 /* ==================== PENDING VALIDATION ==================== */
-function PendingValidationScreen({ nombre, apellido, cedula, plan }: { nombre: string; apellido: string; cedula: string; plan: string }) {
+function PendingValidationScreen({ nombre, apellido, cedula, plan, slug }: { nombre: string; apellido: string; cedula: string; plan: string; slug: string }) {
   const planLabel = plan === "profesional" ? "Profesional ($20)" : "Estándar ($10)";
   const planMonto = plan === "profesional" ? "$20" : "$10";
-  const slug = `${nombre.toLowerCase().replace(/\s+/g, "")}${apellido.toLowerCase().replace(/\s+/g, "")}`;
+  const inviteUrl = conductorInviteUrl(slug);
+  const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=0&data=${encodeURIComponent(inviteUrl)}`;
 
   const whatsappMsg = encodeURIComponent(
     `Hola, soy ${nombre} ${apellido}. Acabo de registrarme en Drivip como conductor con la cédula ${cedula}. Quiero activar mi plan ${planLabel}. Adjunto el comprobante de Pago Móvil.`
@@ -580,15 +578,12 @@ function PendingValidationScreen({ nombre, apellido, cedula, plan }: { nombre: s
         <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200 mb-4">
           <h3 className="text-[11px] font-bold text-slate-900 uppercase tracking-wider mb-3">Tu app personal</h3>
           <div className="flex items-center gap-4">
-            <div className="w-20 h-20 bg-white rounded-xl border border-slate-200 flex items-center justify-center flex-shrink-0">
-              <div className="text-center">
-                <span className="material-symbols-outlined text-[28px] text-purple-600">qr_code_2</span>
-                <p className="text-[8px] text-slate-400 font-bold mt-0.5">QR</p>
-              </div>
+            <div className="w-20 h-20 bg-white rounded-xl border border-slate-200 flex items-center justify-center flex-shrink-0 p-1">
+              <img src={qrSrc} alt={`QR de ${nombre}`} className="w-full h-full object-contain" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-[10px] text-slate-400 font-medium mb-1">Tu enlace personal:</p>
-              <p className="text-[12px] text-purple-700 font-bold truncate">{slug}.drivip.app</p>
+              <p className="text-[12px] text-purple-700 font-bold truncate">{inviteUrl}</p>
               <p className="text-[10px] text-slate-400 mt-2">Compártelo con tus clientes para que instalen tu app.</p>
             </div>
           </div>
@@ -617,6 +612,7 @@ export default function App() {
 function AppContent() {
   const { user, loading, configured } = useAuthContext();
   const [authView, setAuthView] = useState<"landing" | "login" | "register">("landing");
+  const [registered, setRegistered] = useState<{ nombre: string; apellido: string; cedula: string; plan: string; slug: string } | null>(null);
 
   if (loading) {
     return (
@@ -628,9 +624,13 @@ function AppContent() {
     );
   }
 
+  if (registered) {
+    return <PendingValidationScreen {...registered} />;
+  }
+
   if (!user) {
     if (authView === "login") return <LoginScreen onSwitchToRegister={() => setAuthView("register")} />;
-    if (authView === "register") return <RegisterScreen onSwitchToLogin={() => setAuthView("login")} />;
+    if (authView === "register") return <RegisterScreen onSwitchToLogin={() => setAuthView("login")} onRegistered={setRegistered} />;
     return <LandingPage onShowAuth={(mode) => setAuthView(mode)} />;
   }
 

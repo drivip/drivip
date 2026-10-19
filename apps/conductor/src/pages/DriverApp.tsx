@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { cn } from "@drivip/ui";
-import { useAuthContext, useCarreras, useRealtimeCarreras, useUbicaciones, useTenant } from "@drivip/supabase";
+import { useAuthContext, useCarreras, useRealtimeCarreras, useUbicaciones, useTenant, APP_URLS } from "@drivip/supabase";
 import DriverHeader from "../components/driver/DriverHeader";
 import DriverFullGridMenu from "../components/driver/DriverFullGridMenu";
 import ChoferDashboard from "../components/ChoferDashboard";
@@ -121,7 +121,7 @@ export default function DriverApp({ demo }: { demo?: boolean }) {
     initial: demo ? MOCK_DRIVER_PROFILE.nombre.charAt(0) : (tenant?.nombre?.charAt(0) ?? user?.email?.charAt(0)?.toUpperCase() ?? "C"),
   };
 
-  const domain = demo ? `${MOCK_DRIVER_PROFILE.slug}.drivip.app` : `${profile.slug}.drivip.app`;
+  const domain = APP_URLS.conductor;
 
   const isDashboard = activeModule === "dashboard";
 
