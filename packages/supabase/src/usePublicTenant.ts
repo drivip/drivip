@@ -29,7 +29,7 @@ export function useTenantBySlug(slug: string | null) {
     setState((prev) => ({ ...prev, loading: true, error: null }));
 
     supabase
-      .rpc("get_tenant_by_slug", { p_slug: slug })
+      .rpc("get_tenant_by_slug", { p_slug: slug.trim() })
       .maybeSingle()
       .then(({ data, error }) => {
         if (cancelled) return;

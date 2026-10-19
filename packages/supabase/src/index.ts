@@ -5,6 +5,8 @@ export { AuthProvider, useAuthContext } from "./AuthProvider";
 export { SetupScreen } from "./SetupScreen";
 export { useTenant, useMiTenant, useTenants } from "./useTenant";
 export { useTenantBySlug } from "./usePublicTenant";
+export { buscarConductores, agregarConductorRed } from "./useDirectorioConductores";
+export type { AgregarConductorResult } from "./useDirectorioConductores";
 export { useCarreras, useRealtimeCarreras } from "./useCarreras";
 export { useUbicaciones, useRealtimeUbicacionConductor } from "./useUbicaciones";
 export { useRedCliente } from "./useRedCliente";

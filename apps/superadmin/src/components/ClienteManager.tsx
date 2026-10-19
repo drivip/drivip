@@ -32,7 +32,10 @@ export default function ClienteManager() {
         (filter === "without_rides" && (c.total_carreras || 0) === 0) ||
         (filter === "with_network" && c.red_conductores.length > 0);
 
-      const matchTenant = tenantFilter === "all" || c.tenant_id === tenantFilter;
+      const matchTenant =
+        tenantFilter === "all" ||
+        c.tenant_id === tenantFilter ||
+        c.red_conductores.some((r) => r.conductor_tenant_id === tenantFilter);
 
       return matchSearch && matchFilter && matchTenant;
     });
@@ -122,7 +125,7 @@ export default function ClienteManager() {
           onChange={(e) => setTenantFilter(e.target.value)}
           className="w-full bg-white rounded-xl pl-10 pr-4 py-2.5 text-[12px] text-slate-900 border border-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500 appearance-none"
         >
-          <option value="all">Todos los tenants</option>
+          <option value="all">Todos los conductores</option>
           {tenants.map((t) => (
             <option key={t.id} value={t.id}>{t.nombre}</option>
           ))}
@@ -204,7 +207,7 @@ export default function ClienteManager() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 text-[10px] lg:text-[11px] text-slate-500">
-                    <span className="font-bold text-blue-500">{c.tenant_nombre || "Sin tenant"}</span>
+                    <span className="font-bold text-blue-500">{c.tenant_nombre || "Sin conductor asignado"}</span>
                     <span>·</span>
                     <span>{new Date(c.created_at).toLocaleDateString("es-VE")}</span>
                   </div>

@@ -298,6 +298,7 @@ function RegisterScreen({ onSwitchToLogin, inviteConductor }: { onSwitchToLogin:
       nombre: form.nombre,
       apellido: form.apellido,
       telefono: form.telefono,
+      email: form.email,
       activo: true,
     });
 
@@ -459,11 +460,11 @@ function PostRegisterScreen() {
 /* ==================== PASSENGER APP ==================== */
 function PassengerApp() {
   const { user, signOut } = useAuthContext();
-  const { contactos } = useRedCliente(user?.id ?? "");
+  const { contactos, refetch: refetchRed } = useRedCliente(user?.id ?? "");
   const conductorTenantId = contactos[0]?.conductor_tenant_id ?? null;
   const { tarifas } = useTarifasTenant(conductorTenantId);
   const { tasa } = useTasaCambio();
-  const { conductores } = useConductoresRed();
+  const { conductores, refetch: refetchConductores } = useConductoresRed();
   const drivers = useMemo(() => conductores.map(toDriver), [conductores]);
   const { carreras: misCarreras, refetch: refetchCarreras } = useMisCarreras(user?.id);
   const { direcciones, crearDireccion, eliminarDireccion, marcarPredeterminada } = useDireccionesCliente(user?.id);
@@ -767,6 +768,11 @@ function PassengerApp() {
                 setScreen("home");
                 showToast("Configura tu ruta y solicita la carrera");
               }}
+              onConductorAdded={() => {
+                void refetchConductores();
+                void refetchRed();
+                showToast("Conductor agregado a tu círculo");
+              }}
             />
           )}
 
@@ -973,7 +979,8 @@ function AppContent() {
   const [addSlug, setAddSlug] = useState<string | null>(null);
 
   useEffect(() => {
-    const add = new URLSearchParams(window.location.search).get("add");
+    const params = new URLSearchParams(window.location.search);
+    const add = (params.get("add") ?? params.get("conductor"))?.trim();
     if (add) {
       setAddSlug(add);
       setAuthView("register");

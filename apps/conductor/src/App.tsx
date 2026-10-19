@@ -350,6 +350,7 @@ function RegisterScreen({ onSwitchToLogin, onRegistered }: { onSwitchToLogin: ()
       nombre: form.nombre,
       apellido: form.apellido,
       telefono: form.telefono,
+      email: form.email,
       activo: true,
     });
 

@@ -1,16 +1,20 @@
 import { useState } from "react";
 import type { Driver } from "../../types/passenger";
+import AddConductorModal from "./AddConductorModal";
 
 interface DriversListProps {
   drivers: Driver[];
   onBack: () => void;
   onRequestRide: (driver: Driver) => void;
+  onConductorAdded?: () => void;
 }
 
 type FilterType = "all" | "online" | "taxi" | "moto";
 
-export default function DriversList({ drivers, onBack, onRequestRide }: DriversListProps) {
+export default function DriversList({ drivers, onBack, onRequestRide, onConductorAdded }: DriversListProps) {
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
+  const [addOpen, setAddOpen] = useState(false);
+  const [addTab, setAddTab] = useState<"search" | "qr">("search");
 
   const filtered = drivers.filter((d) => {
     if (activeFilter === "online") return d.status === "available";
@@ -64,6 +68,7 @@ export default function DriversList({ drivers, onBack, onRequestRide }: DriversL
           </div>
           <button
             aria-label="Escanear QR"
+            onClick={() => { setAddTab("qr"); setAddOpen(true); }}
             className="w-10 h-10 lg:w-12 lg:h-12 rounded-2xl bg-white flex items-center justify-center text-violet-700 active:scale-95 transition-all border border-slate-100"
             style={{ boxShadow: "3px 3px 8px #d9dce1, -3px -3px 8px #ffffff" }}
           >
@@ -85,6 +90,14 @@ export default function DriversList({ drivers, onBack, onRequestRide }: DriversL
           </div>
           <span className="text-[11px] lg:text-xs font-bold bg-violet-600 text-white px-2.5 py-0.5 rounded-full shadow-sm">0% Comisión</span>
         </div>
+
+        <button
+          onClick={() => { setAddTab("search"); setAddOpen(true); }}
+          className="mt-2 w-full py-3 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-xs lg:text-sm font-black shadow-lg shadow-violet-500/25 active:scale-[0.99] transition flex items-center justify-center gap-2"
+        >
+          <span className="material-symbols-outlined text-[19px]">person_add</span>
+          Buscar o escanear un conductor
+        </button>
       </header>
 
       {/* Filter Tabs */}
@@ -115,8 +128,20 @@ export default function DriversList({ drivers, onBack, onRequestRide }: DriversL
               <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-3">
                 <span className="material-symbols-outlined text-[28px] text-slate-400">person_off</span>
               </div>
-              <p className="text-sm font-semibold text-slate-500">No hay conductores en esta categoria</p>
-              <p className="text-xs text-slate-400 mt-1">Intenta con otro filtro</p>
+              <p className="text-sm font-semibold text-slate-500">
+                {drivers.length === 0 ? "Aún no tienes conductores" : "No hay conductores en esta categoria"}
+              </p>
+              <p className="text-xs text-slate-400 mt-1">
+                {drivers.length === 0 ? "Busca por nombre o escanea el QR de tu conductor" : "Intenta con otro filtro"}
+              </p>
+              {drivers.length === 0 && (
+                <button
+                  onClick={() => { setAddTab("search"); setAddOpen(true); }}
+                  className="mt-3 px-4 py-2.5 rounded-xl bg-violet-600 text-white text-xs font-bold active:scale-95"
+                >
+                  Agregar mi primer conductor
+                </button>
+              )}
             </div>
           ) : filtered.map((driver) => (
             <article key={driver.id} className="bg-white rounded-3xl p-4 lg:p-5 border border-slate-100/90 relative overflow-hidden" style={{ boxShadow: "0 12px 30px -10px rgba(148, 163, 184, 0.25), 0 2px 8px -2px rgba(148, 163, 184, 0.15)" }}>
@@ -203,6 +228,13 @@ export default function DriversList({ drivers, onBack, onRequestRide }: DriversL
           ))}
         </div>
       </main>
+
+      <AddConductorModal
+        open={addOpen}
+        initialTab={addTab}
+        onClose={() => setAddOpen(false)}
+        onAdded={() => onConductorAdded?.()}
+      />
     </div>
   );
 }

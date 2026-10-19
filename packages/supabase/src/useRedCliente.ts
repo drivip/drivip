@@ -6,23 +6,23 @@ export function useRedCliente(clienteId: string) {
   const [contactos, setContactos] = useState<RedCliente[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    supabase
+  const fetchAll = useCallback(async () => {
+    if (!clienteId) {
+      setContactos([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    const { data } = await supabase
       .from("red_cliente")
       .select("*")
       .eq("cliente_id", clienteId)
-      .order("agregado_at", { ascending: false })
-      .then(({ data }) => {
-        if (!cancelled) {
-          setContactos((data as RedCliente[]) ?? []);
-          setLoading(false);
-        }
-      });
-
-    return () => { cancelled = true; };
+      .order("agregado_at", { ascending: false });
+    setContactos((data as RedCliente[]) ?? []);
+    setLoading(false);
   }, [clienteId]);
+
+  useEffect(() => { void fetchAll(); }, [fetchAll]);
 
   const agregarContacto = useCallback(async (contacto: Omit<RedCliente, "id" | "agregado_at">) => {
     const { data, error } = await supabase
@@ -48,5 +48,5 @@ export function useRedCliente(clienteId: string) {
     return !error;
   }, []);
 
-  return { contactos, loading, agregarContacto, eliminarContacto };
+  return { contactos, loading, agregarContacto, eliminarContacto, refetch: fetchAll };
 }

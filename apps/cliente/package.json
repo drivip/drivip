@@ -10,14 +10,15 @@
     "deploy": "npm run build && npx wrangler@4 pages deploy dist --project-name drivip-cliente"
   },
   "dependencies": {
-    "@drivip/types": "workspace:*",
-    "@drivip/ui": "workspace:*",
     "@drivip/maps": "workspace:*",
     "@drivip/supabase": "workspace:*",
+    "@drivip/types": "workspace:*",
+    "@drivip/ui": "workspace:*",
+    "jsqr": "^1.4.0",
+    "maplibre-gl": "^4.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-router-dom": "^7.0.0",
-    "maplibre-gl": "^4.0.0"
+    "react-router-dom": "^7.0.0"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",

@@ -30,7 +30,7 @@ export interface ConductorRed {
 
 export interface Cliente {
   id: string;
-  tenant_id: string;
+  tenant_id: string | null;
   profile_id: string | null;
   nombre: string;
   telefono: string | null;

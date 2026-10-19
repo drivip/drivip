@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useTenantBySlug, useRedCliente, useAuthContext, APP_URLS } from "@drivip/supabase";
+import { useTenantBySlug, useAuthContext, APP_URLS, agregarConductorRed } from "@drivip/supabase";
 
 interface AddConductorProps {
   slug: string;
@@ -11,25 +11,27 @@ interface AddConductorProps {
 export default function AddConductor({ slug, onAdded, onBack, autoAdd = false }: AddConductorProps) {
   const { user } = useAuthContext();
   const { tenant, loading: tenantLoading, error: tenantError } = useTenantBySlug(slug);
-  const { agregarContacto, loading: adding } = useRedCliente(user?.id ?? "");
   const [apodo, setApodo] = useState("");
   const [added, setAdded] = useState(false);
+  const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
 
   const handleAdd = async () => {
     if (!user || !tenant) return;
     setAddError(null);
-    const result = await agregarContacto({
-      cliente_id: user.id,
-      conductor_tenant_id: tenant.id,
-      apodo: apodo || null,
-      favorito: false,
-      notificaciones_activas: true,
-    });
-    if (result) {
+    setAdding(true);
+    try {
+      await agregarConductorRed(tenant.slug, apodo);
       setAdded(true);
-    } else {
-      setAddError("No se pudo agregar. Puede que ya esté en tu círculo.");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "";
+      setAddError(
+        message.includes("conductor_no_encontrado")
+          ? "Ese enlace ya no existe. Escanea el QR actualizado del conductor."
+          : "No se pudo agregar. Revisa tu conexión e intenta de nuevo."
+      );
+    } finally {
+      setAdding(false);
     }
   };
 
@@ -63,12 +65,12 @@ export default function AddConductor({ slug, onAdded, onBack, autoAdd = false }:
             <span className="material-symbols-outlined text-[32px] text-red-500">error</span>
           </div>
           <h2 className="text-lg font-bold text-slate-900">Conductor no encontrado</h2>
-          <p className="text-sm text-slate-500">El enlace no es válido o el conductor no existe.</p>
+          <p className="text-sm text-slate-500">El enlace no es válido, está incompleto o el conductor ya no existe.</p>
           <button
             onClick={onBack}
             className="w-full py-3 rounded-xl bg-purple-600 text-white text-sm font-bold active:scale-95 transition"
           >
-            Volver
+            Buscar conductor manualmente
           </button>
         </div>
       </div>

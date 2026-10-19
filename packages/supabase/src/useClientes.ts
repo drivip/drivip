@@ -25,6 +25,48 @@ interface UseClientesState {
   error: string | null;
 }
 
+interface ProfileRow {
+  id: string;
+  tenant_id: string | null;
+  nombre: string | null;
+  apellido: string | null;
+  telefono: string | null;
+  email: string | null;
+  created_at: string;
+}
+
+interface ClienteRow {
+  profile_id: string | null;
+  tenant_id: string;
+  direccion: string | null;
+  lat: number | null;
+  lng: number | null;
+  total_carreras: number;
+}
+
+function nombreCompleto(profile: ProfileRow): string {
+  return (
+    [profile.nombre, profile.apellido].filter(Boolean).join(" ").trim() ||
+    profile.email ||
+    "Cliente"
+  );
+}
+
+async function getTenantsMap(ids: string[]) {
+  const map: Record<string, { nombre: string; slug: string }> = {};
+  if (ids.length === 0) return map;
+
+  const { data } = await supabase
+    .from("tenants")
+    .select("id, nombre, slug")
+    .in("id", ids);
+
+  (data ?? []).forEach((t: any) => {
+    map[t.id] = { nombre: t.nombre, slug: t.slug };
+  });
+  return map;
+}
+
 export function useClientes() {
   const [state, setState] = useState<UseClientesState>({
     clientes: [],
@@ -35,65 +77,91 @@ export function useClientes() {
   const fetchAll = useCallback(async () => {
     setState((s) => ({ ...s, loading: true, error: null }));
 
-    const { data: clientesData, error: clientesError } = await supabase
-      .from("clientes")
-      .select("*")
+    const { data: profilesData, error: profilesError } = await supabase
+      .from("profiles")
+      .select("id, tenant_id, nombre, apellido, telefono, email, created_at")
+      .eq("rol", "cliente")
       .order("created_at", { ascending: false });
 
-    if (clientesError) {
-      setState({ clientes: [], loading: false, error: clientesError.message });
+    if (profilesError) {
+      setState({ clientes: [], loading: false, error: profilesError.message });
       return;
     }
 
-    const profileIds = (clientesData ?? [])
-      .map((c) => c.profile_id)
-      .filter((id): id is string => id !== null);
+    const profiles = (profilesData ?? []) as ProfileRow[];
+    const profileIds = profiles.map((p) => p.id);
 
     let redData: any[] = [];
+    let clientesData: ClienteRow[] = [];
+
     if (profileIds.length > 0) {
-      const { data } = await supabase
-        .from("red_cliente")
-        .select("*")
-        .in("cliente_id", profileIds);
-      redData = data ?? [];
+      const [redRes, clientesRes] = await Promise.all([
+        supabase
+          .from("red_cliente")
+          .select("*")
+          .in("cliente_id", profileIds)
+          .order("agregado_at", { ascending: false }),
+        supabase
+          .from("clientes")
+          .select("profile_id, tenant_id, direccion, lat, lng, total_carreras")
+          .in("profile_id", profileIds),
+      ]);
+      redData = redRes.data ?? [];
+      clientesData = (clientesRes.data ?? []) as ClienteRow[];
     }
 
     const tenantIds = [
       ...new Set([
-        ...(clientesData ?? []).map((c) => c.tenant_id),
+        ...profiles.map((p) => p.tenant_id).filter((id): id is string => !!id),
         ...redData.map((r) => r.conductor_tenant_id),
+        ...clientesData.map((c) => c.tenant_id),
       ]),
     ];
+    const tenantsMap = await getTenantsMap(tenantIds);
 
-    let tenantsMap: Record<string, { nombre: string; slug: string }> = {};
-    if (tenantIds.length > 0) {
-      const { data: tenantsData } = await supabase
-        .from("tenants")
-        .select("id, nombre, slug")
-        .in("id", tenantIds);
-      (tenantsData ?? []).forEach((t: any) => {
-        tenantsMap[t.id] = { nombre: t.nombre, slug: t.slug };
-      });
-    }
+    const clientes: ClienteConRed[] = profiles.map((p) => {
+      const perfilRed = redData.filter((r) => r.cliente_id === p.id);
+      const perfilClientes = clientesData.filter((c) => c.profile_id === p.id);
+      const primaryTenantId =
+        perfilRed[0]?.conductor_tenant_id ??
+        perfilClientes[0]?.tenant_id ??
+        p.tenant_id ??
+        null;
 
-    const clientes: ClienteConRed[] = (clientesData ?? []).map((c: any) => {
-      const red = redData
-        .filter((r) => r.cliente_id === c.profile_id)
-        .map((r) => ({
-          id: r.id,
-          conductor_tenant_id: r.conductor_tenant_id,
-          conductor_nombre: tenantsMap[r.conductor_tenant_id]?.nombre ?? null,
-          conductor_slug: tenantsMap[r.conductor_tenant_id]?.slug ?? null,
-          apodo: r.apodo,
-          favorito: r.favorito,
-          notificaciones_activas: r.notificaciones_activas,
-          agregado_at: r.agregado_at,
-        }));
+      const red = perfilRed.map((r) => ({
+        id: r.id,
+        conductor_tenant_id: r.conductor_tenant_id,
+        conductor_nombre: tenantsMap[r.conductor_tenant_id]?.nombre ?? null,
+        conductor_slug: tenantsMap[r.conductor_tenant_id]?.slug ?? null,
+        apodo: r.apodo,
+        favorito: r.favorito,
+        notificaciones_activas: r.notificaciones_activas,
+        agregado_at: r.agregado_at,
+      }));
+
+      const firstCliente = perfilClientes[0];
 
       return {
-        ...c,
-        tenant_nombre: tenantsMap[c.tenant_id]?.nombre ?? null,
-        tenant_slug: tenantsMap[c.tenant_id]?.slug ?? null,
+        id: p.id,
+        tenant_id: primaryTenantId,
+        profile_id: p.id,
+        nombre: nombreCompleto(p),
+        telefono: p.telefono,
+        email: p.email,
+        direccion: firstCliente?.direccion ?? null,
+        lat: firstCliente?.lat ?? null,
+        lng: firstCliente?.lng ?? null,
+        total_carreras: perfilClientes.reduce(
+          (sum, c) => sum + (c.total_carreras || 0),
+          0
+        ),
+        created_at: p.created_at,
+        tenant_nombre: primaryTenantId
+          ? tenantsMap[primaryTenantId]?.nombre ?? null
+          : null,
+        tenant_slug: primaryTenantId
+          ? tenantsMap[primaryTenantId]?.slug ?? null
+          : null,
         red_conductores: red,
       };
     });
@@ -161,64 +229,88 @@ export function useClienteDetail(clienteId: string | null) {
       setLoading(true);
       setError(null);
 
-      const { data: clienteData, error: clienteErr } = await supabase
-        .from("clientes")
-        .select("*")
+      const { data: profileData, error: profileErr } = await supabase
+        .from("profiles")
+        .select("id, tenant_id, nombre, apellido, telefono, email, created_at")
         .eq("id", clienteId)
         .single();
 
       if (cancelled) return;
-      if (clienteErr || !clienteData) {
+      if (profileErr || !profileData) {
         setCliente(null);
-        setError(clienteErr?.message || "No encontrado");
+        setError(profileErr?.message || "No encontrado");
         setLoading(false);
         return;
       }
 
-      const redQuery = clienteData.profile_id
-        ? supabase.from("red_cliente").select("*").eq("cliente_id", clienteData.profile_id)
-        : Promise.resolve({ data: [] as any[], error: null });
+      const profile = profileData as ProfileRow;
 
-      const [redRes, tenantRes] = await Promise.all([
-        redQuery,
-        supabase.from("tenants").select("id, nombre, slug").eq("id", clienteData.tenant_id).single(),
+      const [redRes, clientesRes] = await Promise.all([
+        supabase
+          .from("red_cliente")
+          .select("*")
+          .eq("cliente_id", profile.id)
+          .order("agregado_at", { ascending: false }),
+        supabase
+          .from("clientes")
+          .select("profile_id, tenant_id, direccion, lat, lng, total_carreras")
+          .eq("profile_id", profile.id),
       ]);
 
       if (cancelled) return;
 
-      const tenantInfo = tenantRes.data as { nombre: string; slug: string } | null;
+      const redData = redRes.data ?? [];
+      const clientesData = (clientesRes.data ?? []) as ClienteRow[];
+      const tenantIds = [
+        ...new Set([
+          ...(profile.tenant_id ? [profile.tenant_id] : []),
+          ...redData.map((r: any) => r.conductor_tenant_id),
+          ...clientesData.map((c) => c.tenant_id),
+        ]),
+      ];
+      const tenantsMap = await getTenantsMap(tenantIds);
 
-      const red = (redRes.data ?? []).map((r: any) => ({
+      if (cancelled) return;
+
+      const red = redData.map((r: any) => ({
         id: r.id,
         conductor_tenant_id: r.conductor_tenant_id,
-        conductor_nombre: null as string | null,
-        conductor_slug: null as string | null,
+        conductor_nombre: tenantsMap[r.conductor_tenant_id]?.nombre ?? null,
+        conductor_slug: tenantsMap[r.conductor_tenant_id]?.slug ?? null,
         apodo: r.apodo,
         favorito: r.favorito,
         notificaciones_activas: r.notificaciones_activas,
         agregado_at: r.agregado_at,
       }));
 
-      const conductorTenantIds = red.map((r) => r.conductor_tenant_id);
-      if (conductorTenantIds.length > 0) {
-        const { data: conductoresData } = await supabase
-          .from("tenants")
-          .select("id, nombre, slug")
-          .in("id", conductorTenantIds);
-        const cMap: Record<string, { nombre: string; slug: string }> = {};
-        (conductoresData ?? []).forEach((t: any) => {
-          cMap[t.id] = { nombre: t.nombre, slug: t.slug };
-        });
-        red.forEach((r) => {
-          r.conductor_nombre = cMap[r.conductor_tenant_id]?.nombre ?? null;
-          r.conductor_slug = cMap[r.conductor_tenant_id]?.slug ?? null;
-        });
-      }
+      const primaryTenantId =
+        redData[0]?.conductor_tenant_id ??
+        clientesData[0]?.tenant_id ??
+        profile.tenant_id ??
+        null;
+      const firstCliente = clientesData[0];
 
       setCliente({
-        ...(clienteData as Cliente),
-        tenant_nombre: tenantInfo?.nombre ?? null,
-        tenant_slug: tenantInfo?.slug ?? null,
+        id: profile.id,
+        tenant_id: primaryTenantId,
+        profile_id: profile.id,
+        nombre: nombreCompleto(profile),
+        telefono: profile.telefono,
+        email: profile.email,
+        direccion: firstCliente?.direccion ?? null,
+        lat: firstCliente?.lat ?? null,
+        lng: firstCliente?.lng ?? null,
+        total_carreras: clientesData.reduce(
+          (sum, c) => sum + (c.total_carreras || 0),
+          0
+        ),
+        created_at: profile.created_at,
+        tenant_nombre: primaryTenantId
+          ? tenantsMap[primaryTenantId]?.nombre ?? null
+          : null,
+        tenant_slug: primaryTenantId
+          ? tenantsMap[primaryTenantId]?.slug ?? null
+          : null,
         red_conductores: red,
       });
       setLoading(false);

@@ -5,6 +5,7 @@ export interface Profile {
   nombre: string | null;
   apellido: string | null;
   telefono: string | null;
+  email: string | null;
   avatar_url: string | null;
   activo: boolean;
   created_at: string;
