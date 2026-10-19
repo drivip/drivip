@@ -192,9 +192,6 @@ importers:
 
   apps/superadmin:
     dependencies:
-      '@drivip/maps':
-        specifier: workspace:*
-        version: link:../../packages/maps
       '@drivip/supabase':
         specifier: workspace:*
         version: link:../../packages/supabase
@@ -210,9 +207,6 @@ importers:
       react-dom:
         specifier: ^19.0.0
         version: 19.3.0(react@19.3.0)
-      react-router-dom:
-        specifier: ^7.0.0
-        version: 7.18.3(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
     devDependencies:
       '@types/react':
         specifier: ^19.0.0
