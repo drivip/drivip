@@ -14,7 +14,12 @@ interface MapLibreViewProps {
   destination?: { lat: number; lng: number; label?: string } | null;
   origin?: { lat: number; lng: number; label?: string } | null;
   showPulse?: boolean;
+  /** Solo se llama cuando el usuario mueve el mapa, no en movimientos programáticos. */
   onCenterChange?: (center: [number, number]) => void;
+  /** Límites geográficos, en formato [[oeste, sur], [este, norte]]. */
+  maxBounds?: [[number, number], [number, number]] | null;
+  /** Permite desactivar gestos para usar el mapa como vista previa. */
+  interactive?: boolean;
 }
 
 let uid = 0;
@@ -108,6 +113,8 @@ export default function MapLibreView({
   origin,
   showPulse = true,
   onCenterChange,
+  maxBounds,
+  interactive = true,
 }: MapLibreViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -121,6 +128,9 @@ export default function MapLibreView({
   const onCenterChangeRef = useRef(onCenterChange);
   onCenterChangeRef.current = onCenterChange;
   const userDraggingRef = useRef(false);
+  const programmaticMoveRef = useRef(false);
+  const maxBoundsRef = useRef(maxBounds);
+  maxBoundsRef.current = maxBounds;
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -130,8 +140,17 @@ export default function MapLibreView({
       center: [center[1], center[0]],
       zoom,
       attributionControl: false,
+      renderWorldCopies: false,
+      interactive,
+      ...(maxBounds ? { maxBounds } : {}),
     });
-    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
+
+    if (interactive) {
+      map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
+      map.dragRotate.disable();
+      map.touchZoomRotate.disableRotation();
+    }
+
     map.on("load", () => {
       loadedRef.current = true;
 
@@ -193,9 +212,16 @@ export default function MapLibreView({
         if (src) src.setData(toGeoJSON(pendingRouteSecRef.current));
       }
     });
-    map.on("movestart", () => { userDraggingRef.current = true; });
+    map.on("dragstart", () => { userDraggingRef.current = true; });
+    map.on("zoomstart", (event) => {
+      if (event.originalEvent) userDraggingRef.current = true;
+    });
     map.on("moveend", () => {
+      const wasProgrammatic = programmaticMoveRef.current;
+      const wasUser = userDraggingRef.current;
+      programmaticMoveRef.current = false;
       userDraggingRef.current = false;
+      if (wasProgrammatic || !wasUser) return;
       if (onCenterChangeRef.current) {
         const c = map.getCenter();
         onCenterChangeRef.current([c.lat, c.lng]);
@@ -212,8 +238,19 @@ export default function MapLibreView({
   useEffect(() => {
     const map = mapRef.current;
     if (!map || userDraggingRef.current) return;
-    map.flyTo({ center: [center[1], center[0]], zoom: Math.max(map.getZoom(), 16), duration: 800 });
-  }, [center]);
+    const targetZoom = Math.max(map.getZoom(), zoom);
+    if (map.getCenter().lat === center[0] && map.getCenter().lng === center[1] && map.getZoom() === targetZoom) {
+      return;
+    }
+    programmaticMoveRef.current = true;
+    map.flyTo({ center: [center[1], center[0]], zoom: targetZoom, duration: 800 });
+  }, [center, zoom]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    map.setMaxBounds(maxBounds ?? null);
+  }, [maxBounds]);
 
   // Main route (purple)
   useEffect(() => {
@@ -262,6 +299,7 @@ export default function MapLibreView({
     } else {
       carMarkerRef.current.setLngLat([carPosition.lng, carPosition.lat]).setRotation(carPosition.bearing);
     }
+    programmaticMoveRef.current = true;
     map.flyTo({ center: [carPosition.lng, carPosition.lat], zoom: Math.max(map.getZoom(), 17), duration: 800 });
   }, [carPosition, showPulse]);
 

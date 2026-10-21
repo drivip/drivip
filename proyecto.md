@@ -18,7 +18,6 @@ Drivip es una plataforma SaaS multi-tenant que digitaliza la operación de moto 
 | **Moto taxistas individuales** | Tener su propia PWA, recibir carreras, cobrar, gestionar clientes |
 | **Taxistas individuales** | Digitalizar su operación sin comisiones de terceros |
 | **Líneas de taxis** | Gestionar flota, afiliados, porcentajes y reportes consolidados |
-| **Comercios (Plugin Premium)** | Afiliarse para gestionar delivery, rutas y cuentas con conductores |
 | **Clientes finales** | Pedir carrera desde la PWA del conductor, pagar en efectivo o Pago Móvil, calificar |
 
 ## Propuesta de valor
@@ -28,7 +27,7 @@ Drivip es una plataforma SaaS multi-tenant que digitaliza la operación de moto 
 - **PWA instalable:** El cliente agrega el icono del conductor a su móvil.
 - **QR personal:** Cada conductor comparte su subdominio (`josetaxi.drivip.app`) y su QR.
 - **Mapas estilo Uber/Didi:** Seguimiento en tiempo real con MapLibre GL JS + GraphHopper.
-- **Plugins Premium:** Delivery, zonas de cobro, gestión de comercios afiliados.
+- **Plugins Premium:** Zonas de cobro y aliados B2B.
 - **Panel Maestro CRM/ERP:** Control total del SaaS desde un solo lugar.
 
  PWA del Conductor (individual y personalizada)

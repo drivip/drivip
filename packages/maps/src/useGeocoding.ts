@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { searchVenezuelaPlaces } from "./venezuelaGeocoder";
 
 interface GeocodingResult {
   lat: number;
@@ -17,40 +18,33 @@ export default function useGeocoding() {
       setResults([]);
       return;
     }
+
     setLoading(true);
     setError(null);
-    try {
-      const params = new URLSearchParams({
-        q: query,
-        format: "jsonv2",
-        limit: "5",
-        addressdetails: "1",
-      });
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?${params}`,
-        {
-          headers: {
-            "User-Agent": "DrivipApp/1.0 (drivip.app)",
-          },
-        }
-      );
-      if (!response.ok) throw new Error("Error en la busqueda");
-      const data = await response.json();
-      const mapped: GeocodingResult[] = data.map(
-        (item: Record<string, unknown>) => ({
-          lat: parseFloat(item.lat as string),
-          lng: parseFloat(item.lon as string),
-          displayName: item.display_name as string,
-          address: (item.address as Record<string, string>) || {},
-        })
-      );
-      setResults(mapped);
-    } catch {
-      setError("Error al buscar direccion");
+
+    const places = await searchVenezuelaPlaces(query, { limit: 6 });
+
+    if (places.length === 0) {
       setResults([]);
-    } finally {
+      setError("No encontramos esa dirección en Venezuela.");
       setLoading(false);
+      return;
     }
+
+    setResults(
+      places.map((place) => ({
+        lat: place.lat,
+        lng: place.lng,
+        displayName: place.displayName,
+        address: {
+          road: place.primary,
+          city: place.city ?? "",
+          state: place.state ?? "",
+          country: "Venezuela",
+        },
+      }))
+    );
+    setLoading(false);
   }, []);
 
   return { results, loading, error, search };

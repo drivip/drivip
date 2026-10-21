@@ -19,6 +19,7 @@ export { useTenantNotificaciones } from "./useTenantNotificaciones";
 export { usePushNotifications } from "./usePushNotifications";
 export { PushNotificationCard } from "./PushNotificationCard";
 export { useMensajesCarrera } from "./useMensajesCarrera";
+export { useConversacionesCliente, useMensajesDirectos } from "./useConversaciones";
 export { CarreraChat } from "./CarreraChat";
 export { enviarPushCarrera } from "./notificacionesCarrera";
 export type { PushCarreraInput } from "./notificacionesCarrera";
@@ -32,10 +33,6 @@ export { useDireccionesCliente } from "./useDireccionesCliente";
 export type { NuevaDireccion } from "./useDireccionesCliente";
 export { useReservasCliente } from "./useReservasCliente";
 export type { NuevaReserva } from "./useReservasCliente";
-export { useProductos } from "./useProductos";
-export type { NuevoProducto } from "./useProductos";
-export { usePedidosComercio } from "./usePedidosComercio";
-export type { NuevoPedidoComercio } from "./usePedidosComercio";
 export { usePluginsCatalogo } from "./usePluginsCatalogo";
 export type { PluginCatalogo } from "./usePluginsCatalogo";
 export { useTarifasTenant, useZonas, guardarTarifas } from "./useTarifas";
@@ -44,8 +41,9 @@ export {
   useConductoresRed,
   useMisCarreras,
   crearCarreraCliente,
+  crearSolicitudServicio,
   calificarCarrera,
   cancelarCarrera,
 } from "./useConductorRed";
-export type { CrearCarreraClienteInput } from "./useConductorRed";
+export type { CrearCarreraClienteInput, CrearSolicitudServicioInput } from "./useConductorRed";
 export type { ClienteConRed, RedConductorEntry } from "./useClientes";

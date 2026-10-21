@@ -120,18 +120,6 @@ Requisitos funcionales por panel
 
     Historial de carreras.
 
-6. Panel de Comercios Afiliados (Plugin Premium)
-
-    Registro como comercio.
-
-    Gestión de pedidos de delivery.
-
-    Rutas asignadas a conductores.
-
-    Cuadratura de cuentas diarias/semanales.
-
-    Historial de entregas y detalles de pedidos.
-
 Reglas de negocio
 
     Aislamiento multi-tenant: Toda tabla debe tener tenant_id y políticas RLS activas.
@@ -144,7 +132,7 @@ Reglas de negocio
 
     Seguimiento en vivo: Las coordenadas del conductor se guardan en Supabase y se transmiten vía Realtime.
 
-    Plugins modulares: Cada funcionalidad premium (delivery, zonas, etc.) es un módulo activable desde el panel maestro.
+    Plugins modulares: Cada funcionalidad premium (zonas, aliados B2B, etc.) es un módulo activable desde el panel maestro.
 
 Entregables
 

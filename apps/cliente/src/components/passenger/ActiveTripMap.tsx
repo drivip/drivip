@@ -139,7 +139,7 @@ export default function ActiveTripMap({
                 {ride.conductorInitials}
               </div>
             )}
-            <span className="absolute -bottom-1 -right-1 bg-amber-500 text-white text-[9px] font-extrabold px-1 rounded-md flex items-center gap-0.5 shadow-sm">
+            <span className="absolute -bottom-1 -right-1 bg-amber-500 text-white text-[10px] font-extrabold px-1 rounded-md flex items-center gap-0.5 shadow-sm">
               ★ {ride.conductorRating}
             </span>
           </div>

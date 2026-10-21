@@ -17,7 +17,6 @@ export const APP_URLS = {
   conductor: resolveAppUrl(env.VITE_CONDUCTOR_URL, "https://drivip-conductor.pages.dev"),
   cliente: resolveAppUrl(env.VITE_CLIENTE_URL, "https://drivip-cliente.pages.dev"),
   superadmin: resolveAppUrl(env.VITE_SUPERADMIN_URL, "https://drivip-superadmin.pages.dev"),
-  comercio: resolveAppUrl(env.VITE_COMERCIO_URL, "https://drivip-comercio.pages.dev"),
 } as const;
 
 /** Enlace que abre la app del cliente invitando a agregar a un conductor por slug. */

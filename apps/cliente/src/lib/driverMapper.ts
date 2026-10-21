@@ -27,23 +27,30 @@ export function toDriver(c: ConductorRed): Driver {
   const name = c.apodo?.trim() || c.nombre;
   const vehicle = [c.vehiculo_modelo, c.vehiculo_tipo].filter(Boolean).join(" ") || "Vehículo";
   const disponible = !c.pausado && c.suscripcion_activa;
+  const vehicleType: Driver["vehicleType"] =
+    c.vehiculo_tipo === "moto" || c.vehiculo_tipo === "camioneta" ? c.vehiculo_tipo : "carro";
 
   return {
     id: c.conductor_tenant_id,
+    slug: c.slug,
     name,
     initials: initialsOf(name),
     vehicle,
+    vehicleColor: c.vehiculo_color || "Sin color",
+    vehicleType,
     plate: c.vehiculo_placa || "S/P",
-    rating: c.calificacion ?? 5,
+    rating: c.calificacion ?? 0,
+    reviews: Number(c.total_resenas ?? 0),
     trips: 0,
-    status: disponible ? "available" : "offline",
-    availability: disponible ? "Disponible" : "No disponible",
+    status: disponible ? "available" : c.pausado ? "busy" : "offline",
+    availability: disponible ? "Disponible ahora" : c.pausado ? "Se desocupa pronto" : "No disponible",
     paymentMethods: ["Efectivo", "Pago Móvil"],
     phone: c.telefono || "",
     whatsapp: (c.telefono || "").replace(/[^\d]/g, ""),
     ci: "",
     bank: "",
     color: GRADIENTS[hashIndex(c.conductor_tenant_id, GRADIENTS.length)],
+    isVip: c.suscripcion_activa,
     image: c.logo_url || undefined,
   };
 }

@@ -1,20 +1,23 @@
 import { useState } from "react";
 import type { Driver } from "../../types/passenger";
 import AddConductorModal from "./AddConductorModal";
+import DriverRating from "./DriverRating";
 
 interface DriversListProps {
   drivers: Driver[];
   onBack: () => void;
   onRequestRide: (driver: Driver) => void;
   onConductorAdded?: () => void;
+  onUnfollow?: (driver: Driver) => void | Promise<void>;
 }
 
 type FilterType = "all" | "online" | "taxi" | "moto";
 
-export default function DriversList({ drivers, onBack, onRequestRide, onConductorAdded }: DriversListProps) {
+export default function DriversList({ drivers, onBack, onRequestRide, onConductorAdded, onUnfollow }: DriversListProps) {
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
   const [addOpen, setAddOpen] = useState(false);
   const [addTab, setAddTab] = useState<"search" | "qr">("search");
+  const [confirmUnfollowId, setConfirmUnfollowId] = useState<string | null>(null);
 
   const filtered = drivers.filter((d) => {
     if (activeFilter === "online") return d.status === "available";
@@ -158,15 +161,10 @@ export default function DriversList({ drivers, onBack, onRequestRide, onConducto
                     <span className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${driver.status === "available" ? "bg-emerald-500" : driver.status === "busy" ? "bg-amber-500" : "bg-slate-400"}`}></span>
                   </div>
                   <div>
-                    <div className="flex items-center gap-1.5">
-                      <h2 className="text-base lg:text-lg font-bold text-slate-900 leading-tight">{driver.name}</h2>
-                      <span className="bg-amber-100 text-amber-800 text-[10px] lg:text-[11px] font-extrabold px-1.5 py-0.5 rounded-md flex items-center gap-0.5">
-                        <svg className="w-3 h-3 text-amber-500 fill-current" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
-                        {driver.rating}
-                      </span>
-                    </div>
+                    <h2 className="text-base lg:text-lg font-bold text-slate-900 leading-tight">{driver.name}</h2>
                     <p className="text-xs lg:text-sm text-slate-500 font-medium mt-0.5">{driver.vehicle}</p>
-                    <div className="flex items-center gap-2 mt-1">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1.5">
+                      <DriverRating rating={driver.rating} reviews={driver.reviews} size="xs" />
                       <span className="bg-slate-100 text-slate-600 text-[10px] lg:text-[11px] font-mono font-semibold px-2 py-0.5 rounded-md">{driver.plate}</span>
                       <span className="text-[11px] lg:text-xs text-slate-400">• {driver.trips} viajes</span>
                     </div>
@@ -224,6 +222,42 @@ export default function DriversList({ drivers, onBack, onRequestRide, onConducto
                   <span>Pedir Carrera</span>
                 </button>
               </div>
+
+              {onUnfollow && (
+                confirmUnfollowId === driver.id ? (
+                  <div className="mt-2 flex items-center gap-2 rounded-xl border border-rose-100 bg-rose-50 p-2">
+                    <p className="min-w-0 flex-1 text-[11px] font-bold leading-tight text-rose-700">
+                      ¿Dejar de seguir a {driver.name.split(" ")[0]}?
+                    </p>
+                    <button
+                      type="button"
+                      className="rounded-lg bg-white px-2.5 py-1.5 text-[10px] font-bold text-slate-600 active:scale-95"
+                      onClick={() => setConfirmUnfollowId(null)}
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-lg bg-rose-600 px-2.5 py-1.5 text-[10px] font-bold text-white active:scale-95"
+                      onClick={() => {
+                        setConfirmUnfollowId(null);
+                        void onUnfollow(driver);
+                      }}
+                    >
+                      Sí, eliminar
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className="mt-2 flex w-full items-center justify-center gap-1 rounded-xl py-2 text-[11px] font-bold text-rose-600 active:scale-[0.98]"
+                    onClick={() => setConfirmUnfollowId(driver.id)}
+                  >
+                    <span className="material-symbols-outlined text-[15px]">person_remove</span>
+                    Dejar de seguir
+                  </button>
+                )
+              )}
             </article>
           ))}
         </div>

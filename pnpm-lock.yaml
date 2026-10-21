@@ -73,46 +73,6 @@ importers:
         specifier: ^6.0.0
         version: 6.4.3(jiti@2.7.0)(lightningcss@1.32.0)
 
-  apps/comercio:
-    dependencies:
-      '@drivip/maps':
-        specifier: workspace:*
-        version: link:../../packages/maps
-      '@drivip/supabase':
-        specifier: workspace:*
-        version: link:../../packages/supabase
-      '@drivip/types':
-        specifier: workspace:*
-        version: link:../../packages/types
-      '@drivip/ui':
-        specifier: workspace:*
-        version: link:../../packages/ui
-      react:
-        specifier: ^19.0.0
-        version: 19.3.0
-      react-dom:
-        specifier: ^19.0.0
-        version: 19.3.0(react@19.3.0)
-      react-router-dom:
-        specifier: ^7.0.0
-        version: 7.18.3(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
-    devDependencies:
-      '@types/react':
-        specifier: ^19.0.0
-        version: 19.3.0
-      '@types/react-dom':
-        specifier: ^19.0.0
-        version: 19.3.0(@types/react@19.3.0)
-      '@vitejs/plugin-react':
-        specifier: ^4.0.0
-        version: 4.7.0(vite@6.4.3(jiti@2.7.0)(lightningcss@1.32.0))
-      typescript:
-        specifier: ^5.7.0
-        version: 5.9.3
-      vite:
-        specifier: ^6.0.0
-        version: 6.4.3(jiti@2.7.0)(lightningcss@1.32.0)
-
   apps/conductor:
     dependencies:
       '@drivip/maps':

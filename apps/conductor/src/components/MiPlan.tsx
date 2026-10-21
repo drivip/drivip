@@ -41,7 +41,6 @@ export default function MiPlan({ tenant, demo = false }: MiPlanProps) {
             { icon: "check_circle", label: "Soporte prioritario 24/7", included: true },
             { icon: "check_circle", label: "Pagina web personalizada", included: true },
             { icon: "check_circle", label: "QR y PWA propia", included: true },
-            { icon: "lock", label: "Plugin Delivery", included: false },
             { icon: "lock", label: "Plugin Zonas Avanzado", included: false },
           ].map((feat) => (
             <div key={feat.label} className="flex items-center gap-3 py-2">

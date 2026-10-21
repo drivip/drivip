@@ -149,21 +149,21 @@ text
 
 [Maestro entra a "Plugins"]
 ↓
-[Selecciona plugin: "Delivery"]
+[Selecciona plugin: "Zonas"]
 ↓
 [Elige tenant: "José Taxi"]
 ↓
 [Configura parámetros:
 
-    Comisión Drivip: 5%
+    Precio base por zona: $1.50
 
-    Radio máximo: 5km
+    Recargo por km: $0.50
 
-    Tarifa base: $1.50]
+    Zona máxima: 5km]
     ↓
     [Guardar → INSERT en plugins_activos]
     ↓
-    [Notificación push a José: "Plugin Delivery activado"]
+    [Notificación push a José: "Plugin Zonas activado"]
     ↓
     [Aparece en menú de José con icono naranja]
 
@@ -655,142 +655,9 @@ text
 
 ---
 
-## 🏪 FLUJO 6: Panel de Comercio (Plugin Delivery)
+## 🔌 FLUJO 6: Sistema de Plugins (arquitectura lógica)
 
-### 6.1 Registro del comercio
-
-[Conductor con plugin Delivery activo]
-↓
-[Va a "Plugins > Delivery > Afiliar comercio"]
-↓
-[Genera link único:
-josetaxi.drivip.app/comercio/afiliar/[token]]
-↓
-[Envía link al comerciante]
-↓
-[Comerciante abre link]
-↓
-[Formulario:
-
-    Nombre del comercio
-
-    Teléfono
-
-    Dirección (con mapa)
-
-    Horario
-
-    Foto del local]
-    ↓
-    [Registro creado en tabla comercios]
-    [rol=comercio en profiles]
-    ↓
-    [Comerciante accede a su panel]
-
-text
-
-
-### 6.2 Ciclo de un pedido
-
-[Cliente llama al comercio (o pide por su propio canal)]
-↓
-[Comercio entra a su panel]
-[Click en "Nuevo pedido"]
-↓
-[Formulario:
-
-    Cliente (nombre + teléfono)
-
-    Dirección de entrega (mapa)
-
-    Detalles del pedido
-
-    Precio total: $8.00
-
-    Método de pago: efectivo/pago_movil]
-    ↓
-    [Click en "Solicitar delivery"]
-    ↓
-    [Se muestra lista de conductores disponibles:
-
-    José (moto) — 2km — disponible
-
-    Pedro (moto) — 3km — disponible]
-    ↓
-    [Selecciona a José]
-    ↓
-    [Notificación a José:
-    "📦 Nuevo delivery de Panadería El Trigal
-    Recoger en: [dirección]
-    Entregar en: [dirección]
-    Cobrar al cliente: $8.00
-    Tu ganancia: $2.00"
-    [Aceptar] [Rechazar]]
-    ↓
-    ├── José acepta
-    │ ↓
-    │ José va a recoger el pedido
-    │ ↓
-    │ Comercio marca "Entregado a conductor"
-    │ ↓
-    │ José va al destino
-    │ ↓
-    │ José cobra al cliente
-    │ ↓
-    │ José marca "Completado"
-    │ ↓
-    │ Comercio ve: "Pedido entregado ✅"
-    │ ↓
-    │ Se registra:
-    │ - Precio: $8.00
-    │ - Comisión José: $2.00
-    │ - Comisión Drivip: $0.40 (5%)
-    │ - Comercio recibe: $5.60
-    │
-    └── José rechaza
-    ↓
-    Comercio ve "Rechazado" y puede pedir a otro
-
-text
-
-
-### 6.3 Cuadratura de cuentas
-
-[Comercio va a "Cuadratura"]
-↓
-[Selecciona período:
-○ Diaria (hoy)
-○ Semanal (esta semana)
-○ Mensual
-○ Personalizado]
-↓
-[Ve tabla:
-┌─────────────────────────────────┐
-│ Pedido │ Fecha │ Monto │ Comisión │
-│ #3421 │ 10/09 │ $8.00 │ $0.40 │
-│ #3422 │ 10/09 │ $5.00 │ $0.25 │
-│ #3423 │ 11/09 │ $12.00│ $0.60 │
-└─────────────────────────────────┘
-TOTAL BRUTO: $25.00
-COMISIÓN DRIVIP: $1.25
-NETO COMERCIO: $23.75]
-↓
-[Botones:
-
-    Exportar CSV
-
-    Exportar PDF
-
-    Enviar por WhatsApp al conductor]
-
-text
-
-
----
-
-## 🔌 FLUJO 7: Sistema de Plugins (arquitectura lógica)
-
-### 7.1 Registro de un plugin
+### 6.1 Registro de un plugin
 
 [Desarrollador de Drivip crea módulo]
 ↓
@@ -804,7 +671,7 @@ text
 text
 
 
-### 7.2 Activación de un plugin a un tenant
+### 6.2 Activación de un plugin a un tenant
 
 [Maestro va a "Plugins"]
 ↓
@@ -823,7 +690,7 @@ text
 text
 
 
-### 7.3 Desactivación
+### 6.3 Desactivación
 
 [Maestro desactiva plugin]
 ↓
@@ -837,9 +704,9 @@ text
 
 ---
 
-## 🔔 FLUJO 8: Notificaciones
+## 🔔 FLUJO 7: Notificaciones
 
-### 8.1 Tipos de notificación
+### 7.1 Tipos de notificación
 
 | Tipo | Destinatario | Trigger |
 |------|-------------|---------|
@@ -852,9 +719,8 @@ text
 | Suscripción vence pronto | Conductor | 3 días antes |
 | Banner promocional | Conductor/Línea | Maestro envía |
 | Nuevo cliente en red | Conductor | Cliente agrega a su círculo |
-| Nuevo pedido delivery | Conductor | Comercio solicita |
 
-### 8.2 Flujo técnico de notificación
+### 7.2 Flujo técnico de notificación
 
 [Evento ocurre en backend]
 ↓
@@ -879,7 +745,7 @@ text
 
 ---
 
-## 📱 FLUJO 9: Ciclo de vida del cliente en Drivip
+## 📱 FLUJO 8: Ciclo de vida del cliente en Drivip
 
     DESCUBRIMIENTO
     Cliente ve QR pegado en el vehículo de José
@@ -916,7 +782,7 @@ text
 
 ---
 
-## 🔄 FLUJO 10: Ciclo de vida del conductor en Drivip
+## 🔄 FLUJO 9: Ciclo de vida del conductor en Drivip
 
     AFILIACIÓN ($10/mes)
     Registro en drivip.app
@@ -939,7 +805,7 @@ text
     ↓
 
     ESCALAMIENTO
-    Activa plugins (Delivery, Zonas)
+    Activa plugins (Zonas, Aliados B2B)
     O se une/convierte en línea de taxis
     ↓
 
@@ -957,7 +823,7 @@ text
 
 ---
 
-## 🎯 FLUJO 11: Diferenciación vs Uber/Ridery
+## 🎯 FLUJO 10: Diferenciación vs Uber/Ridery
 
 | Situación | Uber/Ridery | Drivip |
 |-----------|-------------|--------|
@@ -972,7 +838,7 @@ text
 
 ---
 
-## 🚨 FLUJO 12: Manejo de errores y casos límite
+## 🚨 FLUJO 11: Manejo de errores y casos límite
 
 ### Conductor offline
 
@@ -1054,7 +920,7 @@ text
 
 ---
 
-## 📊 FLUJO 13: Métricas y analítica
+## 📊 FLUJO 12: Métricas y analítica
 
 ### Lo que ve el conductor
 - Carreras del día / semana / mes
@@ -1079,7 +945,7 @@ text
 
 ---
 
-## 🔐 FLUJO 14: Auditoría y seguridad
+## 🔐 FLUJO 13: Auditoría y seguridad
 
 Cada acción sensible se registra:
 
@@ -1127,4 +993,3 @@ text
 | **Conductor** | Recibir y completar carreras | Crecer red de clientes vía QR |
 | **Línea** | Gestionar flota y comisiones | Reportes consolidados |
 | **Cliente** | Pedir carrera a su red | Expandir su círculo de confianza |
-| **Comercio** | Gestionar pedidos delivery | Cuadratura con conductores 

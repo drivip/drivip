@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useScrollLock } from "../../hooks/useScrollLock";
 import type { TripHistory as TripHistoryType } from "../../types/passenger";
@@ -6,11 +6,30 @@ import type { TripHistory as TripHistoryType } from "../../types/passenger";
 interface TripHistoryProps {
   trips: TripHistoryType[];
   onBack: () => void;
+  onRepeatTrip?: (trip: TripHistoryType) => void;
 }
 
-export default function TripHistory({ trips, onBack }: TripHistoryProps) {
+export default function TripHistory({ trips, onBack, onRepeatTrip }: TripHistoryProps) {
   const [showReceipt, setShowReceipt] = useState(false);
   const [selectedTrip, setSelectedTrip] = useState<TripHistoryType | null>(null);
+  const [filter, setFilter] = useState<"all" | "completed">("all");
+
+  const totalPaidUsd = useMemo(
+    () => trips.reduce((sum, trip) => sum + (Number.isFinite(trip.priceUsd) ? trip.priceUsd : 0), 0),
+    [trips]
+  );
+  const totalPaidBs = useMemo(
+    () => trips.reduce((sum, trip) => sum + (Number.isFinite(trip.priceBs) ? trip.priceBs : 0), 0),
+    [trips]
+  );
+  const completedCount = useMemo(
+    () => trips.filter((trip) => trip.type === "Completado").length,
+    [trips]
+  );
+  const visibleTrips = useMemo(
+    () => (filter === "completed" ? trips.filter((trip) => trip.type === "Completado") : trips),
+    [filter, trips]
+  );
 
   useScrollLock(showReceipt);
 
@@ -60,13 +79,13 @@ export default function TripHistory({ trips, onBack }: TripHistoryProps) {
               </div>
             </div>
             <div className="mt-2">
-              <span className="text-2xl lg:text-3xl font-extrabold text-slate-900 font-mono tracking-tight">{trips.length}</span>
+              <span className="text-2xl lg:text-3xl font-extrabold text-slate-900 font-mono tracking-tight">{completedCount}</span>
               <span className="text-xs lg:text-sm font-medium text-slate-400 block mt-0.5">Completados</span>
             </div>
           </div>
           <div className="p-4 lg:p-5 rounded-3xl border border-slate-100/80 flex flex-col justify-between" style={{ boxShadow: "0 10px 25px -5px rgba(148, 163, 184, 0.2), 0 8px 10px -6px rgba(148, 163, 184, 0.15)" }}>
             <div className="flex items-center justify-between">
-              <span className="text-xs lg:text-sm font-semibold text-slate-500 uppercase tracking-wide">Ahorro</span>
+              <span className="text-xs lg:text-sm font-semibold text-slate-500 uppercase tracking-wide">Pagado</span>
               <div className="w-7 h-7 lg:w-8 lg:h-8 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" viewBox="0 0 24 24">
                   <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
@@ -74,30 +93,69 @@ export default function TripHistory({ trips, onBack }: TripHistoryProps) {
               </div>
             </div>
             <div className="mt-2">
-              <span className="text-2xl lg:text-3xl font-extrabold text-emerald-600 font-mono tracking-tight">~$42.00</span>
-              <span className="text-[11px] lg:text-xs font-medium text-slate-400 block mt-0.5">Sin intermediarios</span>
+              <span className="text-2xl lg:text-3xl font-extrabold text-emerald-600 font-mono tracking-tight">
+                ${totalPaidUsd.toFixed(2)}
+              </span>
+              <span className="text-[11px] lg:text-xs font-medium text-slate-400 block mt-0.5">
+                Bs. {totalPaidBs.toLocaleString("es-VE")} • 100% al chofer
+              </span>
             </div>
           </div>
         </section>
 
         {/* Filter pills */}
-        <section className="overflow-x-auto no-scrollbar -mx-5 px-5 py-1">
-          <div className="flex gap-2 w-max">
-            <button className="px-4 py-2 rounded-2xl text-xs lg:text-sm font-bold text-white bg-slate-900 shadow-md">Todos ({trips.length})</button>
-            <button className="px-4 py-2 rounded-2xl text-xs lg:text-sm font-semibold text-slate-600 bg-white shadow-sm border border-slate-200/80">Esta semana</button>
-            <button className="px-4 py-2 rounded-2xl text-xs lg:text-sm font-semibold text-slate-600 bg-white shadow-sm border border-slate-200/80">Completados</button>
-            <button className="px-4 py-2 rounded-2xl text-xs lg:text-sm font-semibold text-slate-600 bg-white shadow-sm border border-slate-200/80 flex items-center gap-1.5">
-              <svg className="w-3.5 h-3.5 text-purple-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              Con Recibo
+        <section className="no-scrollbar -mx-5 overflow-x-auto px-5 py-1">
+          <div className="flex w-max gap-2">
+            <button
+              type="button"
+              onClick={() => setFilter("all")}
+              className={`rounded-2xl px-4 py-2 text-xs font-bold transition lg:text-sm ${
+                filter === "all"
+                  ? "bg-slate-900 text-white shadow-md"
+                  : "border border-slate-200/80 bg-white font-semibold text-slate-600 shadow-sm"
+              }`}
+            >
+              Todos ({trips.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilter("completed")}
+              className={`rounded-2xl px-4 py-2 text-xs font-bold transition lg:text-sm ${
+                filter === "completed"
+                  ? "bg-slate-900 text-white shadow-md"
+                  : "border border-slate-200/80 bg-white font-semibold text-slate-600 shadow-sm"
+              }`}
+            >
+              Completados ({completedCount})
             </button>
           </div>
         </section>
 
         {/* RidesListSection */}
         <section className="lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-5 space-y-4 lg:space-y-0">
-          {trips.map((trip) => (
+          {visibleTrips.length === 0 && (
+            <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-8 text-center lg:col-span-2 xl:col-span-3">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-50 text-purple-600">
+                <span className="material-symbols-outlined text-[28px]">route</span>
+              </div>
+              <h3 className="mt-3 text-sm font-black text-slate-900">
+                {filter === "completed" ? "Sin viajes completados" : "Todavía no tienes viajes"}
+              </h3>
+              <p className="mt-1 text-xs text-slate-500">
+                {filter === "completed"
+                  ? "Tus viajes completados aparecerán aquí."
+                  : "Cuando completes tu primer viaje aparecerá aquí con su recibo."}
+              </p>
+              <button
+                type="button"
+                onClick={onBack}
+                className="mt-4 rounded-xl bg-purple-700 px-4 py-2.5 text-xs font-bold text-white shadow-md active:scale-95"
+              >
+                Pedir un viaje
+              </button>
+            </div>
+          )}
+          {visibleTrips.map((trip) => (
             <article key={trip.id} className="bg-white rounded-3xl p-4 lg:p-5 border border-slate-100 shadow-xl shadow-slate-200/50 space-y-3.5">
               {/* Card Header */}
               <div className="flex items-center justify-between pb-2 border-b border-slate-100">
@@ -175,7 +233,12 @@ export default function TripHistory({ trips, onBack }: TripHistoryProps) {
                   </svg>
                   Ver Recibo
                 </button>
-                <button className="py-2.5 px-3 rounded-2xl text-xs lg:text-sm font-bold text-slate-700 flex items-center justify-center gap-1.5 bg-white border border-slate-200/80">
+                <button
+                  type="button"
+                  onClick={() => onRepeatTrip?.(trip)}
+                  disabled={!onRepeatTrip}
+                  className="py-2.5 px-3 rounded-2xl text-xs lg:text-sm font-bold text-slate-700 flex items-center justify-center gap-1.5 bg-white border border-slate-200/80 disabled:opacity-40"
+                >
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                     <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>

@@ -100,7 +100,7 @@ export default function Reservations({ reservations, onBack, onCreate, onCancel 
                       ? "bg-orange-50 text-orange-600 border-orange-100"
                       : "bg-purple-50 text-purple-700 border-purple-100"
                   }`}>
-                    <span className="text-[10px] lg:text-[11px] font-extrabold tracking-wider uppercase">{res.dayShort}</span>
+                    <span className="text-[11px] font-extrabold uppercase tracking-wider">{res.dayShort}</span>
                     <span className="text-sm lg:text-base font-black leading-none">{res.dayNum}</span>
                   </div>
                   <div>
@@ -114,7 +114,7 @@ export default function Reservations({ reservations, onBack, onCreate, onCancel 
                     <span>{res.countdown}</span>
                   </div>
                 ) : (
-                  <span className="px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 text-[10px] lg:text-[11px] font-extrabold border border-amber-200/80">
+                  <span className="px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 text-[11px] font-extrabold border border-amber-200/80">
                     Por Asignar
                   </span>
                 )}
@@ -162,7 +162,7 @@ export default function Reservations({ reservations, onBack, onCreate, onCancel 
                       <div>
                         <div className="flex items-center gap-1.5">
                           <p className="text-xs lg:text-sm font-bold text-slate-900 leading-none">{res.driverName}</p>
-                          <span className="text-[10px] lg:text-[11px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded-md">Confirmado ✓</span>
+                          <span className="text-[11px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded-md">Confirmado ✓</span>
                         </div>
                         <p className="text-[11px] lg:text-xs text-slate-500 mt-1 font-medium">{res.driverVehicle}</p>
                       </div>
@@ -172,7 +172,7 @@ export default function Reservations({ reservations, onBack, onCreate, onCancel 
                         <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
                         <span>{res.driverRating}</span>
                       </div>
-                      <span className="text-[10px] lg:text-[11px] text-slate-400">Chofer VIP</span>
+                      <span className="text-[11px] text-slate-400">Chofer VIP</span>
                     </div>
                   </div>
                   <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 text-xs lg:text-sm">
@@ -197,7 +197,7 @@ export default function Reservations({ reservations, onBack, onCreate, onCancel 
                     </p>
                   </div>
                   <div className="text-right">
-                    <span className="text-[10px] lg:text-[11px] text-slate-400 block font-medium">Estimada</span>
+                    <span className="text-[11px] text-slate-400 block font-medium">Estimada</span>
                     <span className="text-sm lg:text-base font-extrabold text-slate-900">${res.priceUsd.toFixed(2)} USD</span>
                   </div>
                 </div>

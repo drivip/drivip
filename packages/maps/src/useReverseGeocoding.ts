@@ -1,4 +1,6 @@
 import { useState, useCallback } from "react";
+import { isInVenezuela } from "./venezuela";
+import { reverseVenezuelaPlace } from "./venezuelaGeocoder";
 
 interface ReverseGeocodingResult {
   displayName: string;
@@ -17,41 +19,30 @@ export default function useReverseGeocoding() {
     setLoading(true);
     setError(null);
 
-    try {
-      const params = new URLSearchParams({
-        lat: lat.toString(),
-        lon: lng.toString(),
-        format: "jsonv2",
-        addressdetails: "1",
-      });
-
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?${params}`,
-        {
-          headers: {
-            "User-Agent": "DrivipApp/1.0 (drivip.app)",
-          },
-        }
-      );
-
-      if (!response.ok) throw new Error("Error en reverse geocoding");
-
-      const data = await response.json();
-      const addr = data.address || {};
-
-      setResult({
-        displayName: data.display_name || "",
-        street: addr.road || addr.pedestrian || "",
-        city: addr.city || addr.town || addr.village || "",
-        state: addr.state || "",
-        country: addr.country || "",
-      });
-    } catch {
-      setError("Error al obtener direccion");
+    if (!isInVenezuela(lat, lng)) {
+      setError("Drivip solo está disponible en Venezuela.");
       setResult(null);
-    } finally {
       setLoading(false);
+      return;
     }
+
+    const place = await reverseVenezuelaPlace(lat, lng);
+
+    if (!place) {
+      setError("No pudimos obtener la dirección de ese punto.");
+      setResult(null);
+      setLoading(false);
+      return;
+    }
+
+    setResult({
+      displayName: place.displayName,
+      street: place.primary,
+      city: place.city ?? "",
+      state: place.state ?? "",
+      country: "Venezuela",
+    });
+    setLoading(false);
   }, []);
 
   return { result, loading, error, reverse };

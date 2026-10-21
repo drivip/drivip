@@ -1,6 +1,6 @@
 import type { TarifaModo } from "./tarifa";
 
-export type TenantType = "conductor" | "comercio";
+export type TenantType = "conductor";
 
 export type VehiculoTipo = "moto" | "carro" | "camioneta";
 

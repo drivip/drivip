@@ -113,6 +113,12 @@
 }
 
 @layer base {
+  html {
+    height: 100%;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    color-scheme: light;
+  }
   html, body {
     margin: 0;
     padding: 0;
@@ -120,13 +126,29 @@
     color: var(--color-on-surface);
     font-family: var(--font-sans);
     -webkit-tap-highlight-color: transparent;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
   body {
     min-height: 100dvh;
+    overflow-x: hidden;
+    overscroll-behavior-y: none;
   }
   #root {
     margin: 0;
     padding: 0;
+    min-height: 100%;
+  }
+  /* iOS hace zoom al enfocar inputs con menos de 16px. Evita el salto tipo web. */
+  @supports (-webkit-touch-callout: none) {
+    input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
+  }
+  button, a, [role="button"] {
+    touch-action: manipulation;
   }
   .pb-safe {
     padding-bottom: env(safe-area-inset-bottom, 0px);

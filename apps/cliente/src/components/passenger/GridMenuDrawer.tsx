@@ -33,23 +33,27 @@ export default function GridMenuDrawer({
       />
 
       {/* Panel - slide in from left */}
-      <div className="absolute left-0 top-0 bottom-0 w-[85%] max-w-sm md:left-1/2 md:top-1/2 md:bottom-auto md:-translate-x-1/2 md:-translate-y-1/2 md:w-full md:max-w-md lg:max-w-lg md:rounded-3xl md:shadow-2xl bg-[#f4f6f8] p-5 lg:p-6 flex flex-col justify-between overflow-y-auto">
+      <div className="absolute left-0 top-0 bottom-0 flex w-[88%] max-w-sm flex-col justify-between gap-4 overflow-y-auto bg-[#f4f6f8] p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))] md:bottom-auto md:left-1/2 md:top-1/2 md:max-h-[85dvh] md:w-full md:max-w-md md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-3xl md:shadow-2xl lg:max-w-lg lg:p-6">
         <div className="space-y-5">
           {/* Drawer Header */}
-          <div className="flex items-center justify-between border-b border-slate-200 pb-4">
-            <div className="flex items-center gap-3">
-              <img
-                alt="Pasajero"
-                className="w-12 h-12 lg:w-14 lg:h-14 rounded-2xl object-cover border-2 border-white shadow-md"
-                src="https://lh3.googleusercontent.com/aida/AEtjO1UtcPVc3Q3lAz8nr1VmoqLAl5T0lgizVxTrazT9sC9ZDM_cRsDKVuHjIaIX0wcBNEV1WKS9wk428xTkPA3azZgVXrNT4aS7W2aTgitlKI9zngnrbGDH-2s7Fjdmztf58Hk0cjSuYFw6O1QPwSHuVrYFd_ER2x5Fc8yIBrz847a2LdSejbVlVe-5TUFGLbZxAon4324QNvfjHJjBlqpXPaapJZnNo2aIalP2ftK3Jmp4pgPCxbliIceftzvS"
-              />
-              <div>
-                <h3 className="text-sm lg:text-base font-black text-slate-900 leading-tight">{passengerName}</h3>
-                <span className="text-[11px] lg:text-xs text-purple-700 font-bold">Pasajero VIP • Venezuela</span>
+          <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-4">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border-2 border-white bg-purple-100 text-lg font-black text-purple-700 shadow-md lg:h-14 lg:w-14 lg:text-xl">
+                {passengerName.charAt(0).toUpperCase()}
+              </span>
+              <div className="min-w-0">
+                <h3 className="truncate text-base font-black leading-tight text-slate-900 lg:text-lg">{passengerName}</h3>
+                <span className="block text-xs font-bold text-purple-700">Pasajero VIP</span>
+                <span className="block text-[10px] font-semibold text-slate-400">Venezuela</span>
               </div>
             </div>
-            <button className="w-8 h-8 lg:w-9 lg:h-9 rounded-xl bg-white shadow-sm flex items-center justify-center text-slate-600 active:scale-95" onClick={onClose}>
-              ✕
+            <button
+              type="button"
+              aria-label="Cerrar menú"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-slate-600 shadow-sm active:scale-95"
+              onClick={onClose}
+            >
+              <span className="material-symbols-outlined text-[20px]">close</span>
             </button>
           </div>
 
@@ -66,8 +70,8 @@ export default function GridMenuDrawer({
                 </svg>
               </div>
               <div>
-                <strong className="text-xs lg:text-sm font-extrabold text-slate-900 block">Direcciones</strong>
-                <span className="text-[10px] lg:text-[11px] text-slate-500">Casa, Trabajo, Sambil</span>
+                <strong className="block text-sm font-extrabold text-slate-900">Direcciones</strong>
+                <span className="text-xs text-slate-500">Casa, Trabajo, Sambil</span>
               </div>
             </button>
 
@@ -82,8 +86,8 @@ export default function GridMenuDrawer({
                 </svg>
               </div>
               <div>
-                <strong className="text-xs lg:text-sm font-extrabold text-slate-900 block">Mis Conductores</strong>
-                <span className="text-[10px] lg:text-[11px] text-slate-500">Línea Multi-Chofer</span>
+                <strong className="block text-sm font-extrabold text-slate-900">Mis Conductores</strong>
+                <span className="text-xs text-slate-500">Línea Multi-Chofer</span>
               </div>
             </button>
 
@@ -98,8 +102,8 @@ export default function GridMenuDrawer({
                 </svg>
               </div>
               <div>
-                <strong className="text-xs lg:text-sm font-extrabold text-slate-900 block">Historial & Recibos</strong>
-                <span className="text-[10px] lg:text-[11px] text-slate-500">Recibos digitales BCV</span>
+                <strong className="block text-sm font-extrabold text-slate-900">Historial & Recibos</strong>
+                <span className="text-xs text-slate-500">Recibos digitales BCV</span>
               </div>
             </button>
 
@@ -114,8 +118,8 @@ export default function GridMenuDrawer({
                 </svg>
               </div>
               <div>
-                <strong className="text-xs lg:text-sm font-extrabold text-slate-900 block">Mis Reservas</strong>
-                <span className="text-[10px] lg:text-[11px] text-slate-500">Viajes programados</span>
+                <strong className="block text-sm font-extrabold text-slate-900">Mis Reservas</strong>
+                <span className="text-xs text-slate-500">Viajes programados</span>
               </div>
             </button>
           </div>
@@ -123,15 +127,15 @@ export default function GridMenuDrawer({
           <PushNotificationCard />
         </div>
 
-        {/* Footer Drawer: WhatsApp Soporte Directo */}
-        <div className="pt-4 border-t border-slate-200">
+        <div className="border-t border-slate-200 pt-4">
           <a
-            className="w-full py-3 lg:py-3.5 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs lg:text-sm font-bold flex items-center justify-center gap-2 shadow-lg"
-            href="https://wa.me/584120000000"
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white py-3 px-4 text-xs font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 active:scale-[0.98] lg:py-3.5 lg:text-sm"
+            href="https://drivip-home.pages.dev"
             target="_blank"
             rel="noreferrer"
           >
-            <span>Soporte Drivip</span>
+            <span className="material-symbols-outlined text-[18px] text-purple-600">help</span>
+            Centro de ayuda
           </a>
         </div>
       </div>

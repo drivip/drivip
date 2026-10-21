@@ -84,11 +84,7 @@ Drivip es un SaaS multi-tenant con datos sensibles. El QA debe probar no solo qu
 
 | # | Prueba | Resultado esperado |
 |---|--------|-------------------|
-| 7.1 | Activar plugin delivery desde panel maestro | Panel de comercio visible para tenant |
-| 7.2 | Desactivar plugin | Panel de comercio desaparece |
-| 7.3 | Comercio crea pedido | Conductor recibe notificación |
-| 7.4 | Conductor entrega pedido | Comercio ve estado actualizado |
-| 7.5 | Cuadratura semanal | Reporte genera totales correctos |
+
 
 ### 8. Pruebas de seguridad
 

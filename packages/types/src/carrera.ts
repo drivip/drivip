@@ -17,11 +17,14 @@ export interface Carrera {
   precio: number | null;
   metodo_pago: MetodoPago | null;
   comprobante_url: string | null;
+  tipo_servicio?: "viaje" | "delivery" | "compra";
+  detalle_servicio?: string | null;
   estado: CarreraEstado;
   calificacion: number | null;
   comentario_calificacion: string | null;
   created_at: string;
   aceptada_at: string | null;
+  llego_at?: string | null;
   completada_at: string | null;
   cancelada_at: string | null;
 }

@@ -93,8 +93,8 @@ export const MOCK_CLIENTS = [
 ];
 
 export const MOCK_ALLIES = [
-  { id: "a1", nombre: "Farmacia La Abuela", tipo: "comercio", direccion: "Chacao", carreras: 32 },
-  { id: "a2", nombre: "Restaurante El Buen Sabor", tipo: "comercio", direccion: "Las Mercedes", carreras: 18 },
+  { id: "a1", nombre: "Farmacia La Abuela", tipo: "tienda", direccion: "Chacao", carreras: 32 },
+  { id: "a2", nombre: "Restaurante El Buen Sabor", tipo: "restaurante", direccion: "Las Mercedes", carreras: 18 },
   { id: "a3", nombre: "Hotel Caracas Palace", tipo: "hotel", direccion: "Altamira", carreras: 45 },
 ];
 

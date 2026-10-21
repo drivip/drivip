@@ -29,7 +29,7 @@ El chofer **no es un empleado de Drivip**. Es un cliente que usa la tecnología 
 | Plan Base | $35/mes | Acceso al panel + GPS + mapas + clientes |
 | Plugin DISPATCH | +$45/mes | Central de despacho automático |
 | Plugin REFERRALS | +$25/mes | Red de aliados + pasaje P2P + descuentos |
-| Plugin DELIVERY | +$35/mes | Conexión con comercios para entregas |
+
 | Plugin CUSTOM_DOMAIN | +$60/mes | Dominio propio (ej: taxijuan.com) |
 | Descuento por referido | -$5/mes | Por cada chofer referido activo |
 
@@ -616,7 +616,7 @@ DISPONIBLE → SOLICITADA → ACEPTADA → EN CAMINO → EN CURSO → COMPLETADA
 |---|---|---|---|
 | DISPATCH | ✅ ACTIVO | $45/mes | Despacho automático de carreras |
 | REFERRALS | ✅ ACTIVO | $25/mes | Aliados + Referidos |
-| DELIVERY | ❌ DESACTIVADO | $35/mes | Conexión con comercios |
+
 | CUSTOM_DOMAIN | ❌ DESACTIVADO | $60/mes | Dominio propio |
 
 **Acciones:**

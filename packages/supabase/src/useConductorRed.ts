@@ -62,6 +62,45 @@ export async function crearCarreraCliente(input: CrearCarreraClienteInput): Prom
   return data as Carrera;
 }
 
+export interface CrearSolicitudServicioInput {
+  conductor_tenant_id: string;
+  tipo_servicio: "delivery" | "compra";
+  detalle_servicio: string;
+  origen_lat: number;
+  origen_lng: number;
+  origen_direccion: string;
+  destino_lat: number;
+  destino_lng: number;
+  destino_direccion: string;
+  distancia_km: number;
+  duracion_min: number;
+  precio: number;
+  metodo_pago: MetodoPago;
+}
+
+/** Crea un delivery o servicio de compra para un conductor de la red. */
+export async function crearSolicitudServicio(
+  input: CrearSolicitudServicioInput
+): Promise<Carrera | null> {
+  const { data, error } = await supabase.rpc("crear_solicitud_servicio", {
+    p_conductor_tenant_id: input.conductor_tenant_id,
+    p_tipo_servicio: input.tipo_servicio,
+    p_detalle_servicio: input.detalle_servicio,
+    p_origen_lat: input.origen_lat,
+    p_origen_lng: input.origen_lng,
+    p_origen_direccion: input.origen_direccion,
+    p_destino_lat: input.destino_lat,
+    p_destino_lng: input.destino_lng,
+    p_destino_direccion: input.destino_direccion,
+    p_distancia_km: input.distancia_km,
+    p_duracion_min: input.duracion_min,
+    p_precio: input.precio,
+    p_metodo_pago: input.metodo_pago,
+  });
+  if (error || !data) return null;
+  return data as Carrera;
+}
+
 /** Carreras del cliente autenticado (historial). */
 export function useMisCarreras(clienteId: string | null | undefined) {
   const [carreras, setCarreras] = useState<Carrera[]>([]);

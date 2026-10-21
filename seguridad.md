@@ -71,7 +71,6 @@ maestro	Todas las tablas (bypass RLS con service role)
 conductor	Solo su tenant, sus carreras, sus clientes
 linea	Su tenant, sus afiliados, carreras de la línea
 cliente	Solo sus carreras y su perfil
-comercio	Solo sus pedidos y cuentas (plugin delivery)
 Autenticación
 
     Supabase Auth con JWT firmado.

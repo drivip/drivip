@@ -46,7 +46,6 @@ VITE_SUPABASE_ANON_KEY=eyJ...tu-anon-key`}
             <div>Linea: <span className="text-primary">drivip-linea.pages.dev</span></div>
             <div>SuperAdmin: <span className="text-primary">drivip-superadmin.pages.dev</span></div>
             <div>Cliente: <span className="text-primary">drivip-cliente.pages.dev</span></div>
-            <div>Comercio: <span className="text-primary">drivip-comercio.pages.dev</span></div>
           </div>
         </div>
       </div>

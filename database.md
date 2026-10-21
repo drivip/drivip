@@ -55,7 +55,7 @@ sql
 CREATE TABLE profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
-    rol TEXT NOT NULL CHECK (rol IN ('maestro', 'conductor', 'cliente', 'comercio')),
+    rol TEXT NOT NULL CHECK (rol IN ('maestro', 'conductor', 'cliente')),
     nombre TEXT,
     telefono TEXT,
     avatar_url TEXT,
@@ -105,11 +105,14 @@ CREATE TABLE carreras (
     precio DECIMAL(10, 2),
     metodo_pago TEXT CHECK (metodo_pago IN ('efectivo', 'pago_movil', 'transferencia')),
     comprobante_url TEXT,
+    tipo_servicio TEXT NOT NULL DEFAULT 'viaje' CHECK (tipo_servicio IN ('viaje', 'delivery', 'compra')),
+    detalle_servicio TEXT,
     estado TEXT DEFAULT 'pendiente' CHECK (estado IN ('pendiente', 'aceptada', 'en_curso', 'completada', 'cancelada')),
     calificacion INTEGER CHECK (calificacion BETWEEN 1 AND 5),
     comentario_calificacion TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     aceptada_at TIMESTAMPTZ,
+    llego_at TIMESTAMPTZ,
     completada_at TIMESTAMPTZ,
     cancelada_at TIMESTAMPTZ
 );
@@ -118,6 +121,7 @@ CREATE INDEX idx_carreras_tenant ON carreras(tenant_id);
 CREATE INDEX idx_carreras_conductor ON carreras(conductor_id);
 CREATE INDEX idx_carreras_cliente ON carreras(cliente_id);
 CREATE INDEX idx_carreras_estado ON carreras(estado);
+CREATE INDEX idx_carreras_tipo_servicio ON carreras(tipo_servicio);
 CREATE INDEX idx_carreras_fecha ON carreras(created_at DESC);
 
 5. ubicaciones — Seguimiento en tiempo real
@@ -175,51 +179,7 @@ CREATE TABLE plugins_activos (
 
 CREATE INDEX idx_plugins_tenant ON plugins_activos(tenant_id);
 
-8. comercios — Comercios afiliados (Plugin Premium)
-sql
-
-CREATE TABLE comercios (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID REFERENCES tenants(id) NOT NULL,
-    nombre TEXT NOT NULL,
-    telefono TEXT,
-    direccion TEXT,
-    lat DECIMAL(10, 8),
-    lng DECIMAL(11, 8),
-    horario_apertura TIME,
-    horario_cierre TIME,
-    activo BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE INDEX idx_comercios_tenant ON comercios(tenant_id);
-
-9. pedidos — Delivery (Plugin Premium)
-sql
-
-CREATE TABLE pedidos (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID REFERENCES tenants(id) NOT NULL,
-    comercio_id UUID REFERENCES comercios(id),
-    conductor_id UUID REFERENCES profiles(id),
-    cliente_id UUID REFERENCES profiles(id),
-    origen_lat DECIMAL(10, 8),
-    origen_lng DECIMAL(11, 8),
-    destino_lat DECIMAL(10, 8),
-    destino_lng DECIMAL(11, 8),
-    distancia_km DECIMAL(10, 2),
-    precio DECIMAL(10, 2),
-    comision_drivip DECIMAL(10, 2),
-    estado TEXT DEFAULT 'pendiente' CHECK (estado IN ('pendiente', 'asignado', 'en_ruta', 'entregado', 'cancelado')),
-    detalles JSONB,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    entregado_at TIMESTAMPTZ
-);
-
-CREATE INDEX idx_pedidos_tenant ON pedidos(tenant_id);
-CREATE INDEX idx_pedidos_comercio ON pedidos(comercio_id);
-
-10. zonas — Cobro por zona (Plugin Premium)
+8. zonas — Cobro por zona (Plugin Premium)
 sql
 
 CREATE TABLE zonas (
@@ -232,7 +192,7 @@ CREATE TABLE zonas (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-11. suscripciones — Historial de pagos
+9. suscripciones — Historial de pagos
 sql
 
 CREATE TABLE suscripciones (
@@ -252,7 +212,7 @@ CREATE TABLE suscripciones (
 
 CREATE INDEX idx_suscripciones_tenant ON suscripciones(tenant_id, created_at DESC);
 
-12. audit_log — Auditoría
+10. audit_log — Auditoría
 sql
 
 CREATE TABLE audit_log (
@@ -272,7 +232,7 @@ CREATE TABLE audit_log (
 CREATE INDEX idx_audit_tenant ON audit_log(tenant_id, created_at DESC);
 CREATE INDEX idx_audit_usuario ON audit_log(usuario_id, created_at DESC);
 
-13. tenant_banners — Banners individuales por tenant
+11. tenant_banners — Banners individuales por tenant
 sql
 
 CREATE TABLE tenant_banners (
@@ -288,7 +248,7 @@ CREATE TABLE tenant_banners (
 
 CREATE INDEX idx_tenant_banners_tenant ON tenant_banners(tenant_id);
 
-14. tenant_notificaciones — Notificaciones individuales por tenant
+12. tenant_notificaciones — Notificaciones individuales por tenant
 sql
 
 CREATE TABLE tenant_notificaciones (
@@ -415,22 +375,6 @@ ALTER TABLE plugins_activos ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "plugins_tenant_isolation"
 ON plugins_activos FOR ALL
-USING (tenant_id = auth.tenant_id())
-WITH CHECK (tenant_id = auth.tenant_id());
-
--- ============ COMERCIOS ============
-ALTER TABLE comercios ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "comercios_tenant_isolation"
-ON comercios FOR ALL
-USING (tenant_id = auth.tenant_id())
-WITH CHECK (tenant_id = auth.tenant_id());
-
--- ============ PEDIDOS ============
-ALTER TABLE pedidos ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "pedidos_tenant_isolation"
-ON pedidos FOR ALL
 USING (tenant_id = auth.tenant_id())
 WITH CHECK (tenant_id = auth.tenant_id());
 
@@ -578,7 +522,6 @@ sql
 
 ALTER PUBLICATION supabase_realtime ADD TABLE carreras;
 ALTER PUBLICATION supabase_realtime ADD TABLE ubicaciones;
-ALTER PUBLICATION supabase_realtime ADD TABLE pedidos;
 ALTER PUBLICATION supabase_realtime ADD TABLE red_cliente;
 
 Storage

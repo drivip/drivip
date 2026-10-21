@@ -81,19 +81,17 @@ text
 | `/historial` | Historial de carreras |
 | `/pagos` | Métodos de pago y suscripción |
 | `/linea` | Panel de línea de taxis (solo si tipo=linea) |
-| `/comercio` | Panel de comercio (plugin premium) |
 
 ## Modelo de datos (resumen)
 
 ### Tablas principales
 - `tenants` (conductores y líneas)
-- `profiles` (usuarios: maestro, conductor, cliente, comercio)
+- `profiles` (usuarios: maestro, conductor, cliente)
 - `carreras` (viajes)
 - `ubicaciones` (seguimiento en tiempo real)
 - `clientes` (base de clientes del conductor)
 - `red_cliente` (**NUEVA**: relación cliente ↔ conductor agregado)
 - `plugins_activos` (plugins premium por tenant)
-- `comercios` y `pedidos` (plugin delivery)
 - `zonas` (plugin cobro por zona)
 - `suscripciones` (historial de pagos)
 - `audit_log` (auditoría)
@@ -179,15 +177,6 @@ Cada plugin es un módulo independiente:
 typescript
 
 const pluginRegistry: Record<string, PluginModule> = {
-  delivery: {
-    nombre: 'Delivery',
-    icono: 'Truck',
-    componentes: {
-      panelConductor: DeliveryPanel,
-      panelComercio: ComercioPanel,
-    },
-    tablas: ['pedidos', 'comercios'],
-  },
   zonas: {
     nombre: 'Cobro por Zona',
     icono: 'Map',

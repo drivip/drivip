@@ -1,414 +1,855 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useScrollLock } from "../../hooks/useScrollLock";
-import { MapLibreView } from "@drivip/maps";
+import {
+  MapLibreView,
+  fetchDrivingRoute,
+  isInVenezuela,
+  reverseVenezuelaPlace,
+  searchVenezuelaPlaces,
+  VENEZUELA_CENTER,
+  VENEZUELA_MAP_BOUNDS,
+  type VenezuelanPlace,
+} from "@drivip/maps";
 
 const LIGHT_STYLE = "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json";
-const OSRM_BASE = "https://router.project-osrm.org";
-const DEFAULT_CENTER: [number, number] = [10.491, -66.881];
+const RECENT_KEY = "drivip:recientes";
+const RECENT_LIMIT = 6;
 
-const NOMINATIM_INSTANCES = [
-  "https://nominatim.openstreetmap.org",
-];
+export interface MapPickerSuggestion {
+  id: string;
+  name: string;
+  address: string;
+  lat?: number | null;
+  lng?: number | null;
+  icon?: string;
+}
 
-interface GeocodingResult {
+export interface MapPickerPlace {
+  address: string;
   lat: number;
   lng: number;
-  displayName: string;
 }
 
 interface MapPickerModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onUseGps: () => void;
-  onConfirmPin: (address: string, point: "origin" | "destination") => void;
+  onUseGps?: (coords: { lat: number; lng: number }) => void;
+  onConfirmPin: (place: MapPickerPlace, point: "origin" | "destination") => void;
   onConfirmRoute?: (
-    origin: { lat: number; lng: number; address: string },
-    stops: { lat: number; lng: number; address: string }[],
-    destination: { lat: number; lng: number; address: string },
+    origin: MapPickerPlace,
+    stops: MapPickerPlace[],
+    destination: MapPickerPlace,
     totalKm: number,
     totalMin: number
   ) => void;
   initialOrigin?: { lat: number; lng: number; address: string } | null;
   pointType?: "origin" | "destination";
+  suggestions?: MapPickerSuggestion[];
 }
 
-async function osrmRoute(
-  waypoints: { lat: number; lng: number }[]
-): Promise<{ geometry: [number, number][]; distanceKm: number; durationMin: number } | null> {
-  if (waypoints.length < 2) return null;
-  const coords = waypoints.map((w) => `${w.lng},${w.lat}`).join(";");
+interface RecentPlace {
+  primary: string;
+  address: string;
+  lat: number;
+  lng: number;
+}
+
+function readRecent(): RecentPlace[] {
   try {
-    const res = await fetch(`${OSRM_BASE}/route/v1/driving/${coords}?overview=full&geometries=geojson&steps=false`, {
-      signal: AbortSignal.timeout(15000),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (!data.routes || data.routes.length === 0) return null;
-    const route = data.routes[0];
-    return {
-      geometry: route.geometry.coordinates.map((c: [number, number]) => [c[1], c[0]]),
-      distanceKm: route.distance / 1000,
-      durationMin: route.duration / 60,
-    };
-  } catch { return null; }
+    const raw = window.localStorage.getItem(RECENT_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((item): item is RecentPlace =>
+        Boolean(item) &&
+        typeof item.lat === "number" &&
+        typeof item.lng === "number" &&
+        isInVenezuela(item.lat, item.lng)
+      )
+      .slice(0, RECENT_LIMIT);
+  } catch {
+    return [];
+  }
+}
+
+function writeRecent(place: RecentPlace) {
+  try {
+    const next = [place, ...readRecent().filter(
+      (item) => Math.abs(item.lat - place.lat) > 0.0001 || Math.abs(item.lng - place.lng) > 0.0001
+    )].slice(0, RECENT_LIMIT);
+    window.localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+  } catch {
+    // El almacenamiento local puede estar deshabilitado; no es crítico.
+  }
+}
+
+function categoryIcon(category?: string): string {
+  const value = (category ?? "").toLowerCase();
+  if (value.includes("airport") || value.includes("aeropuerto")) return "flight";
+  if (value.includes("hospital") || value.includes("clinic") || value.includes("doctor")) return "local_hospital";
+  if (value.includes("school") || value.includes("university") || value.includes("college")) return "school";
+  if (value.includes("mall") || value.includes("shop") || value.includes("supermarket") || value.includes("market")) return "storefront";
+  if (value.includes("restaurant") || value.includes("cafe") || value.includes("food")) return "restaurant";
+  if (value.includes("hotel") || value.includes("tourism")) return "hotel";
+  if (value.includes("fuel") || value.includes("gas")) return "local_gas_station";
+  if (value.includes("bank") || value.includes("atm")) return "account_balance";
+  if (value.includes("park")) return "park";
+  if (value.includes("metro") || value.includes("station") || value.includes("bus")) return "directions_transit";
+  if (value.includes("ciudad")) return "location_city";
+  return "location_on";
+}
+
+function formatDistance(km: number): string {
+  return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`;
+}
+
+function formatDuration(min: number): string {
+  if (min < 60) return `${Math.max(1, Math.round(min))} min`;
+  return `${Math.floor(min / 60)} h ${Math.round(min % 60)} min`;
 }
 
 export default function MapPickerModal({
-  isOpen, onClose, onUseGps, onConfirmPin, onConfirmRoute,
-  initialOrigin, pointType: initialPointType = "origin",
+  isOpen,
+  onClose,
+  onUseGps,
+  onConfirmPin,
+  onConfirmRoute,
+  initialOrigin,
+  pointType: initialPointType = "origin",
+  suggestions = [],
 }: MapPickerModalProps) {
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<GeocodingResult[]>([]);
+  const [results, setResults] = useState<VenezuelanPlace[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState("");
-  const [center, setCenter] = useState<[number, number]>(DEFAULT_CENTER);
-  const [selectedAddress, setSelectedAddress] = useState("");
-  const [selectedCoords, setSelectedCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [extraStops, setExtraStops] = useState<{ lat: number; lng: number; address: string }[]>([]);
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [recent, setRecent] = useState<RecentPlace[]>([]);
+
+  const [mapCenter, setMapCenter] = useState<[number, number]>(VENEZUELA_CENTER);
+  const [coords, setCoords] = useState<{ lat: number; lng: number }>({
+    lat: VENEZUELA_CENTER[0],
+    lng: VENEZUELA_CENTER[1],
+  });
+  const [address, setAddress] = useState("");
+  const [primary, setPrimary] = useState("");
+  const [secondary, setSecondary] = useState("");
+  const [addressLoading, setAddressLoading] = useState(false);
+  const [outsideVenezuela, setOutsideVenezuela] = useState(false);
+  const [gpsLoading, setGpsLoading] = useState(false);
+
+  const [extraStops, setExtraStops] = useState<MapPickerPlace[]>([]);
   const [routeGeometry, setRouteGeometry] = useState<[number, number][] | null>(null);
   const [totalKm, setTotalKm] = useState(0);
   const [totalMin, setTotalMin] = useState(0);
   const [calculating, setCalculating] = useState(false);
+
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const reverseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reverseAbortRef = useRef<AbortController | null>(null);
   const searchIdRef = useRef(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const coordsRef = useRef({ lat: VENEZUELA_CENTER[0], lng: VENEZUELA_CENTER[1] });
+
+  useEffect(() => {
+    coordsRef.current = coords;
+  }, [coords]);
 
   useScrollLock(isOpen);
 
+  const resetState = useCallback(() => {
+    const hasOrigin = Boolean(
+      initialOrigin && isInVenezuela(initialOrigin.lat, initialOrigin.lng)
+    );
+    const startLat = hasOrigin ? initialOrigin!.lat : VENEZUELA_CENTER[0];
+    const startLng = hasOrigin ? initialOrigin!.lng : VENEZUELA_CENTER[1];
+    const showOriginAddress = initialPointType === "origin" && hasOrigin;
+
+    setQuery("");
+    setResults([]);
+    setSearchError("");
+    setSearching(false);
+    setSearchFocused(false);
+    setRecent(readRecent());
+    setMapCenter([startLat, startLng]);
+    setCoords({ lat: startLat, lng: startLng });
+    coordsRef.current = { lat: startLat, lng: startLng };
+    setAddress(showOriginAddress ? initialOrigin!.address : "");
+    setPrimary(showOriginAddress ? initialOrigin!.address : "");
+    setSecondary("");
+    setAddressLoading(false);
+    setOutsideVenezuela(!isInVenezuela(startLat, startLng));
+    setGpsLoading(false);
+    setExtraStops([]);
+    setRouteGeometry(null);
+    setTotalKm(0);
+    setTotalMin(0);
+    setCalculating(false);
+  }, [initialOrigin, initialPointType]);
+
+  const wasOpenRef = useRef(false);
+  useEffect(() => {
+    if (isOpen && !wasOpenRef.current) resetState();
+    wasOpenRef.current = isOpen;
+  }, [isOpen, resetState]);
+
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (reverseTimerRef.current) clearTimeout(reverseTimerRef.current);
+      reverseAbortRef.current?.abort();
+    };
+  }, []);
+
+  /* ---------------------------------------------------------------- Búsqueda */
+
+  const runSearch = useCallback(
+    async (value: string) => {
+      if (value.trim().length < 2) {
+        setResults([]);
+        setSearchError("");
+        setSearching(false);
+        return;
+      }
+
+      const id = ++searchIdRef.current;
+      setSearching(true);
+      setSearchError("");
+
+      const places = await searchVenezuelaPlaces(value, {
+        near: coordsRef.current,
+        limit: 8,
+      });
+
+      if (id !== searchIdRef.current) return;
+
+      setResults(places);
+      setSearching(false);
+      if (places.length === 0) {
+        setSearchError("No encontramos ese lugar en Venezuela. Prueba con una calle, avenida o punto de referencia.");
+      }
+    },
+    []
+  );
+
   useEffect(() => {
     if (!isOpen) return;
-    setQuery(""); setSelectedAddress(""); setSelectedCoords(null);
-    setExtraStops([]); setRouteGeometry(null); setTotalKm(0); setTotalMin(0);
-    setResults([]); setSearchError("");
-    if (initialPointType === "destination" && initialOrigin) {
-      setCenter([initialOrigin.lat, initialOrigin.lng]);
-    } else {
-      setCenter(DEFAULT_CENTER);
-    }
-  }, [isOpen]);
-
-  const searchNominatim = useCallback(async (q: string): Promise<GeocodingResult[]> => {
-    const results: GeocodingResult[] = [];
-    for (const base of NOMINATIM_INSTANCES) {
-      try {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 6000);
-        const params = new URLSearchParams({
-          q, format: "jsonv2", limit: "8", "accept-language": "es", addressdetails: "1",
-          viewbox: "-73.5,5,-59.5,12.5", bounded: "0",
-        });
-        const res = await fetch(`${base}/search?${params}`, {
-          headers: { "User-Agent": "DrivipApp/2.0 (drivipapp@gmail.com)" },
-          signal: controller.signal,
-        });
-        clearTimeout(timer);
-        if (res.ok) {
-          const data = await res.json();
-          for (const item of data) {
-            results.push({
-              lat: parseFloat(item.lat), lng: parseFloat(item.lon),
-              displayName: item.display_name,
-            });
-          }
-          if (results.length > 0) break;
-        }
-      } catch { continue; }
-    }
-    return results;
-  }, []);
-
-  const searchPhoton = useCallback(async (q: string): Promise<GeocodingResult[]> => {
-    const results: GeocodingResult[] = [];
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 6000);
-      const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=8`, {
-        signal: controller.signal,
-      });
-      clearTimeout(timer);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.features) {
-          for (const f of data.features) {
-            const [lng, lat] = f.geometry.coordinates;
-            const p = f.properties;
-            const parts: string[] = [];
-            if (p.name) parts.push(p.name);
-            if (p.housenumber && p.street) parts.push(`${p.street} ${p.housenumber}`);
-            else if (p.street) parts.push(p.street);
-            if (p.district) parts.push(p.district);
-            if (p.city || p.town || p.village) parts.push(p.city || p.town || p.village);
-            if (p.state) parts.push(p.state);
-            const label = parts.join(", ") || p.label || "";
-            if (label) results.push({ lat, lng, displayName: label });
-          }
-        }
-      }
-    } catch { /* timeout */ }
-    return results;
-  }, []);
-
-  const searchAddress = useCallback(async (q: string) => {
-    if (!q || q.length < 2) { setResults([]); setSearchError(""); return; }
-    setSearching(true); setSearchError("");
-    const id = ++searchIdRef.current;
-    const allResults: GeocodingResult[] = [];
-    const seen = new Set<string>();
-
-    const addAll = (items: GeocodingResult[]) => {
-      for (const r of items) {
-        const key = `${r.lat.toFixed(4)},${r.lng.toFixed(4)}`;
-        if (!seen.has(key)) { seen.add(key); allResults.push(r); }
-      }
-    };
-
-    // Photon first (browser-side, different IP)
-    addAll(await searchPhoton(q));
-    // Nominatim fallback (multiple instances)
-    if (allResults.length < 3) {
-      addAll(await searchNominatim(q));
-    }
-
-    if (id !== searchIdRef.current) return;
-
-    if (allResults.length === 0) {
-      setSearchError("No se encontraron resultados. Puedes arrastrar el mapa para colocar el punto manualmente.");
-    }
-    setResults(allResults.slice(0, 8));
-    setSearching(false);
-  }, [searchPhoton, searchNominatim]);
-
-  useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => searchAddress(query), 350);
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [query, searchAddress]);
+    debounceRef.current = setTimeout(() => void runSearch(query), 400);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [query, isOpen, runSearch]);
 
-  const selectResult = (r: GeocodingResult) => {
-    setCenter([r.lat, r.lng]);
-    setSelectedAddress(r.displayName);
-    setSelectedCoords({ lat: r.lat, lng: r.lng });
-    setQuery(r.displayName); setResults([]); setSearchError("");
-    inputRef.current?.blur();
-  };
+  /* ------------------------------------------------------ Geocodificación inversa */
 
-  const handleMapCenterChange = useCallback(async (newCenter: [number, number]) => {
-    setSelectedCoords({ lat: newCenter[0], lng: newCenter[1] });
+  const reverseAt = useCallback((lat: number, lng: number) => {
+    if (reverseTimerRef.current) clearTimeout(reverseTimerRef.current);
+    reverseAbortRef.current?.abort();
 
-    // Reverse geocode - Photon
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 5000);
-      const res = await fetch(
-        `https://photon.komoot.io/api/?lon=${newCenter[1]}&lat=${newCenter[0]}&limit=1`,
-        { signal: controller.signal }
-      );
-      clearTimeout(timer);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.features && data.features.length > 0) {
-          const p = data.features[0].properties;
-          const parts: string[] = [];
-          if (p.name) parts.push(p.name);
-          if (p.street) parts.push(p.street);
-          if (p.district) parts.push(p.district);
-          if (p.city || p.town) parts.push(p.city || p.town);
-          if (p.state) parts.push(p.state);
-          const label = parts.join(", ") || p.label || "";
-          if (label) { setSelectedAddress(label); setQuery(label); return; }
-        }
-      }
-    } catch { /* fallback */ }
+    const inside = isInVenezuela(lat, lng);
+    setOutsideVenezuela(!inside);
+    setCoords({ lat, lng });
 
-    // Reverse geocode - Nominatim
-    for (const base of NOMINATIM_INSTANCES) {
-      try {
-        const params = new URLSearchParams({
-          lat: String(newCenter[0]), lon: String(newCenter[1]),
-          format: "jsonv2", "accept-language": "es", addressdetails: "1",
-        });
-        const res = await fetch(`${base}/reverse?${params}`, {
-          headers: { "User-Agent": "DrivipApp/2.0 (drivipapp@gmail.com)" },
-          signal: AbortSignal.timeout(5000),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.display_name) {
-            setSelectedAddress(data.display_name);
-            setQuery(data.display_name.split(",").slice(0, 3).join(",").trim());
-            return;
-          }
-        }
-      } catch { continue; }
+    if (!inside) {
+      setAddress("");
+      setPrimary("Fuera de Venezuela");
+      setSecondary("Drivip solo opera dentro del territorio venezolano");
+      setAddressLoading(false);
+      return;
     }
+
+    setAddressLoading(true);
+
+    reverseTimerRef.current = setTimeout(async () => {
+      const controller = new AbortController();
+      reverseAbortRef.current = controller;
+      const place = await reverseVenezuelaPlace(lat, lng, controller.signal);
+      if (controller.signal.aborted) return;
+
+      if (place) {
+        setAddress(place.displayName);
+        setPrimary(place.primary);
+        setSecondary(place.secondary);
+      } else {
+        setAddress(`${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+        setPrimary("Punto en el mapa");
+        setSecondary("Arrastra el mapa para ajustar la ubicación");
+      }
+      setAddressLoading(false);
+    }, 550);
   }, []);
 
-  useEffect(() => {
-    if (initialPointType !== "destination" || !initialOrigin || !selectedCoords) {
-      setRouteGeometry(null); setTotalKm(0); setTotalMin(0); return;
+  const handleCenterChange = useCallback(
+    (next: [number, number]) => {
+      setSearchFocused(false);
+      reverseAt(next[0], next[1]);
+    },
+    [reverseAt]
+  );
+
+  /* ------------------------------------------------------------------- Acciones */
+
+  const moveTo = useCallback((lat: number, lng: number, nextAddress?: string) => {
+    setMapCenter([lat, lng]);
+    setCoords({ lat, lng });
+    setOutsideVenezuela(!isInVenezuela(lat, lng));
+    if (nextAddress) setAddress(nextAddress);
+  }, []);
+
+  const selectPlace = useCallback((place: VenezuelanPlace) => {
+    const next: RecentPlace = {
+      primary: place.primary,
+      address: place.displayName,
+      lat: place.lat,
+      lng: place.lng,
+    };
+    writeRecent(next);
+    setRecent(readRecent());
+    moveTo(place.lat, place.lng);
+    setPrimary(place.primary);
+    setSecondary(place.secondary);
+    setAddress(place.displayName);
+    setQuery(place.primary);
+    setResults([]);
+    setSearchError("");
+    setSearchFocused(false);
+    setAddressLoading(false);
+    inputRef.current?.blur();
+  }, [moveTo]);
+
+  const selectSuggestion = useCallback(async (suggestion: MapPickerSuggestion) => {
+    if (typeof suggestion.lat === "number" && typeof suggestion.lng === "number" && isInVenezuela(suggestion.lat, suggestion.lng)) {
+      selectPlace({
+        lat: suggestion.lat,
+        lng: suggestion.lng,
+        displayName: suggestion.address,
+        primary: suggestion.name,
+        secondary: suggestion.address,
+        source: "city",
+        category: "guardada",
+      });
+      return;
     }
-    let cancelled = false;
-    setCalculating(true);
-    const allPts = [
-      { lat: initialOrigin.lat, lng: initialOrigin.lng },
-      ...extraStops,
-      { lat: selectedCoords.lat, lng: selectedCoords.lng },
-    ];
-    osrmRoute(allPts).then((result) => {
-      if (cancelled) return;
-      if (result) { setRouteGeometry(result.geometry); setTotalKm(result.distanceKm); setTotalMin(result.durationMin); }
-      setCalculating(false);
+
+    setQuery(suggestion.address || suggestion.name);
+    inputRef.current?.focus();
+    const places = await searchVenezuelaPlaces(suggestion.address || suggestion.name, {
+      near: coordsRef.current,
+      limit: 1,
     });
-    return () => { cancelled = true; };
-  }, [selectedCoords, extraStops, initialOrigin, initialPointType]);
+    if (places[0]) selectPlace(places[0]);
+  }, [selectPlace]);
 
-  const addExtraStop = () => {
-    if (!selectedCoords) return;
-    setExtraStops([...extraStops, { lat: selectedCoords.lat, lng: selectedCoords.lng, address: selectedAddress || query }]);
-    setSelectedAddress(""); setSelectedCoords(null); setQuery(""); setResults([]); setSearchError("");
-  };
+  const selectRecent = useCallback((item: RecentPlace) => {
+    selectPlace({
+      lat: item.lat,
+      lng: item.lng,
+      displayName: item.address,
+      primary: item.primary,
+      secondary: "",
+      source: "city",
+      category: "reciente",
+    });
+  }, [selectPlace]);
 
-  const removeExtraStop = (index: number) => { setExtraStops(extraStops.filter((_, i) => i !== index)); };
+  const useGps = useCallback(() => {
+    if (!("geolocation" in navigator)) {
+      setSearchError("Tu dispositivo no permite obtener la ubicación GPS.");
+      return;
+    }
+    setGpsLoading(true);
+    setSearchError("");
 
-  const handleConfirm = () => {
-    const coords = selectedCoords || { lat: center[0], lng: center[1] };
-    const addr = selectedAddress || query || "Punto en mapa";
-    if (initialPointType === "destination" && initialOrigin) {
-      if (onConfirmRoute) {
-        onConfirmRoute(
-          { lat: initialOrigin.lat, lng: initialOrigin.lng, address: initialOrigin.address },
-          extraStops,
-          { lat: coords.lat, lng: coords.lng, address: addr },
-          totalKm, totalMin
-        );
-      } else { onConfirmPin(addr, "destination"); }
-    } else { onConfirmPin(addr, "origin"); }
-    onClose();
-  };
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setGpsLoading(false);
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
 
-  const handleGps = () => {
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const newC: [number, number] = [pos.coords.latitude, pos.coords.longitude];
-          setCenter(newC);
-          setSelectedCoords({ lat: newC[0], lng: newC[1] });
-          onUseGps();
-        },
-        () => onUseGps(),
-        { enableHighAccuracy: true, timeout: 5000 }
+        if (!isInVenezuela(lat, lng)) {
+          setOutsideVenezuela(true);
+          setSearchError("Tu GPS está fuera de Venezuela. Elige tu ubicación manualmente en el mapa.");
+          setMapCenter(VENEZUELA_CENTER);
+          setCoords({ lat: VENEZUELA_CENTER[0], lng: VENEZUELA_CENTER[1] });
+          return;
+        }
+
+        moveTo(lat, lng);
+        reverseAt(lat, lng);
+        onUseGps?.({ lat, lng });
+      },
+      () => {
+        setGpsLoading(false);
+        setSearchError("No pudimos obtener tu GPS. Revisa los permisos o busca tu dirección.");
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 20000 }
+    );
+  }, [moveTo, onUseGps, reverseAt]);
+
+  /* ------------------------------------------------------------------- Ruta */
+
+  const calculateRoute = useCallback(async () => {
+    if (initialPointType !== "destination" || !initialOrigin) return null;
+
+    const waypoints = [
+      { lat: initialOrigin.lat, lng: initialOrigin.lng },
+      ...extraStops.map((stop) => ({ lat: stop.lat, lng: stop.lng })),
+      { lat: coords.lat, lng: coords.lng },
+    ];
+
+    if (waypoints.some((point) => !isInVenezuela(point.lat, point.lng))) {
+      setRouteGeometry(null);
+      setTotalKm(0);
+      setTotalMin(0);
+      return null;
+    }
+
+    setCalculating(true);
+    const route = await fetchDrivingRoute(waypoints);
+    setCalculating(false);
+
+    if (!route) {
+      setRouteGeometry(null);
+      setTotalKm(0);
+      setTotalMin(0);
+      return null;
+    }
+
+    setRouteGeometry(route.geometry);
+    setTotalKm(route.distanceKm);
+    setTotalMin(route.durationMin);
+    return route;
+  }, [coords.lat, coords.lng, extraStops, initialOrigin, initialPointType]);
+
+  useEffect(() => {
+    if (!isOpen || initialPointType !== "destination" || !initialOrigin) {
+      setRouteGeometry(null);
+      setTotalKm(0);
+      setTotalMin(0);
+      return;
+    }
+
+    const timer = setTimeout(() => void calculateRoute(), 450);
+    return () => clearTimeout(timer);
+  }, [calculateRoute, initialOrigin, initialPointType, isOpen]);
+
+  const addExtraStop = useCallback(() => {
+    if (outsideVenezuela) return;
+    const stop: MapPickerPlace = {
+      address: address || primary || "Punto en el mapa",
+      lat: coords.lat,
+      lng: coords.lng,
+    };
+    setExtraStops((prev) => [...prev, stop]);
+    setPrimary("");
+    setSecondary("");
+    setAddress("");
+    setQuery("");
+    setResults([]);
+  }, [address, coords.lat, coords.lng, outsideVenezuela, primary]);
+
+  const handleConfirm = useCallback(async () => {
+    if (outsideVenezuela) {
+      setSearchError("Selecciona una ubicación dentro de Venezuela para continuar.");
+      return;
+    }
+
+    const finalAddress = address || primary || "Punto en el mapa";
+    const place: MapPickerPlace = { address: finalAddress, lat: coords.lat, lng: coords.lng };
+
+    writeRecent({
+      primary: primary || finalAddress,
+      address: finalAddress,
+      lat: coords.lat,
+      lng: coords.lng,
+    });
+
+    if (initialPointType === "destination" && initialOrigin && onConfirmRoute) {
+      let km = totalKm;
+      let min = totalMin;
+
+      if (km <= 0) {
+        const route = await calculateRoute();
+        if (route) {
+          km = route.distanceKm;
+          min = route.durationMin;
+        }
+      }
+
+      onConfirmRoute(
+        { address: initialOrigin.address, lat: initialOrigin.lat, lng: initialOrigin.lng },
+        extraStops,
+        place,
+        km,
+        min
       );
-    } else { onUseGps(); }
-  };
+    } else {
+      onConfirmPin(place, initialPointType);
+    }
+
+    onClose();
+  }, [
+    address,
+    calculateRoute,
+    coords.lat,
+    coords.lng,
+    extraStops,
+    initialOrigin,
+    initialPointType,
+    onClose,
+    onConfirmPin,
+    onConfirmRoute,
+    outsideVenezuela,
+    primary,
+    totalKm,
+    totalMin,
+  ]);
 
   if (!isOpen) return null;
 
+  const pinLabel = addressLoading
+    ? "Obteniendo dirección..."
+    : primary || address || (outsideVenezuela ? "Fuera de Venezuela" : "Mueve el mapa");
+
+  const showSearchPanel = searchFocused || query.trim().length > 0;
+  const savedSuggestions = suggestions.filter(
+    (item) => typeof item.lat === "number" && typeof item.lng === "number"
+  );
+
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-slate-100" data-purpose="map-picker-modal">
-      {/* Top bar */}
-      <div className="relative z-20 flex items-center gap-3 px-4 pt-3 pb-2 bg-white/90 backdrop-blur-lg border-b border-slate-200/60">
-        <button className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 active:scale-90 transition-transform shrink-0" onClick={onClose}>
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-        <div className="flex-1 min-w-0">
-          <h3 className="text-sm font-bold text-slate-900 leading-tight">
-            {initialPointType === "origin" ? "Punto de Partida" : "¿A dónde vas?"}
-          </h3>
-          <p className="text-[11px] text-slate-400">
-            {selectedCoords ? "Punto fijado en el mapa" : "Busca o arrastra el mapa"}
-          </p>
-        </div>
-        {calculating && (
-          <div className="w-5 h-5 border-2 border-purple-400 border-t-transparent rounded-full animate-spin shrink-0" />
-        )}
-        {selectedCoords && (
-          <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center shrink-0">
-            <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+    <div className="fixed inset-0 z-[110] overflow-hidden bg-slate-950" data-purpose="map-picker-modal">
+      {/* Mapa a pantalla completa */}
+      <div className="absolute inset-0">
+        <MapLibreView
+          center={mapCenter}
+          zoom={16}
+          mapStyle={LIGHT_STYLE}
+          className="h-full w-full"
+          maxBounds={VENEZUELA_MAP_BOUNDS}
+          origin={
+            initialPointType === "destination" && initialOrigin
+              ? { lat: initialOrigin.lat, lng: initialOrigin.lng }
+              : null
+          }
+          destination={initialPointType === "destination" ? { lat: coords.lat, lng: coords.lng } : null}
+          route={routeGeometry || undefined}
+          onCenterChange={handleCenterChange}
+        />
+      </div>
+
+      {/* Buscador flotante */}
+      <div className="absolute inset-x-0 top-0 z-30 px-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            aria-label="Volver"
+            onClick={onClose}
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/60 bg-white/95 text-slate-700 shadow-lg backdrop-blur-md active:scale-95"
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
             </svg>
+          </button>
+
+          <div className="relative min-w-0 flex-1">
+            <svg
+              className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              viewBox="0 0 24 24"
+            >
+              <circle cx="11" cy="11" r="7.5" />
+              <path strokeLinecap="round" d="M21 21l-4.35-4.35" />
+            </svg>
+            <input
+              ref={inputRef}
+              type="text"
+              value={query}
+              enterKeyHint="search"
+              autoComplete="off"
+              onChange={(event) => {
+                const value = event.target.value;
+                setQuery(value);
+                setSearchError("");
+                setSearchFocused(true);
+                if (value.trim().length === 0) setResults([]);
+              }}
+              onFocus={() => setSearchFocused(true)}
+              placeholder="Calle, barrio o punto de referencia"
+              aria-label="Buscar dirección en Venezuela"
+              className="h-12 w-full rounded-2xl border border-white/60 bg-white/95 pl-11 pr-11 text-base font-semibold text-slate-800 placeholder-slate-400 shadow-lg outline-none backdrop-blur-md focus:ring-2 focus:ring-purple-500/40 sm:text-sm"
+            />
+            {searching ? (
+              <span className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin rounded-full border-2 border-purple-500 border-t-transparent" />
+            ) : query.length > 0 ? (
+              <button
+                type="button"
+                aria-label="Limpiar búsqueda"
+                onClick={() => {
+                  setQuery("");
+                  setResults([]);
+                  setSearchError("");
+                  inputRef.current?.focus();
+                }}
+                className="absolute right-3 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-slate-100 text-slate-500 active:scale-90"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            ) : null}
+          </div>
+
+          <button
+            type="button"
+            aria-label="Usar mi ubicación GPS"
+            onClick={useGps}
+            disabled={gpsLoading}
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/60 bg-white/95 text-emerald-600 shadow-lg backdrop-blur-md active:scale-95 disabled:opacity-60"
+          >
+            {gpsLoading ? (
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
+            ) : (
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M12 2v3m0 14v3m10-10h-3M5 12H2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
+          </button>
+        </div>
+
+        {/* Panel de búsqueda / sugerencias */}
+        {showSearchPanel && (
+          <div className="mt-2 max-h-[52dvh] overflow-y-auto overscroll-contain rounded-3xl border border-white/60 bg-white/97 shadow-2xl backdrop-blur-xl">
+            {searchError ? (
+              <div className="flex items-start gap-2.5 px-4 py-4">
+                <span className="material-symbols-outlined mt-0.5 text-[19px] text-amber-500">info</span>
+                <p className="text-xs font-medium leading-relaxed text-slate-600">{searchError}</p>
+              </div>
+            ) : null}
+
+            {results.length > 0 ? (
+              <ul className="divide-y divide-slate-100">
+                {results.map((place, index) => (
+                  <li key={`${place.lat}-${place.lng}-${index}`}>
+                    <button
+                      type="button"
+                      onClick={() => selectPlace(place)}
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-slate-50"
+                    >
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
+                        <span className="material-symbols-outlined text-[20px]">
+                          {categoryIcon(place.category)}
+                        </span>
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-bold text-slate-900">{place.primary}</span>
+                        <span className="block truncate text-xs font-medium text-slate-500">
+                          {place.secondary || place.displayName}
+                        </span>
+                      </span>
+                      {place.source === "city" ? (
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">
+                          Ciudad
+                        </span>
+                      ) : null}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : !searching && query.trim().length < 2 ? (
+              <div className="p-3">
+                {savedSuggestions.length > 0 && (
+                  <>
+                    <p className="px-1 pb-2 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                      Tus direcciones
+                    </p>
+                    <div className="mb-2 flex flex-wrap gap-2">
+                      {savedSuggestions.slice(0, 4).map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => void selectSuggestion(item)}
+                          className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 active:scale-95"
+                        >
+                          <span className="material-symbols-outlined text-[16px] text-purple-600">
+                            {item.icon || "home"}
+                          </span>
+                          {item.name}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {recent.length > 0 && (
+                  <>
+                    <p className="px-1 pb-1 pt-1 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                      Recientes
+                    </p>
+                    <ul>
+                      {recent.map((item, index) => (
+                        <li key={`${item.lat}-${item.lng}-${index}`}>
+                          <button
+                            type="button"
+                            onClick={() => selectRecent(item)}
+                            className="flex w-full items-center gap-3 rounded-2xl px-1 py-2.5 text-left active:bg-slate-50"
+                          >
+                            <span className="material-symbols-outlined text-[19px] text-slate-400">history</span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-[13px] font-bold text-slate-800">{item.primary}</span>
+                              <span className="block truncate text-[11px] text-slate-400">{item.address}</span>
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+
+                <div className="mt-2 flex items-start gap-2 rounded-2xl bg-slate-50 p-3">
+                  <span className="material-symbols-outlined text-[18px] text-purple-500">tips_and_updates</span>
+                  <p className="text-[11px] font-medium leading-relaxed text-slate-500">
+                    Busca por <strong className="text-slate-700">avenida, calle, sector, barrio</strong> o un
+                    <strong className="text-slate-700"> punto de referencia</strong> (centro comercial, hospital,
+                    plaza). También puedes arrastrar el mapa y fijar el pin.
+                  </p>
+                </div>
+              </div>
+            ) : !searching && query.trim().length >= 2 && results.length === 0 && !searchError ? (
+              <div className="px-4 py-6 text-center">
+                <span className="material-symbols-outlined text-[34px] text-slate-300">location_off</span>
+                <p className="mt-1 text-xs font-semibold text-slate-500">Sin resultados dentro de Venezuela</p>
+              </div>
+            ) : null}
           </div>
         )}
       </div>
 
-      {/* Map */}
-      <div className="relative flex-1 min-h-0">
-        <MapLibreView
-          center={center}
-          zoom={selectedCoords ? 16 : 14}
-          mapStyle={LIGHT_STYLE}
-          className="w-full h-full"
-          origin={initialPointType === "destination" && initialOrigin ? { lat: initialOrigin.lat, lng: initialOrigin.lng } : null}
-          destination={selectedCoords ? { lat: selectedCoords.lat, lng: selectedCoords.lng } : null}
-          route={routeGeometry || undefined}
-          onCenterChange={handleMapCenterChange}
-        />
-
-        {/* Center pin */}
-        <div className="absolute inset-x-0 top-1/2 -translate-y-full flex justify-center pointer-events-none z-10">
-          <div className="flex flex-col items-center">
-            <div className={`px-3 py-1.5 rounded-lg text-[11px] font-bold shadow-xl shadow-slate-900/15 border max-w-[260px] truncate ${
-              selectedCoords ? "bg-green-500 text-white border-green-600" : "bg-white text-slate-800 border-slate-200/60"
-            }`}>
-              {selectedAddress || (selectedCoords ? "Punto fijado" : "Arrastra el mapa aquí")}
-            </div>
-            <svg className={`w-7 h-7 drop-shadow-lg ${selectedCoords ? "text-green-500" : "text-purple-600"}`} viewBox="0 0 24 24" fill="currentColor">
+      {/* Pin central */}
+      <div className="pointer-events-none absolute inset-x-0 top-1/2 z-10 flex -translate-y-full justify-center">
+        <div className="flex flex-col items-center">
+          <div
+            className={`max-w-[280px] truncate rounded-xl border px-3 py-1.5 text-[11px] font-bold shadow-xl ${
+              outsideVenezuela
+                ? "border-red-200 bg-red-500 text-white"
+                : addressLoading
+                  ? "border-slate-200 bg-white text-slate-500"
+                  : "border-white/60 bg-slate-900/90 text-white backdrop-blur-md"
+            }`}
+          >
+            {pinLabel}
+          </div>
+          <div className="relative mt-0.5 flex h-10 w-10 items-center justify-center">
+            <span
+              className={`absolute bottom-0 h-5 w-5 rounded-full ${
+                outsideVenezuela ? "bg-red-500/30" : "bg-purple-600/30"
+              } animate-ping`}
+            />
+            <svg
+              className={`relative h-9 w-9 drop-shadow-xl ${
+                outsideVenezuela ? "text-red-500" : "text-purple-700"
+              }`}
+              viewBox="0 0 24 24"
+              fill="currentColor"
+            >
               <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 010-5 2.5 2.5 0 010 5z" />
             </svg>
           </div>
+          <div className="-mt-1 h-1.5 w-6 rounded-full bg-slate-900/20 blur-[1px]" />
         </div>
-
-        {/* Route info */}
-        {selectedCoords && initialPointType === "destination" && initialOrigin && totalKm > 0 && (
-          <div className="absolute top-3 left-3 right-3 z-10 px-3 py-2.5 rounded-xl bg-white/95 backdrop-blur-sm border border-slate-200/60 shadow-lg">
-            <div className="flex items-center justify-between">
-              <div>
-                <span className="text-[10px] font-bold text-slate-400 uppercase block">Distancia</span>
-                <p className="text-sm font-black text-slate-900">{totalKm.toFixed(1)} km</p>
-              </div>
-              <div className="text-center">
-                <span className="text-[10px] font-bold text-slate-400 uppercase block">Tiempo</span>
-                <p className="text-sm font-black text-slate-900">
-                  {totalMin < 60 ? `${Math.round(totalMin)} min` : `${Math.floor(totalMin / 60)}h ${Math.round(totalMin % 60)}m`}
-                </p>
-              </div>
-              {extraStops.length > 0 && (
-                <div className="text-right">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Escalas</span>
-                  <p className="text-sm font-black text-purple-600">{extraStops.length}</p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Tip */}
-        {!selectedCoords && (
-          <div className="absolute bottom-3 left-3 right-3 z-10 flex justify-center">
-            <div className="px-4 py-2 rounded-full bg-slate-900/80 text-white text-[11px] font-medium backdrop-blur-sm flex items-center gap-1.5">
-              <svg className="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              Arrastra el mapa para colocar el pin donde necesites
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* Bottom panel */}
-      <div className="relative z-20 bg-white border-t border-slate-200/60 px-4 pt-3 pb-8">
-        {/* Extra stops */}
+      {/* Info de ruta flotante */}
+      {initialPointType === "destination" && initialOrigin && (totalKm > 0 || calculating) && (
+        <div className="pointer-events-none absolute left-3 right-3 top-[7.5rem] z-10 flex justify-center">
+          <div className="flex items-center gap-3 rounded-full border border-white/60 bg-white/95 px-4 py-2 shadow-lg backdrop-blur-md">
+            {calculating ? (
+              <>
+                <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-purple-500 border-t-transparent" />
+                <span className="text-[11px] font-bold text-slate-600">Calculando ruta...</span>
+              </>
+            ) : (
+              <>
+                <span className="text-xs font-black text-slate-900">{formatDistance(totalKm)}</span>
+                <span className="h-3 w-px bg-slate-200" />
+                <span className="text-xs font-bold text-slate-600">{formatDuration(totalMin)}</span>
+                {extraStops.length > 0 && (
+                  <>
+                    <span className="h-3 w-px bg-slate-200" />
+                    <span className="text-[10px] font-bold text-purple-600">
+                      {extraStops.length} escala{extraStops.length > 1 ? "s" : ""}
+                    </span>
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Hoja inferior */}
+      <div
+        className="absolute inset-x-0 bottom-0 z-20 max-h-[72dvh] overflow-y-auto overscroll-contain rounded-t-[28px] border-t border-white/70 bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2.5 shadow-[0_-12px_40px_rgba(15,23,42,0.18)]"
+        style={{
+          backgroundImage:
+            "radial-gradient(circle at 1px 1px, rgba(148,163,184,0.14) 1px, transparent 0)",
+          backgroundSize: "16px 16px",
+        }}
+      >
+        <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-slate-200" />
+
+        <div className="flex items-start gap-3">
+          <span
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${
+              initialPointType === "origin"
+                ? "bg-emerald-50 text-emerald-600"
+                : "bg-orange-50 text-orange-600"
+            }`}
+          >
+            <span className="material-symbols-outlined text-[22px]">
+              {initialPointType === "origin" ? "my_location" : "location_on"}
+            </span>
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-black uppercase tracking-wider text-slate-400">
+              {initialPointType === "origin" ? "¿Dónde estás?" : "Destino"}
+            </p>
+            <p className="truncate text-[15px] font-black leading-tight text-slate-900">
+              {addressLoading ? "Ubicando dirección..." : primary || (outsideVenezuela ? "Fuera de Venezuela" : "Selecciona un punto")}
+            </p>
+            <p className="mt-0.5 line-clamp-2 text-xs font-medium leading-snug text-slate-500">
+              {outsideVenezuela
+                ? "Drivip solo está disponible en Venezuela. Mueve el mapa o usa tu GPS."
+                : secondary || (addressLoading ? "Espera un momento" : "Arrastra el mapa para ajustar el pin")}
+            </p>
+          </div>
+          {addressLoading && (
+            <span className="mt-1 h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-purple-500 border-t-transparent" />
+          )}
+        </div>
+
         {extraStops.length > 0 && (
-          <div className="mb-2 space-y-1">
-            {extraStops.map((stop, i) => (
-              <div key={i} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-50 border border-purple-200 text-xs">
-                <span className="w-5 h-5 rounded bg-purple-500 text-white text-[10px] font-black flex items-center justify-center shrink-0">{i + 1}</span>
-                <span className="flex-1 truncate text-slate-700 font-medium">{stop.address}</span>
-                <span className="text-[10px] text-slate-400 font-bold">ESCALA</span>
-                <button className="text-red-400 active:scale-90" onClick={() => removeExtraStop(i)}>
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                    <path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" />
+          <div className="mt-2.5 flex gap-2 overflow-x-auto no-scrollbar">
+            {extraStops.map((stop, index) => (
+              <div
+                key={`${stop.lat}-${stop.lng}-${index}`}
+                className="flex shrink-0 items-center gap-1.5 rounded-full border border-purple-200 bg-purple-50 py-1.5 pl-2 pr-1.5 text-[11px] font-bold text-purple-700"
+              >
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-purple-600 text-[10px] text-white">
+                  {index + 1}
+                </span>
+                <span className="max-w-[150px] truncate">{stop.address}</span>
+                <button
+                  type="button"
+                  aria-label={`Quitar escala ${index + 1}`}
+                  onClick={() => setExtraStops((prev) => prev.filter((_, i) => i !== index))}
+                  className="flex h-5 w-5 items-center justify-center rounded-full text-purple-500 active:scale-90"
+                >
+                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
               </div>
@@ -416,97 +857,29 @@ export default function MapPickerModal({
           </div>
         )}
 
-        {/* Search */}
-        <div className="relative mb-2">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <circle cx="11" cy="11" r="8" />
-            <path strokeLinecap="round" d="M21 21l-4.35-4.35" />
-          </svg>
-          <input
-            ref={inputRef}
-            type="text"
-            value={query}
-            onChange={(e) => { setQuery(e.target.value); setSelectedAddress(""); setSelectedCoords(null); setSearchError(""); }}
-            placeholder="Buscar dirección, barrio, avenida..."
-            className="w-full pl-10 pr-10 py-3 rounded-2xl bg-slate-100 border border-slate-200 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-400 transition-all"
-          />
-          {searching && (
-            <div className="absolute right-3 top-1/2 -translate-y-1/2">
-              <div className="w-4 h-4 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
-            </div>
-          )}
-          {!searching && query.length > 0 && (
+        <div className="mt-3 flex gap-2">
+          {initialPointType === "destination" && (
             <button
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-              onClick={() => { setQuery(""); setSelectedAddress(""); setSelectedCoords(null); setResults([]); setSearchError(""); }}
+              type="button"
+              onClick={addExtraStop}
+              disabled={outsideVenezuela}
+              className="flex h-12 shrink-0 items-center justify-center gap-1 rounded-2xl border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-600 active:scale-95 disabled:opacity-40"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" />
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
               </svg>
-            </button>
-          )}
-        </div>
-
-        {/* Results */}
-        {results.length > 0 && (
-          <div className="mb-2 max-h-44 overflow-y-auto rounded-2xl border border-slate-200 bg-white divide-y divide-slate-100">
-            {results.map((r, i) => (
-              <button key={i} className="w-full px-4 py-3 text-left flex items-start gap-3 active:bg-slate-50 transition-colors" onClick={() => selectResult(r)}>
-                <svg className="w-4 h-4 text-purple-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  <circle cx="12" cy="11" r="2" />
-                </svg>
-                <span className="text-xs text-slate-600 leading-tight line-clamp-2">{r.displayName}</span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Error */}
-        {searchError && !searching && (
-          <div className="mb-2 px-4 py-3 rounded-2xl bg-amber-50 border border-amber-200 flex items-start gap-2.5">
-            <svg className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <p className="text-xs text-amber-700">{searchError}</p>
-          </div>
-        )}
-
-        {/* Action buttons */}
-        <div className="flex gap-2">
-          <button className="py-3 px-3 rounded-xl bg-slate-100 border border-slate-200 text-slate-600 text-xs font-bold flex items-center justify-center gap-1.5 active:scale-[0.97] transition shrink-0" onClick={handleGps}>
-            <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M12 2v3m0 14v3m10-10h-3M5 12H2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            GPS
-          </button>
-
-          {selectedCoords && initialPointType === "destination" && (
-            <button className="py-3 px-3 rounded-xl bg-slate-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 active:scale-[0.97] transition shrink-0" onClick={addExtraStop}>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                <path d="M12 4.5v15m7.5-7.5h-15" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              + Escala
+              Escala
             </button>
           )}
 
           <button
-            className={`flex-1 py-3 rounded-xl text-sm font-bold shadow-lg active:scale-[0.97] transition flex items-center justify-center gap-2 ${
-              selectedCoords
-                ? "bg-green-600 text-white shadow-green-600/25"
-                : "bg-purple-600 text-white shadow-purple-600/25"
-            }`}
-            onClick={handleConfirm}
+            type="button"
+            onClick={() => void handleConfirm()}
+            disabled={outsideVenezuela || addressLoading || calculating}
+            className="flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-purple-700 to-indigo-700 text-sm font-black text-white shadow-lg shadow-purple-600/25 active:scale-[0.98] disabled:opacity-50"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
-            {selectedCoords
-              ? initialPointType === "destination"
-                ? `Confirmar${totalKm > 0 ? ` (${totalKm.toFixed(1)} km)` : ""}`
-                : "Confirmar Origen"
-              : "Fijar Punto Aquí"}
+            <span className="material-symbols-outlined text-[19px]">check_circle</span>
+            {initialPointType === "origin" ? "Confirmar origen" : "Confirmar destino"}
           </button>
         </div>
       </div>

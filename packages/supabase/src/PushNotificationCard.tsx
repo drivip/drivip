@@ -25,7 +25,7 @@ export function PushNotificationCard({ tenantId, disabled }: PushNotificationCar
           <span className="material-symbols-outlined text-[20px] text-purple-600">notifications_active</span>
           <div className="min-w-0">
             <p className="text-sm font-bold text-slate-900">Notificaciones Push</p>
-            <p className="text-[11px] text-slate-500 truncate">
+            <p className="line-clamp-2 text-[11px] leading-tight text-slate-500">
               {subscribed
                 ? "Activadas en este dispositivo"
                 : permission === "denied"

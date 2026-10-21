@@ -311,7 +311,7 @@ export default function AddConductorModal({
                       <div className="flex items-center gap-1.5">
                         <p className="text-sm font-bold text-slate-900 truncate">{conductor.nombre}</p>
                         {conductor.pausado && (
-                          <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[9px] font-bold">Pausado</span>
+                          <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-bold">Pausado</span>
                         )}
                       </div>
                       <p className="text-[11px] text-slate-500 truncate">

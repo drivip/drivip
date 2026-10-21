@@ -1,16 +1,34 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import {
   AuthProvider, useAuthContext, supabase, useTenantBySlug, useRedCliente, useTarifasTenant,
   useTasaCambio, useConductoresRed, useMisCarreras, crearCarreraCliente, calificarCarrera,
   cancelarCarrera, useDireccionesCliente, useReservasCliente, enviarPushCarrera,
+  crearSolicitudServicio, conductorInviteUrl, useConversacionesCliente,
 } from "@drivip/supabase";
 import { TASA_BCV_REFERENCIA } from "@drivip/types";
+import {
+  fetchDrivingRoute,
+  isInVenezuela,
+  reverseVenezuelaPlace,
+  searchVenezuelaPlaces,
+  VENEZUELA_CENTER,
+  VENEZUELA_STATES,
+} from "@drivip/maps";
 import { useCarreraRealtime } from "./hooks/useCarreraRealtime";
 import { useConductorLocation } from "./hooks/useConductorLocation";
+import { useScrollLock } from "./hooks/useScrollLock";
 import { toDriver } from "./lib/driverMapper";
 import PassengerHeader from "./components/passenger/PassengerHeader";
-import HeroWelcomeCard from "./components/passenger/HeroWelcomeCard";
+import PassengerBottomNav from "./components/passenger/PassengerBottomNav";
+import NavGlyph from "./components/passenger/NavGlyph";
+import AdCarousel from "./components/passenger/AdCarousel";
+import ServiceHub from "./components/passenger/ServiceHub";
+import CouponsSection from "./components/passenger/CouponsSection";
+import VipDriversSection from "./components/passenger/VipDriversSection";
+import OtherDriversModal from "./components/passenger/OtherDriversModal";
+import ServiceRequestModal, { type ServiceMode, type ServiceRequestInput } from "./components/passenger/ServiceRequestModal";
+import MessageCenter from "./components/passenger/MessageCenter";
 import RouteCalculator from "./components/passenger/RouteCalculator";
 import MapPickerModal from "./components/passenger/MapPickerModal";
 import LiveTripTracker from "./components/passenger/LiveTripTracker";
@@ -32,14 +50,6 @@ const METODO_PAGO_MAP: Record<"usd" | "bs" | "pmovil", MetodoPago> = {
   bs: "efectivo",
   pmovil: "pago_movil",
 };
-
-const bottomNavItems = [
-  { id: "home", label: "En Vivo", icon: "map" },
-  { id: "drivers", label: "Choferes", icon: "people" },
-  { id: "center", label: "", icon: "plus" },
-  { id: "history", label: "Historial", icon: "history" },
-  { id: "menu", label: "Menú", icon: "menu" },
-] as const;
 
 /* ==================== LANDING PAGE ==================== */
 function LandingPage({ onShowAuth }: { onShowAuth: (mode: "login" | "register") => void }) {
@@ -255,26 +265,43 @@ function LoginScreen({ onSwitchToRegister }: { onSwitchToRegister: () => void })
 
 /* ==================== REGISTER ==================== */
 function RegisterScreen({ onSwitchToLogin, inviteConductor }: { onSwitchToLogin: () => void; inviteConductor?: string | null }) {
-  const [form, setForm] = useState({ nombre: "", apellido: "", email: "", telefono: "", password: "", ciudad: "Caracas", codigo_referido: "" });
+  const [form, setForm] = useState({
+    nombreCompleto: "",
+    email: "",
+    telefono: "",
+    password: "",
+    estado: "Distrito Capital",
+    ciudad: "Caracas",
+  });
   const [step, setStep] = useState<"form" | "success">("form");
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const ciudades = useMemo(
+    () => VENEZUELA_STATES.find((estado) => estado.nombre === form.estado)?.ciudades ?? [],
+    [form.estado],
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
     setSubmitting(true);
 
+    const nombreCompleto = form.nombreCompleto.trim();
+    const email = form.email.trim();
+    const telefono = form.telefono.trim();
+
     const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: form.email,
+      email,
       password: form.password,
       options: {
         emailRedirectTo: window.location.origin,
         data: {
           rol: "cliente",
-          nombre: form.nombre,
-          apellido: form.apellido,
-          telefono: form.telefono,
+          nombre: nombreCompleto,
+          telefono,
+          estado: form.estado,
+          ciudad: form.ciudad,
         },
       },
     });
@@ -295,10 +322,11 @@ function RegisterScreen({ onSwitchToLogin, inviteConductor }: { onSwitchToLogin:
     const { error: profileError } = await supabase.from("profiles").insert({
       id: user.id,
       rol: "cliente",
-      nombre: form.nombre,
-      apellido: form.apellido,
-      telefono: form.telefono,
-      email: form.email,
+      nombre: nombreCompleto,
+      telefono,
+      email,
+      estado: form.estado,
+      ciudad: form.ciudad,
       activo: true,
     });
 
@@ -312,9 +340,15 @@ function RegisterScreen({ onSwitchToLogin, inviteConductor }: { onSwitchToLogin:
     setStep("success");
   };
 
-  const update = (field: string, value: string) => setForm((prev) => ({ ...prev, [field]: value }));
+  const update = (field: keyof typeof form, value: string) =>
+    setForm((prev) => ({ ...prev, [field]: value }));
 
-  if (step === "success") return <PostRegisterScreen />;
+  const updateEstado = (estado: string) => {
+    const ciudad = VENEZUELA_STATES.find((item) => item.nombre === estado)?.ciudades[0] ?? "";
+    setForm((prev) => ({ ...prev, estado, ciudad }));
+  };
+
+  if (step === "success") return <PostRegisterScreen onContinue={onSwitchToLogin} />;
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-[#f4f6f8] p-4">
@@ -339,51 +373,46 @@ function RegisterScreen({ onSwitchToLogin, inviteConductor }: { onSwitchToLogin:
         )}
 
         <form onSubmit={handleSubmit} className="space-y-3">
-          <div className="grid grid-cols-2 gap-2.5">
-            <div>
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Nombre</label>
-              <input type="text" value={form.nombre} onChange={(e) => update("nombre", e.target.value)}
-                className="w-full mt-1 bg-slate-50 rounded-xl px-4 py-3 text-[13px] text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-purple-500 border border-slate-200"
-                placeholder="Tu nombre" required />
-            </div>
-            <div>
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Apellido</label>
-              <input type="text" value={form.apellido} onChange={(e) => update("apellido", e.target.value)}
-                className="w-full mt-1 bg-slate-50 rounded-xl px-4 py-3 text-[13px] text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-purple-500 border border-slate-200"
-                placeholder="Tu apellido" required />
-            </div>
+          <div>
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Nombre completo</label>
+            <input type="text" value={form.nombreCompleto} onChange={(e) => update("nombreCompleto", e.target.value)}
+              className="w-full mt-1 bg-slate-50 rounded-xl px-4 py-3 text-[13px] text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-purple-500 border border-slate-200"
+              placeholder="Nombre y apellido" autoComplete="name" required />
           </div>
           <div>
             <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Correo <span className="text-slate-400 normal-case">(será tu usuario para iniciar sesión)</span></label>
             <input type="email" value={form.email} onChange={(e) => update("email", e.target.value)}
               className="w-full mt-1 bg-slate-50 rounded-xl px-4 py-3 text-[13px] text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-purple-500 border border-slate-200"
-              placeholder="cliente@email.com" required />
+              placeholder="cliente@email.com" autoComplete="email" required />
           </div>
           <div>
             <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Teléfono / WhatsApp <span className="text-slate-400 normal-case">(para que tu conductor te contacte)</span></label>
             <input type="tel" value={form.telefono} onChange={(e) => update("telefono", e.target.value)}
               className="w-full mt-1 bg-slate-50 rounded-xl px-4 py-3 text-[13px] text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-purple-500 border border-slate-200"
-              placeholder="+58 412 1234567" required />
+              placeholder="+58 412 1234567" autoComplete="tel" required />
           </div>
           <div>
-            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Ciudad</label>
-            <select value={form.ciudad} onChange={(e) => update("ciudad", e.target.value)}
-              className="w-full mt-1 bg-slate-50 rounded-xl px-4 py-3 text-[13px] text-slate-900 focus:outline-none focus:ring-1 focus:ring-purple-500 border border-slate-200">
-              <option>Caracas</option><option>Maracaibo</option><option>Valencia</option>
-              <option>Barquisimeto</option><option>Maracay</option><option>Mérida</option>
-            </select>
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Ubicación</label>
+            <div className="mt-1 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <select value={form.estado} onChange={(e) => updateEstado(e.target.value)} aria-label="Estado"
+                className="w-full bg-slate-50 rounded-xl px-4 py-3 text-[13px] text-slate-900 focus:outline-none focus:ring-1 focus:ring-purple-500 border border-slate-200">
+                {VENEZUELA_STATES.map((estado) => (
+                  <option key={estado.nombre} value={estado.nombre}>{estado.nombre}</option>
+                ))}
+              </select>
+              <select value={form.ciudad} onChange={(e) => update("ciudad", e.target.value)} aria-label="Ciudad"
+                className="w-full bg-slate-50 rounded-xl px-4 py-3 text-[13px] text-slate-900 focus:outline-none focus:ring-1 focus:ring-purple-500 border border-slate-200">
+                {ciudades.map((ciudad) => (
+                  <option key={ciudad} value={ciudad}>{ciudad}</option>
+                ))}
+              </select>
+            </div>
           </div>
           <div>
             <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Contraseña</label>
             <input type="password" value={form.password} onChange={(e) => update("password", e.target.value)}
               className="w-full mt-1 bg-slate-50 rounded-xl px-4 py-3 text-[13px] text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-purple-500 border border-slate-200"
-              placeholder="Mínimo 6 caracteres" minLength={6} required />
-          </div>
-          <div>
-            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Código de referido <span className="text-slate-400 normal-case">(opcional)</span></label>
-            <input type="text" value={form.codigo_referido} onChange={(e) => update("codigo_referido", e.target.value)}
-              className="w-full mt-1 bg-slate-50 rounded-xl px-4 py-3 text-[13px] text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-purple-500 border border-slate-200"
-              placeholder="¿Te refirió un conductor?" />
+              placeholder="Mínimo 6 caracteres" autoComplete="new-password" minLength={6} required />
           </div>
           {formError && <p className="text-[12px] text-red-500">{formError}</p>}
           <button type="submit" disabled={submitting}
@@ -402,56 +431,49 @@ function RegisterScreen({ onSwitchToLogin, inviteConductor }: { onSwitchToLogin:
 }
 
 /* ==================== POST-REGISTER ==================== */
-function PostRegisterScreen() {
-  const [req, setReq] = useState<string | null>(null);
-  const handleRequest = (id: string) => { setReq(id); setTimeout(() => setReq(null), 3000); };
-
+function PostRegisterScreen({ onContinue }: { onContinue: () => void }) {
   return (
-    <div className="min-h-screen bg-[#f4f6f8]">
-      <div className="bg-white border-b border-slate-200/60 px-4 py-4">
-        <div className="max-w-2xl mx-auto flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-md">
-            <span className="material-symbols-outlined text-white text-[18px]">check_circle</span>
+    <div className="flex min-h-screen items-center justify-center bg-[#f4f6f8] p-4">
+      <div className="w-full max-w-md space-y-4 rounded-3xl border border-slate-100 bg-white p-6 shadow-xl shadow-slate-200/60">
+        <div className="flex flex-col items-center gap-3 text-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/25">
+            <span className="material-symbols-outlined text-[30px] text-white">check_circle</span>
           </div>
           <div>
-            <h1 className="text-sm font-black text-slate-900">¡Bienvenido a Drivip!</h1>
-            <p className="text-[11px] text-slate-500">Encuentra tu primer chofer.</p>
+            <h1 className="text-xl font-black text-slate-900">¡Cuenta creada!</h1>
+            <p className="mt-1 text-xs leading-relaxed text-slate-500">
+              Revisa tu correo si necesitas confirmar la cuenta. Luego inicia sesión para empezar.
+            </p>
           </div>
         </div>
-      </div>
-      <div className="max-w-2xl mx-auto px-4 py-6 space-y-3">
-        <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Conductores Cerca de Ti</h2>
-        {[
-          { id: "1", name: "Carlos Mendoza", vehicle: "Toyota Corolla", rating: 4.9, trips: 1240, verified: true, premium: true, distance: "0.3 km" },
-          { id: "2", name: "María González", vehicle: "Hyundai Accent", rating: 4.8, trips: 980, verified: true, premium: false, distance: "0.7 km" },
-          { id: "3", name: "Luis Ramírez", vehicle: "Honda CB190R", rating: 4.7, trips: 2100, verified: true, premium: true, distance: "1.2 km" },
-          { id: "4", name: "Ana Torres", vehicle: "Kia Picanto", rating: 4.6, trips: 650, verified: true, premium: false, distance: "1.8 km" },
-          { id: "5", name: "Carmen Silva", vehicle: "Toyota RAV4", rating: 4.9, trips: 1870, verified: true, premium: true, distance: "2.1 km" },
-        ].map((d) => (
-          <div key={d.id} className="bg-white rounded-2xl p-4 border border-slate-100" style={{ boxShadow: "4px 4px 10px #d9dde2, -4px -4px 10px #ffffff" }}>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-purple-100 to-indigo-100 flex items-center justify-center">
-                <span className="text-sm font-black text-purple-700">{d.name.charAt(0)}</span>
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-1">
-                  <h4 className="text-[13px] font-extrabold text-slate-900">{d.name}</h4>
-                  {d.verified && <span className="material-symbols-outlined text-[14px] text-blue-500">verified</span>}
-                </div>
-                <span className="text-[11px] text-slate-500">{d.vehicle} · {d.distance}</span>
-              </div>
-              <div className="flex items-center gap-0.5">
-                <span className="material-symbols-outlined text-[13px] text-amber-400">star</span>
-                <span className="text-[11px] font-bold text-slate-700">{d.rating}</span>
+
+        <div className="space-y-2.5 rounded-2xl bg-slate-50 p-4">
+          {[
+            { icon: "mark_email_read", title: "Confirma tu correo", desc: "Abre el enlace que te enviamos." },
+            { icon: "person_add", title: "Agrega a tu chofer", desc: "Pídele su enlace o código de invitación." },
+            { icon: "near_me", title: "Pide tu primer viaje", desc: "Busca tu destino y acuerda el pago directo." },
+          ].map((item, index) => (
+            <div key={item.title} className="flex items-start gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-purple-100 text-purple-700">
+                <span className="material-symbols-outlined text-[18px]">{item.icon}</span>
+              </span>
+              <div>
+                <p className="text-xs font-black text-slate-900">
+                  {index + 1}. {item.title}
+                </p>
+                <p className="text-[11px] font-medium text-slate-500">{item.desc}</p>
               </div>
             </div>
-            {req === d.id ? (
-              <div className="w-full py-2 rounded-xl bg-emerald-50 text-emerald-600 text-[11px] font-bold text-center border border-emerald-100">✓ Solicitud Enviada</div>
-            ) : (
-              <button onClick={() => handleRequest(d.id)} className="w-full py-2 rounded-xl bg-purple-700 text-white text-[11px] font-bold shadow-md active:scale-[0.98] transition">Solicitar Servicio</button>
-            )}
-          </div>
-        ))}
+          ))}
+        </div>
+
+        <button
+          type="button"
+          onClick={onContinue}
+          className="w-full rounded-xl bg-purple-700 py-3 text-sm font-bold text-white shadow-lg shadow-purple-600/30 active:scale-[0.98]"
+        >
+          Ya confirmé, iniciar sesión
+        </button>
       </div>
     </div>
   );
@@ -460,9 +482,8 @@ function PostRegisterScreen() {
 /* ==================== PASSENGER APP ==================== */
 function PassengerApp() {
   const { user, signOut } = useAuthContext();
-  const { contactos, refetch: refetchRed } = useRedCliente(user?.id ?? "");
+  const { contactos, refetch: refetchRed, eliminarContacto } = useRedCliente(user?.id ?? "");
   const conductorTenantId = contactos[0]?.conductor_tenant_id ?? null;
-  const { tarifas } = useTarifasTenant(conductorTenantId);
   const { tasa } = useTasaCambio();
   const { conductores, refetch: refetchConductores } = useConductoresRed();
   const drivers = useMemo(() => conductores.map(toDriver), [conductores]);
@@ -485,6 +506,8 @@ function PassengerApp() {
         name: d.alias,
         address: d.direccion,
         reference: d.referencia ?? undefined,
+        lat: d.lat,
+        lng: d.lng,
         icon: d.icono,
         iconBg: m.iconBg,
         iconColor: m.iconColor,
@@ -515,7 +538,9 @@ function PassengerApp() {
   }, [reservas]);
 
   const [screen, setScreen] = useState<PassengerScreen>("home");
+  const mainRef = useRef<HTMLElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [requestOpen, setRequestOpen] = useState(false);
   const [mapModalOpen, setMapModalOpen] = useState(false);
   const [mapPointType, setMapPointType] = useState<"origin" | "destination">("destination");
   const [ratingModalOpen, setRatingModalOpen] = useState(false);
@@ -523,6 +548,21 @@ function PassengerApp() {
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [activeCarrera, setActiveCarrera] = useState<Carrera | null>(null);
+  const [requestMode, setRequestMode] = useState<"now" | "schedule">("now");
+  const [serviceModal, setServiceModal] = useState<ServiceMode | null>(null);
+  const [otherDriversOpen, setOtherDriversOpen] = useState(false);
+  const [messagesOpen, setMessagesOpen] = useState(false);
+  const [messagesTarget, setMessagesTarget] = useState<{ conversationId: string; tenantId: string } | null>(null);
+  const {
+    conversaciones,
+    userId: messagesUserId,
+    loading: messagesLoading,
+    error: messagesError,
+    totalNoLeidos,
+    crearConversacion,
+    marcarLeida,
+  } = useConversacionesCliente();
+  const { tarifas } = useTarifasTenant(selectedDriver?.id ?? conductorTenantId);
 
   const [origin, setOrigin] = useState("Mi ubicación actual");
   const [originCoords, setOriginCoords] = useState<{ lat: number; lng: number } | null>(null);
@@ -537,27 +577,117 @@ function PassengerApp() {
     setTimeout(() => setToastMsg(null), 3100);
   }, []);
 
+  const openRideRequest = useCallback((mode: "now" | "schedule" = "now") => {
+    setRequestMode(mode);
+    setRequestOpen(true);
+  }, []);
+
+  const openMessages = useCallback(async (driverId?: string) => {
+    setMessagesOpen(true);
+    if (!driverId) {
+      setMessagesTarget(null);
+      return;
+    }
+    const conversationId = await crearConversacion(driverId);
+    setMessagesTarget(conversationId ? { conversationId, tenantId: driverId } : null);
+  }, [crearConversacion]);
+
+  const closeMessages = useCallback(() => {
+    setMessagesOpen(false);
+    setMessagesTarget(null);
+  }, []);
+
+  const ensureMessageConversation = useCallback(
+    (tenantId: string) => crearConversacion(tenantId),
+    [crearConversacion]
+  );
+
+  const handleUnfollowDriver = useCallback(
+    async (driver: Driver) => {
+      const contacto = contactos.find((item) => item.conductor_tenant_id === driver.id);
+      if (!contacto) {
+        showToast("Este conductor ya no está en tu círculo");
+        return;
+      }
+      const ok = await eliminarContacto(contacto.id);
+      if (!ok) {
+        showToast("No pudimos eliminar el conductor. Intenta de nuevo.");
+        return;
+      }
+      setSelectedDriver((prev) => (prev?.id === driver.id ? null : prev));
+      void refetchRed();
+      void refetchConductores();
+      showToast(`${driver.name} eliminado de tu círculo`);
+    },
+    [contactos, eliminarContacto, refetchRed, refetchConductores, showToast]
+  );
+
+  useScrollLock(requestOpen);
+
+  useEffect(() => {
+    mainRef.current?.scrollTo({ top: 0 });
+  }, [screen]);
+
   useEffect(() => {
     if (selectedDriver || drivers.length === 0) return;
     setSelectedDriver(drivers[0]);
   }, [drivers, selectedDriver]);
 
+  const locationRequestedRef = useRef(false);
+
   useEffect(() => {
-    if (originCoords) return;
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setOriginCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-          setOrigin("Mi ubicación GPS");
-        },
-        () => { setOriginCoords({ lat: 10.491, lng: -66.881 }); },
-        { enableHighAccuracy: true, timeout: 5000 }
-      );
-    } else { setOriginCoords({ lat: 10.491, lng: -66.881 }); }
-  }, [originCoords]);
+    if (locationRequestedRef.current || originCoords) return;
+    locationRequestedRef.current = true;
+
+    let cancelled = false;
+    const useVenezuelaFallback = () => {
+      if (cancelled) return;
+      setOriginCoords({ lat: VENEZUELA_CENTER[0], lng: VENEZUELA_CENTER[1] });
+      setOrigin("Caracas, Venezuela");
+    };
+
+    if (!("geolocation" in navigator)) {
+      useVenezuelaFallback();
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        if (cancelled) return;
+        const { latitude: lat, longitude: lng } = pos.coords;
+
+        if (!isInVenezuela(lat, lng)) {
+          useVenezuelaFallback();
+          showToast("Drivip solo opera en Venezuela. Busca tu dirección manualmente.");
+          return;
+        }
+
+        setOriginCoords({ lat, lng });
+        const place = await reverseVenezuelaPlace(lat, lng);
+        if (!cancelled) setOrigin(place?.displayName || "Mi ubicación actual");
+      },
+      () => useVenezuelaFallback(),
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 20000 }
+    );
+
+    return () => {
+      cancelled = true;
+      locationRequestedRef.current = false;
+    };
+  }, [showToast]);
+
+  const initialOriginPlace = useMemo(
+    () =>
+      originCoords
+        ? { lat: originCoords.lat, lng: originCoords.lng, address: origin }
+        : null,
+    [originCoords, origin]
+  );
 
   useCarreraRealtime(activeCarrera?.id ?? null, setActiveCarrera);
-  const { location: conductorLocation } = useConductorLocation(activeCarrera?.tenant_id ?? null);
+  const { location: conductorLocation, lastUpdated: conductorUpdatedAt } = useConductorLocation(
+    activeCarrera?.tenant_id ?? null
+  );
 
   const trips = useMemo<TripHistoryType[]>(() => misCarreras.map((c) => {
     const d = drivers.find((x) => x.id === c.tenant_id);
@@ -585,19 +715,89 @@ function PassengerApp() {
     [drivers, activeCarrera, selectedDriver]
   );
 
+  const resolveRouteFor = useCallback(
+    async (
+      target: { lat: number; lng: number },
+      originOverride?: { lat: number; lng: number }
+    ) => {
+      const start = originOverride ?? originCoords;
+      if (!start || !isInVenezuela(start.lat, start.lng) || !isInVenezuela(target.lat, target.lng)) {
+        return null;
+      }
+
+      const route = await fetchDrivingRoute([
+        { lat: start.lat, lng: start.lng },
+        ...stops.map((stop) => ({ lat: stop.lat, lng: stop.lng })),
+        { lat: target.lat, lng: target.lng },
+      ]);
+
+      if (!route) return null;
+      setRouteKm(route.distanceKm);
+      setRouteMin(route.durationMin);
+      return route;
+    },
+    [originCoords, stops]
+  );
+
   const handleRequestRide = async (
     driverArg?: Driver | null,
-    detalle?: { precioUsd: number; metodoPago: "usd" | "bs" | "pmovil" }
+    detalle?: { precioUsd: number; metodoPago: "usd" | "bs" | "pmovil"; programadaPara?: string }
   ) => {
     const d = driverArg ?? selectedDriver ?? drivers[0] ?? null;
     if (!d) { showToast("Agrega un conductor a tu círculo primero"); setScreen("drivers"); return; }
     setSelectedDriver(d);
+
     if (!originCoords || !destinationCoords) {
       showToast("Elige tu destino en el mapa para continuar");
       setMapPointType("destination");
       setMapModalOpen(true);
       return;
     }
+
+    if (activeCarrera) {
+      showToast("Ya tienes un viaje activo. Termínalo o cancélalo primero.");
+      return;
+    }
+
+    let km = routeKm;
+    let min = routeMin;
+
+    if (km <= 0) {
+      const route = await resolveRouteFor(destinationCoords);
+      if (route) {
+        km = route.distanceKm;
+        min = route.durationMin;
+      }
+    }
+
+    if (km <= 0) {
+      showToast("No pudimos calcular la ruta. Vuelve a elegir el destino en el mapa.");
+      setMapPointType("destination");
+      setMapModalOpen(true);
+      return;
+    }
+
+    if (detalle?.programadaPara) {
+      const { error } = await crearReserva({
+        conductor_tenant_id: d.id,
+        origen: origin,
+        destino: destination,
+        fecha_hora: detalle.programadaPara,
+        precio_usd: detalle.precioUsd,
+        origen_lat: originCoords.lat,
+        origen_lng: originCoords.lng,
+        destino_lat: destinationCoords.lat,
+        destino_lng: destinationCoords.lng,
+      });
+      if (error) {
+        showToast(error);
+        return;
+      }
+      setRequestOpen(false);
+      showToast(`Reserva programada con ${d.name}`);
+      return;
+    }
+
     const carrera = await crearCarreraCliente({
       conductor_tenant_id: d.id,
       origen_lat: originCoords.lat,
@@ -606,13 +806,14 @@ function PassengerApp() {
       destino_lat: destinationCoords.lat,
       destino_lng: destinationCoords.lng,
       destino_direccion: destination,
-      distancia_km: routeKm,
-      duracion_min: routeMin,
+      distancia_km: km,
+      duracion_min: min,
       precio: detalle?.precioUsd ?? 0,
       metodo_pago: METODO_PAGO_MAP[detalle?.metodoPago ?? "usd"],
     });
     if (!carrera) { showToast("No se pudo enviar la solicitud. Intenta de nuevo."); return; }
     setActiveCarrera(carrera);
+    setRequestOpen(false);
     void enviarPushCarrera({
       carrera_id: carrera.id,
       title: "Nueva solicitud de viaje",
@@ -623,25 +824,111 @@ function PassengerApp() {
     showToast(`Solicitud enviada a ${d.name}`);
   };
 
+  const handleServiceRequest = async (input: ServiceRequestInput) => {
+    const driver = drivers.find((item) => item.id === input.driverId);
+    if (!driver) {
+      showToast("No encontramos al conductor seleccionado.");
+      return false;
+    }
+    if (activeCarrera) {
+      showToast("Ya tienes un servicio activo. Termínalo o cancélalo primero.");
+      return false;
+    }
+
+    const carrera = await crearSolicitudServicio({
+      conductor_tenant_id: input.driverId,
+      tipo_servicio: input.mode === "delivery" ? "delivery" : "compra",
+      detalle_servicio: input.service,
+      origen_lat: input.origin.lat,
+      origen_lng: input.origin.lng,
+      origen_direccion: input.origin.address,
+      destino_lat: input.destination.lat,
+      destino_lng: input.destination.lng,
+      destino_direccion: input.destination.address,
+      distancia_km: input.distanceKm,
+      duracion_min: input.durationMin,
+      precio: input.priceUsd,
+      metodo_pago: "efectivo",
+    });
+
+    if (!carrera) {
+      showToast("No se pudo enviar la solicitud. Intenta de nuevo.");
+      return false;
+    }
+
+    setSelectedDriver(driver);
+    setActiveCarrera(carrera);
+    void enviarPushCarrera({
+      carrera_id: carrera.id,
+      title: input.mode === "delivery" ? "Nuevo delivery" : "Nueva compra",
+      body: `${input.service} · ${input.origin.address} a ${input.destination.address}`,
+      tag: `carrera-${carrera.id}`,
+      data: { carrera_id: carrera.id, tipo_servicio: input.mode === "delivery" ? "delivery" : "compra" },
+    });
+    showToast(
+      input.mode === "delivery"
+        ? `Delivery enviado a ${driver.name}`
+        : `Compra solicitada a ${driver.name}. Espera su precio.`
+    );
+    return true;
+  };
+
+  const handleSelectCoupon = (driver: Driver) => {
+    setSelectedDriver(driver);
+    showToast(`Cupón de ${driver.name} seleccionado`);
+  };
+
+  const handleShareDriver = async (driver: Driver) => {
+    const url = conductorInviteUrl(driver.slug);
+    const text = `Agrega a ${driver.name} en Drivip y pide tus servicios directamente.`;
+    try {
+      if (typeof navigator.share === "function") {
+        await navigator.share({ title: "Drivip", text, url });
+        return;
+      }
+      await navigator.clipboard.writeText(`${text} ${url}`);
+      showToast("Enlace de invitación copiado");
+    } catch {
+      showToast("No pudimos compartir el enlace");
+    }
+  };
+
+  const handleDismissTrip = () => {
+    setActiveCarrera(null);
+    refetchCarreras();
+  };
+
   const handleCancelTrip = async () => {
     if (!activeCarrera) return;
     const cancelada = activeCarrera;
     const ok = await cancelarCarrera(cancelada.id);
-    if (ok) {
-      void enviarPushCarrera({
-        carrera_id: cancelada.id,
-        title: "Viaje cancelado",
-        body: "El cliente cancelo la solicitud.",
-        tag: `carrera-${cancelada.id}`,
-        data: { carrera_id: cancelada.id },
-      });
+    if (!ok) {
+      showToast("No pudimos cancelar el viaje. Intenta de nuevo.");
+      return;
     }
+
+    void enviarPushCarrera({
+      carrera_id: cancelada.id,
+      title: "Viaje cancelado",
+      body: "El cliente cancelo la solicitud.",
+      tag: `carrera-${cancelada.id}`,
+      data: { carrera_id: cancelada.id },
+    });
     setActiveCarrera(null);
+    refetchCarreras();
     showToast("Viaje cancelado");
   };
 
   const handleSubmitRating = async (rating: number, comment?: string) => {
-    if (activeCarrera) await calificarCarrera(activeCarrera.id, rating, comment);
+    const ok = activeCarrera
+      ? await calificarCarrera(activeCarrera.id, rating, comment)
+      : true;
+
+    if (!ok) {
+      showToast("No pudimos guardar tu calificación. Intenta de nuevo.");
+      return;
+    }
+
     setRatingModalOpen(false);
     setActiveCarrera(null);
     refetchCarreras();
@@ -660,21 +947,22 @@ function PassengerApp() {
     setMapModalOpen(true);
   };
 
-  const handleConfirmMapPin = (address: string, pointType: "origin" | "destination") => {
+  const handleConfirmMapPin = (
+    place: { address: string; lat: number; lng: number },
+    pointType: "origin" | "destination"
+  ) => {
     if (pointType === "origin") {
-      setOrigin(address);
-      if ("geolocation" in navigator) {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => setOriginCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-          () => {},
-          { enableHighAccuracy: true, timeout: 3000 }
-        );
-      }
+      setOrigin(place.address);
+      setOriginCoords({ lat: place.lat, lng: place.lng });
+      if (destinationCoords) void resolveRouteFor(destinationCoords, { lat: place.lat, lng: place.lng });
     } else {
-      setDestination(address);
+      setDestination(place.address);
+      setDestinationCoords({ lat: place.lat, lng: place.lng });
+      void resolveRouteFor({ lat: place.lat, lng: place.lng });
     }
     setMapModalOpen(false);
-    showToast(`${pointType === "origin" ? "Origen" : "Destino"}: ${address}`);
+    setRequestOpen(true);
+    showToast(`${pointType === "origin" ? "Origen" : "Destino"}: ${place.address}`);
   };
 
   const handleConfirmRoute = (
@@ -692,68 +980,271 @@ function PassengerApp() {
     setRouteKm(km);
     setRouteMin(min);
     setMapModalOpen(false);
+    setRequestOpen(true);
     showToast(`Ruta: ${km.toFixed(1)} km • ${Math.round(min)} min`);
+  };
+
+  const handleSavedAddressRide = async (address: SavedAddress) => {
+    let target: { lat: number; lng: number } | null =
+      typeof address.lat === "number" && typeof address.lng === "number" && isInVenezuela(address.lat, address.lng)
+        ? { lat: address.lat, lng: address.lng }
+        : null;
+
+    if (!target) {
+      const places = await searchVenezuelaPlaces(address.address, { near: originCoords, limit: 1 });
+      const found = places[0];
+      if (found) target = { lat: found.lat, lng: found.lng };
+    }
+
+    if (!target) {
+      showToast("No pudimos ubicar esa dirección. Elígela de nuevo en el mapa.");
+      return;
+    }
+
+    setDestination(address.address);
+    setDestinationCoords(target);
+    openRideRequest("now");
+    void resolveRouteFor(target);
+    showToast(`Destino: ${address.name}`);
+  };
+
+  const handleRepeatTrip = async (trip: TripHistoryType) => {
+    const places = await searchVenezuelaPlaces(trip.destination, {
+      near: originCoords,
+      limit: 1,
+    });
+    const found = places[0];
+    if (!found) {
+      showToast("No pudimos ubicar el destino de ese viaje. Elígelo en el mapa.");
+      return;
+    }
+
+    const target = { lat: found.lat, lng: found.lng };
+    setDestination(found.displayName);
+    setDestinationCoords(target);
+    openRideRequest("now");
+    void resolveRouteFor(target);
+    showToast(`Destino: ${found.primary}`);
+  };
+
+  const handleCreateAddress = async (input: {
+    alias: string;
+    direccion: string;
+    referencia?: string;
+    icono?: string;
+    predeterminada?: boolean;
+  }) => {
+    let lat: number | undefined;
+    let lng: number | undefined;
+
+    if (input.direccion.trim()) {
+      const places = await searchVenezuelaPlaces(input.direccion, {
+        near: originCoords,
+        limit: 1,
+      });
+      if (places[0]) {
+        lat = places[0].lat;
+        lng = places[0].lng;
+      }
+    }
+
+    return crearDireccion({
+      alias: input.alias,
+      direccion: input.direccion,
+      referencia: input.referencia,
+      icono: input.icono,
+      predeterminada: input.predeterminada,
+      lat,
+      lng,
+    });
   };
 
   const profileInitial = user?.email?.charAt(0)?.toUpperCase() ?? "U";
   const passengerName = (user?.user_metadata?.nombre as string | undefined)?.trim() || user?.email?.split("@")[0] || "Cliente";
   const hasHeader = screen === "home";
-  const hasBottomNav = screen === "home";
+  const hasBottomNav = screen === "home" || screen === "drivers" || screen === "history";
+
+  const renderRouteCalculator = () => (
+    <RouteCalculator
+      onOpenMap={() => handleOpenMap("destination")}
+      onOpenOriginMap={() => handleOpenMap("origin")}
+      origin={origin}
+      destination={destination}
+      stops={stops.map((s) => s.address)}
+      distanceKm={routeKm}
+      tarifas={tarifas}
+      tasa={tasa}
+      canRequest={Boolean(originCoords && destinationCoords)}
+      driverWhatsapp={selectedDriver?.whatsapp ?? null}
+      drivers={drivers}
+      selectedDriverId={selectedDriver?.id ?? null}
+      onSelectDriver={setSelectedDriver}
+      onAddDriver={() => {
+        setRequestOpen(false);
+        setScreen("drivers");
+      }}
+      distance={
+        routeKm > 0
+          ? `${routeKm.toFixed(1)} km • ~${routeMin < 60 ? Math.round(routeMin) + " min" : Math.floor(routeMin / 60) + "h " + Math.round(routeMin % 60) + "m"}`
+          : "Calculando ruta..."
+      }
+      onRequestRide={(detalle) => handleRequestRide(selectedDriver, detalle)}
+      onToggleSchedule={(mode) => setRequestMode(mode)}
+      initialTripMode={requestMode}
+    />
+  );
 
   return (
     <>
-      <div
-        className="flex flex-col bg-[#f4f6f8] mx-auto max-w-3xl lg:max-w-6xl w-full"
-        style={{ height: "var(--app-h, 100dvh)" }}
-      >
-        {hasHeader && (
-          <PassengerHeader
-            onMenuClick={() => setMenuOpen(true)}
-            onProfileClick={() => setAuthModalOpen(true)}
-            profileInitial={profileInitial}
-          />
-        )}
+      <div className="mx-auto flex h-[100dvh] w-full max-w-3xl flex-col overflow-hidden bg-[#f1f4f8] lg:max-w-6xl lg:flex-row">
+        <aside className="hidden w-60 shrink-0 flex-col border-r border-slate-200/70 bg-white/85 p-4 backdrop-blur-xl lg:flex">
+          <div className="flex items-center gap-3 px-2 pb-4">
+            <img src="/logo.png" alt="Drivip" className="h-10 w-10 rounded-xl object-contain" />
+            <div className="min-w-0">
+              <p className="truncate text-sm font-black text-slate-900" style={{ fontFamily: "Poppins, sans-serif" }}>Drivip</p>
+              <p className="truncate text-[11px] font-semibold text-slate-400">Panel del cliente</p>
+            </div>
+          </div>
 
-        <main
-          className="flex-1 overflow-y-auto overscroll-contain"
-          style={{ paddingBottom: hasBottomNav ? "4.5rem" : "0.5rem" }}
+          <button
+            type="button"
+            onClick={() => openRideRequest("now")}
+            className="mb-3 flex h-11 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-purple-700 to-indigo-700 text-sm font-black text-white shadow-lg shadow-purple-700/20 active:scale-[0.98]"
+          >
+            <span className="material-symbols-outlined text-[19px]">add</span>
+            Pedir un viaje
+          </button>
+
+          <nav className="space-y-1">
+            {[
+              { id: "home", label: "En Vivo", icon: "map" },
+              { id: "drivers", label: "Choferes", icon: "people" },
+              { id: "history", label: "Historial", icon: "history" },
+            ].map((item) => {
+              const active = screen === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setScreen(item.id as PassengerScreen)}
+                  aria-current={active ? "page" : undefined}
+                  className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm font-bold transition ${
+                    active
+                      ? "bg-purple-50 text-purple-700"
+                      : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                  }`}
+                >
+                  <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${active ? "bg-purple-700 text-white" : "bg-slate-100 text-slate-500"}`}>
+                    <NavGlyph icon={item.icon} className="h-[18px] w-[18px]" />
+                  </span>
+                  {item.label}
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              onClick={() => setMenuOpen(true)}
+              className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm font-bold text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+            >
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
+                <NavGlyph icon="menu" className="h-[18px] w-[18px]" />
+              </span>
+              Menú
+            </button>
+          </nav>
+
+          <div className="mt-auto flex items-center gap-3 rounded-2xl border border-slate-200/80 bg-slate-50 p-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-100 text-sm font-black text-purple-700">
+              {profileInitial}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-black text-slate-900">{passengerName}</p>
+              <p className="truncate text-[11px] font-semibold text-slate-400">Pasajero VIP</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAuthModalOpen(true)}
+              aria-label="Abrir perfil"
+              className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-slate-500 shadow-sm active:scale-95"
+            >
+              <span className="material-symbols-outlined text-[18px]">person</span>
+            </button>
+          </div>
+        </aside>
+
+        <div
+          className="relative flex min-h-0 flex-1 flex-col"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle at 1px 1px, rgba(100,116,139,0.16) 1px, transparent 0)",
+            backgroundSize: "18px 18px",
+          }}
         >
+          {hasHeader && (
+            <PassengerHeader
+              onMenuClick={() => setMenuOpen(true)}
+              onProfileClick={() => setAuthModalOpen(true)}
+              profileInitial={profileInitial}
+            />
+          )}
+
+          <main
+            ref={mainRef}
+            className="flex-1 overflow-y-auto overscroll-contain"
+            style={{ paddingBottom: hasBottomNav ? "calc(4.5rem + env(safe-area-inset-bottom))" : "0.5rem" }}
+          >
           {screen === "home" && (
-            <div className="px-4 lg:px-8 pt-3 space-y-4 w-full">
-              <div className="lg:grid lg:grid-cols-2 lg:gap-6">
-                <div className="space-y-4">
-                  <HeroWelcomeCard
-                    onDriversClick={() => setScreen("drivers")}
-                    driverCount={drivers.length}
-                  />
-                  <RouteCalculator
-                    onOpenMap={() => handleOpenMap("destination")}
-                    onOpenOriginMap={() => handleOpenMap("origin")}
-                    origin={origin}
-                    destination={destination}
-                    stops={stops.map((s) => s.address)}
-                    distanceKm={routeKm}
-                    tarifas={tarifas}
-                    tasa={tasa}
-                    distance={`${routeKm.toFixed(1)} km • ~${routeMin < 60 ? Math.round(routeMin) + " min" : Math.floor(routeMin / 60) + "h " + Math.round(routeMin % 60) + "m"}`}
-                    onRequestRide={(detalle) => handleRequestRide(selectedDriver, detalle)}
-                    onToggleSchedule={(mode) => {
-                      if (mode === "schedule") showToast("Programar recogida: el chofer te confirmará por WhatsApp");
+            <div className="w-full space-y-4 px-4 pb-3 pt-3 lg:px-8">
+              {activeCarrera && activeDriver && (
+                <LiveTripTracker
+                  carrera={activeCarrera}
+                  driver={activeDriver}
+                  tasa={tasa}
+                  conductorLocation={conductorLocation}
+                  conductorUpdatedAt={conductorUpdatedAt}
+                  onCallDriver={() => showToast("Llamando al chofer...")}
+                  onRateTrip={() => setRatingModalOpen(true)}
+                  onCancelTrip={handleCancelTrip}
+                  onDismiss={handleDismissTrip}
+                />
+              )}
+
+              <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:items-start lg:gap-5">
+                <div className="min-w-0 space-y-4">
+                  <AdCarousel
+                    onAction={(action) => {
+                      if (action === "ride") openRideRequest("now");
+                      if (action === "schedule") openRideRequest("schedule");
+                      if (action === "delivery") setServiceModal("delivery");
+                      if (action === "purchase") setServiceModal("purchase");
                     }}
                   />
+                  <ServiceHub
+                    onStartRide={() => openRideRequest("now")}
+                    onDelivery={() => setServiceModal("delivery")}
+                    onPurchase={() => setServiceModal("purchase")}
+                    onSchedule={() => openRideRequest("schedule")}
+                  />
                 </div>
-                <div className="space-y-4">
-                  {activeCarrera && activeDriver && (
-                    <LiveTripTracker
-                      carrera={activeCarrera}
-                      driver={activeDriver}
-                      tasa={tasa}
-                      conductorLocation={conductorLocation}
-                      onCallDriver={() => showToast("Llamando al chofer...")}
-                      onRateTrip={() => setRatingModalOpen(true)}
-                      onCancelTrip={handleCancelTrip}
-                    />
-                  )}
+
+                <div className="min-w-0 space-y-4">
+                  <CouponsSection
+                    drivers={drivers}
+                    selectedDriverId={selectedDriver?.id ?? null}
+                    onSelect={handleSelectCoupon}
+                  />
+                  <VipDriversSection
+                    drivers={drivers}
+                    selectedDriverId={selectedDriver?.id ?? null}
+                    onSelectDriver={setSelectedDriver}
+                    onRequest={(driver) => {
+                      setSelectedDriver(driver);
+                      openRideRequest("now");
+                    }}
+                    onMessage={(driver) => void openMessages(driver.id)}
+                    onShare={(driver) => void handleShareDriver(driver)}
+                    onOpenAll={() => setOtherDriversOpen(true)}
+                  />
                 </div>
               </div>
             </div>
@@ -765,7 +1256,7 @@ function PassengerApp() {
               onBack={() => setScreen("home")}
               onRequestRide={(driver) => {
                 setSelectedDriver(driver);
-                setScreen("home");
+                openRideRequest("now");
                 showToast("Configura tu ruta y solicita la carrera");
               }}
               onConductorAdded={() => {
@@ -773,25 +1264,26 @@ function PassengerApp() {
                 void refetchRed();
                 showToast("Conductor agregado a tu círculo");
               }}
+              onUnfollow={handleUnfollowDriver}
             />
           )}
 
           {screen === "history" && (
-            <TripHistory trips={trips} onBack={() => setScreen("home")} />
+            <TripHistory
+              trips={trips}
+              onBack={() => setScreen("home")}
+              onRepeatTrip={(trip) => void handleRepeatTrip(trip)}
+            />
           )}
 
           {screen === "addresses" && (
             <SavedAddresses
               addresses={savedAddresses}
               onBack={() => setScreen("home")}
-              onCreate={crearDireccion}
+              onCreate={handleCreateAddress}
               onDelete={eliminarDireccion}
               onSetDefault={marcarPredeterminada}
-              onRequestRide={(address) => {
-                setDestination(address);
-                setScreen("home");
-                showToast(`Destino: ${address}`);
-              }}
+              onRequestRide={(address) => void handleSavedAddressRide(address)}
             />
           )}
 
@@ -822,66 +1314,16 @@ function PassengerApp() {
               </div>
             </div>
           )}
-        </main>
+          </main>
+        </div>
       </div>
 
       {hasBottomNav && (
-        <nav
-          className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-3xl bg-white/95 backdrop-blur-lg border-t border-slate-200/80 px-4 py-2 z-30 flex items-center justify-between lg:hidden"
-        >
-          {bottomNavItems.map((item) => {
-            if (item.id === "center") {
-              return (
-                <div key={item.id} className="-mt-5">
-                  <button
-                    className="w-13 h-13 p-3.5 rounded-full bg-gradient-to-tr from-purple-700 to-orange-500 text-white shadow-xl shadow-purple-600/40 border-4 border-[#f4f6f8] active:scale-90 transition-transform"
-                    onClick={() => handleRequestRide()}
-                  >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                      <path d="M12 4v16m8-8H4" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </button>
-                </div>
-              );
-            }
-
-            const isActive = item.id === "home" && screen === "home";
-            return (
-              <button
-                key={item.id}
-                className={`flex flex-col items-center gap-1 text-[10px] w-14 ${isActive ? "text-purple-700 font-bold" : "text-slate-500 font-semibold"}`}
-                onClick={() => handleBottomNav(item.id)}
-              >
-                <div className="w-6 h-6 flex items-center justify-center">
-                  {item.icon === "map" && (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                      <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" strokeLinecap="round" strokeLinejoin="round" />
-                      <circle cx="12" cy="11" r="2" />
-                    </svg>
-                  )}
-                  {item.icon === "people" && (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                      <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" strokeLinecap="round" strokeLinejoin="round" />
-                      <circle cx="9" cy="7" r="4" />
-                      <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  )}
-                  {item.icon === "history" && (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                      <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  )}
-                  {item.icon === "menu" && (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                      <path d="M4 6h16M4 12h16M4 18h7" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  )}
-                </div>
-                <span className="text-[10px]">{item.label}</span>
-              </button>
-            );
-          })}
-        </nav>
+        <PassengerBottomNav
+          screen={screen}
+          onNavigate={handleBottomNav}
+          onRequestRide={() => openRideRequest("now")}
+        />
       )}
 
       {createPortal(
@@ -896,27 +1338,115 @@ function PassengerApp() {
             passengerName={passengerName}
           />
 
+          <OtherDriversModal
+            open={otherDriversOpen}
+            drivers={drivers}
+            selectedDriverId={selectedDriver?.id ?? null}
+            onClose={() => setOtherDriversOpen(false)}
+            onSelect={setSelectedDriver}
+            onConductorAdded={() => {
+              void refetchConductores();
+              void refetchRed();
+              showToast("Conductor agregado a tu círculo");
+            }}
+            onUnfollow={handleUnfollowDriver}
+          />
+
+          <ServiceRequestModal
+            isOpen={serviceModal !== null}
+            mode={serviceModal ?? "delivery"}
+            drivers={drivers}
+            selectedDriverId={selectedDriver?.id ?? null}
+            tarifas={tarifas}
+            tasa={tasa}
+            currentLocation={initialOriginPlace}
+            savedAddresses={savedAddresses}
+            onSelectDriver={setSelectedDriver}
+            onClose={() => setServiceModal(null)}
+            onSubmit={handleServiceRequest}
+          />
+
+          <MessageCenter
+            open={messagesOpen}
+            onClose={closeMessages}
+            drivers={drivers}
+            conversaciones={conversaciones}
+            userId={messagesUserId}
+            loading={messagesLoading}
+            error={messagesError}
+            initialTarget={messagesTarget}
+            onEnsureConversation={ensureMessageConversation}
+            onMarkRead={marcarLeida}
+          />
+
+          {requestOpen && (
+            <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center sm:p-4">
+              <button
+                type="button"
+                aria-label="Cerrar solicitud de viaje"
+                className="absolute inset-0 bg-slate-950/65 backdrop-blur-sm"
+                onClick={() => setRequestOpen(false)}
+              />
+              <div
+                className="relative flex h-[94dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-[32px] border border-white/80 bg-white shadow-2xl sm:h-auto sm:max-h-[92dvh] sm:rounded-[32px]"
+                style={{
+                  backgroundImage:
+                    "radial-gradient(circle at 1px 1px, rgba(148,163,184,0.15) 1px, transparent 0)",
+                  backgroundSize: "18px 18px",
+                }}
+              >
+                <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200/70 bg-white/95 px-4 pb-3 pt-3 backdrop-blur-xl">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-700 to-indigo-700 text-white shadow-lg shadow-purple-700/25">
+                      <span className="material-symbols-outlined text-[22px]">local_taxi</span>
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-purple-600">
+                        Drivip
+                      </p>
+                      <h2 className="truncate text-base font-black text-slate-900">Pide tu viaje</h2>
+                      <p className="truncate text-[11px] font-medium text-slate-500">
+                        Origen, destino, precio y conductor
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setRequestOpen(false)}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 shadow-sm active:scale-95"
+                  >
+                    <span className="material-symbols-outlined text-[20px]">close</span>
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto overscroll-contain p-3 pb-0">
+                  {renderRouteCalculator()}
+                </div>
+              </div>
+            </div>
+          )}
+
           <MapPickerModal
             isOpen={mapModalOpen}
             onClose={() => setMapModalOpen(false)}
-            onUseGps={() => {
-              if ("geolocation" in navigator) {
-                navigator.geolocation.getCurrentPosition(
-                  (pos) => {
-                    setOriginCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-                    setOrigin("Mi ubicación GPS");
-                    showToast("Ubicación GPS detectada");
-                  },
-                  () => showToast("No se pudo obtener GPS"),
-                  { enableHighAccuracy: true, timeout: 5000 }
-                );
-              }
-              setMapModalOpen(false);
+            onUseGps={(coords) => {
+              if (mapPointType !== "origin") return;
+              setOriginCoords(coords);
+              setOrigin("Mi ubicación GPS");
+              showToast("Ubicación GPS detectada");
             }}
             onConfirmPin={handleConfirmMapPin}
             onConfirmRoute={handleConfirmRoute}
             pointType={mapPointType}
-            initialOrigin={originCoords ? { ...originCoords, address: origin } : null}
+            initialOrigin={initialOriginPlace}
+            suggestions={savedAddresses.map((address) => ({
+              id: address.id,
+              name: address.name,
+              address: address.address,
+              lat: address.lat,
+              lng: address.lng,
+              icon: address.icon,
+            }))}
           />
 
           <RatingModal
@@ -929,7 +1459,8 @@ function PassengerApp() {
           <AuthModal
             isOpen={authModalOpen}
             onClose={() => setAuthModalOpen(false)}
-            onConfirm={(phone) => { setAuthModalOpen(false); showToast("Código enviado por WhatsApp"); }}
+            onMessagesClick={() => void openMessages()}
+            unreadMessages={totalNoLeidos}
           />
 
           <Toast message={toastMsg ?? ""} visible={!!toastMsg} />

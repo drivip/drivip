@@ -21,6 +21,7 @@ export interface ConductorRed {
   vehiculo_modelo: string | null;
   vehiculo_color: string | null;
   calificacion: number | null;
+  total_resenas?: number | null;
   pausado: boolean;
   suscripcion_activa: boolean;
   apodo: string | null;

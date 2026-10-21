@@ -57,11 +57,19 @@ export default function DriverApp({ demo }: { demo?: boolean }) {
   const arrivedNotifiedRef = useRef<Set<string>>(new Set());
 
   const { tenant, refetch: refetchTenant } = useMiTenant(demo ? null : user?.id);
-  const { carreras, updateCarreraEstado } = useCarreras(tenant?.id);
+  const { carreras, updateCarreraEstado, marcarLlegadaCarrera, quoteCarrera } = useCarreras(tenant?.id);
   const { reportarUbicacion } = useUbicaciones(tenant?.id ?? "");
 
   const effectiveCarreras = demo ? MOCK_CARRERAS_CONDUCTOR : carreras;
   const isPaused = !demo && !!tenant?.pausado;
+
+  useEffect(() => {
+    if (!carreraActiva) return;
+    const activa = effectiveCarreras.find((c) => c.id === carreraActiva);
+    if (activa && (activa.estado === "completada" || activa.estado === "cancelada")) {
+      setCarreraActiva(null);
+    }
+  }, [carreraActiva, effectiveCarreras]);
 
   useEffect(() => {
     if (!isOnline || !tenant?.id) return;
@@ -104,6 +112,20 @@ export default function DriverApp({ demo }: { demo?: boolean }) {
     }
   };
 
+  const sendQuote = async (id: string, precio: number) => {
+    const ok = await quoteCarrera(id, precio);
+    if (ok) {
+      void enviarPushCarrera({
+        carrera_id: id,
+        title: "Precio de tu compra",
+        body: `Tu conductor cotizó $${precio.toFixed(2)}. Revisa el precio en el seguimiento.`,
+        tag: `carrera-${id}`,
+        data: { carrera_id: id },
+      });
+    }
+    return ok;
+  };
+
   const rejectCarrera = async (id: string) => {
     const ok = await updateCarreraEstado(id, "cancelada");
     if (ok) {
@@ -131,9 +153,13 @@ export default function DriverApp({ demo }: { demo?: boolean }) {
     }
   };
 
-  const notifyArrivedAtPickup = (id: string) => {
+  const notifyArrivedAtPickup = async (id: string) => {
     if (arrivedNotifiedRef.current.has(id)) return;
     arrivedNotifiedRef.current.add(id);
+
+    const ok = await marcarLlegadaCarrera(id);
+    if (!ok) arrivedNotifiedRef.current.delete(id);
+
     void enviarPushCarrera({
       carrera_id: id,
       title: "Tu conductor llego",
@@ -186,6 +212,7 @@ export default function DriverApp({ demo }: { demo?: boolean }) {
           onStartCarrera={startCarrera}
           onCompleteCarrera={completeCarrera}
           onArrivedAtPickup={notifyArrivedAtPickup}
+          onQuoteCarrera={sendQuote}
           carreraActiva={carreraActiva}
           domain={domain}
           profileName={profile.name}

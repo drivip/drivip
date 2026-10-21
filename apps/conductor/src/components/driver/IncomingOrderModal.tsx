@@ -10,6 +10,7 @@ interface IncomingOrderModalProps {
   isOpen: boolean;
   onAccept: () => void;
   onReject: (reason?: string) => void;
+  onQuote?: (precio: number) => Promise<boolean>;
   carrera: Carrera;
 }
 
@@ -19,11 +20,36 @@ const QUICK_REJECTIONS = [
   "Zona fuera de cobertura",
 ];
 
-export default function IncomingOrderModal({ isOpen, onAccept, onReject, carrera }: IncomingOrderModalProps) {
+export default function IncomingOrderModal({ isOpen, onAccept, onReject, onQuote, carrera }: IncomingOrderModalProps) {
   const [showRejectOptions, setShowRejectOptions] = useState(false);
   const [routePreview, setRoutePreview] = useState<[number, number][] | null>(null);
   const [distanceKm, setDistanceKm] = useState(carrera.distancia_km ?? 0);
+  const [quoteValue, setQuoteValue] = useState("");
+  const [quoting, setQuoting] = useState(false);
+  const [quoteError, setQuoteError] = useState("");
+  const [quoteSent, setQuoteSent] = useState(false);
   const { tasa } = useTasaCambio();
+
+  const isPurchase = carrera.tipo_servicio === "compra";
+  const isDelivery = carrera.tipo_servicio === "delivery";
+
+  const handleSendQuote = async () => {
+    const precio = Number(String(quoteValue).replace(",", "."));
+    if (!Number.isFinite(precio) || precio <= 0) {
+      setQuoteError("Escribe un precio válido mayor a cero.");
+      return;
+    }
+    if (!onQuote) return;
+    setQuoting(true);
+    setQuoteError("");
+    const ok = await onQuote(precio);
+    setQuoting(false);
+    if (!ok) {
+      setQuoteError("No pudimos enviar el precio. Intenta de nuevo.");
+      return;
+    }
+    setQuoteSent(true);
+  };
 
   const originCoords: [number, number] = [carrera.origen_lat, carrera.origen_lng];
   const destCoords: [number, number] | null = carrera.destino_lat && carrera.destino_lng
@@ -47,6 +73,10 @@ export default function IncomingOrderModal({ isOpen, onAccept, onReject, carrera
     if (!isOpen) {
       setShowRejectOptions(false);
       setRoutePreview(null);
+      setQuoteValue("");
+      setQuoteError("");
+      setQuoteSent(false);
+      setQuoting(false);
     }
   }, [isOpen]);
 
@@ -74,7 +104,7 @@ export default function IncomingOrderModal({ isOpen, onAccept, onReject, carrera
             onClick={() => onReject()}
             className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-slate-900/50 backdrop-blur-sm flex items-center justify-center text-white active:scale-95"
           >
-            ✕
+            <span className="material-symbols-outlined text-[18px]">close</span>
           </button>
           <div className="absolute bottom-3 left-3 z-10 bg-white/90 backdrop-blur-sm px-2.5 py-1 rounded-full text-[10px] font-bold text-slate-700 shadow">
             {distanceKm.toFixed(1)} km
@@ -95,12 +125,32 @@ export default function IncomingOrderModal({ isOpen, onAccept, onReject, carrera
               </div>
             </div>
             <div className="text-right">
-              <p className="text-xl font-black text-slate-900">${(carrera.precio ?? 0).toFixed(2)}</p>
-              <p className="text-[10px] font-bold text-purple-600">
-                {formatearBs(carrera.precio ?? 0, tasa ?? TASA_BCV_REFERENCIA)}
-              </p>
+              {isPurchase && !carrera.precio ? (
+                <p className="text-sm font-black text-amber-600">Por cotizar</p>
+              ) : (
+                <>
+                  <p className="text-xl font-black text-slate-900">${(carrera.precio ?? 0).toFixed(2)}</p>
+                  <p className="text-[10px] font-bold text-purple-600">
+                    {formatearBs(carrera.precio ?? 0, tasa ?? TASA_BCV_REFERENCIA)}
+                  </p>
+                </>
+              )}
             </div>
           </div>
+
+          {carrera.tipo_servicio && carrera.tipo_servicio !== "viaje" && (
+            <div className={`rounded-2xl border p-3 ${isPurchase ? "border-emerald-200 bg-emerald-50" : "border-orange-200 bg-orange-50"}`}>
+              <div className="flex items-center gap-2">
+                <span className={`material-symbols-outlined text-[18px] ${isPurchase ? "text-emerald-600" : "text-orange-600"}`}>
+                  {isPurchase ? "shopping_bag" : "package_2"}
+                </span>
+                <span className={`text-[10px] font-black uppercase tracking-wide ${isPurchase ? "text-emerald-700" : "text-orange-700"}`}>
+                  {isPurchase ? "Servicio de compra" : "Delivery"}
+                </span>
+              </div>
+              <p className="mt-1.5 text-xs font-bold text-slate-800">{carrera.detalle_servicio ?? "Sin detalle"}</p>
+            </div>
+          )}
 
           <div className="bg-slate-50 rounded-2xl p-3 space-y-2 border border-slate-100">
             <div className="flex items-start gap-2.5">
@@ -131,10 +181,50 @@ export default function IncomingOrderModal({ isOpen, onAccept, onReject, carrera
             </span>
             <span className="flex items-center gap-1 capitalize">
               <span className="material-symbols-outlined text-[14px]">payments</span>
-              {carrera.metodo_pago === "pago_movil" ? "Pago Móvil" :
+              {carrera.metodo_pago === "pago_movil" ? "Pago M�vil" :
                carrera.metodo_pago === "transferencia" ? "Transferencia" : "Efectivo"}
             </span>
           </div>
+
+          {isPurchase && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3.5 space-y-2.5">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[18px] text-amber-600">request_quote</span>
+                <p className="text-xs font-black text-amber-800">Envía tu precio al cliente</p>
+              </div>
+              {quoteSent ? (
+                <div className="flex items-center gap-2 rounded-xl bg-white px-3 py-2.5">
+                  <span className="material-symbols-outlined text-[18px] text-emerald-600">check_circle</span>
+                  <p className="text-[11px] font-bold text-emerald-700">
+                    Precio enviado. Espera la confirmación del cliente.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-10 items-center rounded-xl border border-amber-200 bg-white px-3 text-xs font-black text-slate-500">
+                      $
+                    </span>
+                    <input
+                      value={quoteValue}
+                      onChange={(event) => setQuoteValue(event.target.value)}
+                      inputMode="decimal"
+                      placeholder="0.00"
+                      className="h-10 min-w-0 flex-1 rounded-xl border border-amber-200 bg-white px-3 text-sm font-black text-slate-900 outline-none focus:border-amber-400"
+                    />
+                    <button
+                      onClick={() => void handleSendQuote()}
+                      disabled={quoting}
+                      className="h-10 rounded-xl bg-amber-500 px-3.5 text-[11px] font-black text-white shadow-md active:scale-95 disabled:opacity-50"
+                    >
+                      {quoting ? "..." : "Enviar"}
+                    </button>
+                  </div>
+                  {quoteError && <p className="text-[10px] font-bold text-rose-600">{quoteError}</p>}
+                </>
+              )}
+            </div>
+          )}
 
           {showRejectOptions ? (
             <div className="space-y-2">

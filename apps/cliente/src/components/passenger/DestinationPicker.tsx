@@ -1,10 +1,15 @@
 import { useState, useEffect, useRef } from "react";
-import { useGeocoding } from "@drivip/maps";
+import {
+  isInVenezuela,
+  MapLibreView,
+  useGeocoding,
+  VENEZUELA_CENTER,
+  VENEZUELA_MAP_BOUNDS,
+} from "@drivip/maps";
 import { useScrollLock } from "../../hooks/useScrollLock";
-import { MapLibreView } from "@drivip/maps";
 
 const VOYAGER_STYLE = "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json";
-const CARACAS_CENTER: [number, number] = [10.4806, -66.9036];
+const CARACAS_CENTER: [number, number] = VENEZUELA_CENTER;
 
 interface DestinationPickerProps {
   isOpen: boolean;
@@ -93,6 +98,7 @@ export default function DestinationPicker({
           mapStyle={VOYAGER_STYLE}
           origin={pointType === "origin" && selectedCoords ? { lat: selectedCoords[0], lng: selectedCoords[1] } : null}
           destination={pointType === "destination" && selectedCoords ? { lat: selectedCoords[0], lng: selectedCoords[1] } : null}
+          maxBounds={VENEZUELA_MAP_BOUNDS}
         />
         {/* Center pin */}
         <div className="absolute inset-x-0 top-1/2 -translate-y-full flex justify-center pointer-events-none z-10">
@@ -195,8 +201,13 @@ export default function DestinationPicker({
             onClick={() => {
               if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition((pos) => {
-                  const coords: [number, number] = [pos.coords.latitude, pos.coords.longitude];
-                  setSelectedCoords(coords);
+                  const lat = pos.coords.latitude;
+                  const lng = pos.coords.longitude;
+                  if (!isInVenezuela(lat, lng)) {
+                    setSelectedAddress("Tu GPS está fuera de Venezuela");
+                    return;
+                  }
+                  setSelectedCoords([lat, lng]);
                   setSelectedAddress("Mi ubicación actual");
                 });
               }

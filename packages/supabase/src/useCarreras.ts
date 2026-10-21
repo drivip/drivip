@@ -88,7 +88,27 @@ export function useCarreras(conductorId?: string) {
     return !error;
   }, []);
 
-  return { ...state, createCarrera, updateCarreraEstado };
+  const marcarLlegadaCarrera = useCallback(async (id: string) => {
+    const { error } = await supabase
+      .from("carreras")
+      .update({ llego_at: new Date().toISOString() })
+      .eq("id", id)
+      .eq("estado", "aceptada");
+
+    return !error;
+  }, []);
+
+  const quoteCarrera = useCallback(async (id: string, precio: number) => {
+    if (!Number.isFinite(precio) || precio <= 0) return false;
+    const { error } = await supabase
+      .from("carreras")
+      .update({ precio })
+      .eq("id", id);
+
+    return !error;
+  }, []);
+
+  return { ...state, createCarrera, updateCarreraEstado, marcarLlegadaCarrera, quoteCarrera };
 }
 
 export function useRealtimeCarreras(conductorId: string, onCarrera: (carrera: Carrera) => void) {

@@ -1,10 +1,14 @@
 export interface Driver {
   id: string;
+  slug: string;
   name: string;
   initials: string;
   vehicle: string;
+  vehicleColor: string;
+  vehicleType: "carro" | "moto" | "camioneta";
   plate: string;
   rating: number;
+  reviews: number;
   trips: number;
   status: "available" | "busy" | "offline";
   availability: string;
@@ -14,6 +18,7 @@ export interface Driver {
   ci: string;
   bank: string;
   color: string;
+  isVip: boolean;
   image?: string;
 }
 
@@ -40,6 +45,8 @@ export interface SavedAddress {
   name: string;
   address: string;
   reference?: string;
+  lat?: number | null;
+  lng?: number | null;
   icon: string;
   iconBg: string;
   iconColor: string;

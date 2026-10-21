@@ -51,10 +51,13 @@ CREATE INDEX IF NOT EXISTS idx_tenants_slug ON tenants(slug);
 CREATE TABLE IF NOT EXISTS profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     tenant_id UUID REFERENCES tenants(id) ON DELETE SET NULL,
-    rol TEXT NOT NULL DEFAULT 'cliente' CHECK (rol IN ('maestro', 'conductor', 'cliente', 'comercio')),
+    rol TEXT NOT NULL DEFAULT 'cliente' CHECK (rol IN ('maestro', 'conductor', 'cliente')),
     nombre TEXT,
     apellido TEXT,
     telefono TEXT,
+    email TEXT,
+    estado TEXT,
+    ciudad TEXT,
     avatar_url TEXT,
     activo BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -86,11 +89,14 @@ CREATE TABLE IF NOT EXISTS carreras (
     precio DOUBLE PRECISION,
     metodo_pago metodo_pago,
     comprobante_url TEXT,
+    tipo_servicio TEXT NOT NULL DEFAULT 'viaje' CHECK (tipo_servicio IN ('viaje', 'delivery', 'compra')),
+    detalle_servicio TEXT,
     estado carrera_estado NOT NULL DEFAULT 'pendiente',
     calificacion DOUBLE PRECISION,
     comentario_calificacion TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     aceptada_at TIMESTAMPTZ,
+    llego_at TIMESTAMPTZ,
     completada_at TIMESTAMPTZ,
     cancelada_at TIMESTAMPTZ
 );
@@ -99,6 +105,7 @@ CREATE INDEX IF NOT EXISTS idx_carreras_tenant ON carreras(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_carreras_conductor ON carreras(conductor_id);
 CREATE INDEX IF NOT EXISTS idx_carreras_cliente ON carreras(cliente_id);
 CREATE INDEX IF NOT EXISTS idx_carreras_estado ON carreras(estado);
+CREATE INDEX IF NOT EXISTS idx_carreras_tipo_servicio ON carreras(tipo_servicio);
 
 -- =============================================
 -- 4. UBICACIONES (posiciones GPS)

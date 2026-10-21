@@ -13,13 +13,13 @@ export default function PassengerHeader({
 }: PassengerHeaderProps) {
   return (
     <header
-      className="sticky top-0 z-30 bg-[#f4f6f8]/90 backdrop-blur-md px-5 lg:px-8 pt-3 pb-3 flex items-center justify-between border-b border-slate-200/60"
+      className="sticky top-0 z-30 flex select-none items-center justify-between border-b border-slate-200/60 bg-[#f4f6f8]/90 px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 backdrop-blur-md sm:px-5 lg:px-8"
       data-purpose="passenger-header"
     >
       {/* Botón de Menú Neumórfico */}
       <button
         aria-label="Abrir Menú"
-        className="w-11 h-11 lg:w-12 lg:h-12 rounded-2xl bg-white flex items-center justify-center text-slate-700 active:scale-95 transition-transform border border-slate-100"
+        className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-100 bg-white text-slate-700 transition-transform active:scale-95 lg:hidden"
         style={{ boxShadow: "4px 4px 10px #d9dde2, -4px -4px 10px #ffffff" }}
         onClick={onMenuClick}
       >

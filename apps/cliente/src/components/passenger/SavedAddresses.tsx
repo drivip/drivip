@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { normalizeText } from "@drivip/maps";
 import type { SavedAddress } from "../../types/passenger";
 
 interface NuevaDireccionInput {
@@ -15,10 +16,11 @@ interface SavedAddressesProps {
   onCreate?: (input: NuevaDireccionInput) => Promise<{ error: string | null }>;
   onDelete?: (id: string) => Promise<{ error: string | null }>;
   onSetDefault?: (id: string) => Promise<{ error: string | null }>;
-  onRequestRide?: (address: string) => void;
+  onRequestRide?: (address: SavedAddress) => void;
 }
 
 export default function SavedAddresses({ addresses, onBack, onCreate, onDelete, onSetDefault, onRequestRide }: SavedAddressesProps) {
+  const [query, setQuery] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -29,6 +31,14 @@ export default function SavedAddresses({ addresses, onBack, onCreate, onDelete, 
     icono: "home",
     predeterminada: addresses.length === 0,
   });
+
+  const visibleAddresses = useMemo(() => {
+    const needle = normalizeText(query);
+    if (!needle) return addresses;
+    return addresses.filter((address) =>
+      normalizeText(`${address.name} ${address.address} ${address.reference ?? ""}`).includes(needle)
+    );
+  }, [addresses, query]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,7 +56,7 @@ export default function SavedAddresses({ addresses, onBack, onCreate, onDelete, 
   };
 
   return (
-    <div className="min-h-screen bg-[#f4f6f8]">
+    <div className="min-h-full bg-[#f4f6f8]">
       {/* TopHeader */}
       <header className="sticky top-0 z-30 bg-[#f4f6f8]/90 backdrop-blur-md px-5 lg:px-8 pt-4 pb-3 border-b border-slate-200/50">
         <div className="flex items-center justify-between">
@@ -80,7 +90,25 @@ export default function SavedAddresses({ addresses, onBack, onCreate, onDelete, 
                 <path d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </div>
-            <input className="w-full pl-11 pr-11 py-3.5 lg:py-4 bg-white border border-slate-200/80 rounded-2xl text-sm lg:text-base font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/30 transition-all" placeholder="Buscar una dirección o lugar en Venezuela..." type="text" />
+            <input
+              className="w-full pl-11 pr-11 py-3.5 lg:py-4 bg-white border border-slate-200/80 rounded-2xl text-sm lg:text-base font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/30 transition-all"
+              placeholder="Buscar una dirección o lugar en Venezuela..."
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+            {query && (
+              <button
+                type="button"
+                aria-label="Limpiar búsqueda"
+                onClick={() => setQuery("")}
+                className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                  <path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" />
+                </svg>
+              </button>
+            )}
           </div>
         </section>
 
@@ -90,21 +118,26 @@ export default function SavedAddresses({ addresses, onBack, onCreate, onDelete, 
             <h2 className="text-xs lg:text-sm font-bold uppercase tracking-wider text-slate-500">Acceso Rápido (1 Toque)</h2>
             <span className="text-[11px] lg:text-xs font-semibold text-purple-600">Personalizar</span>
           </div>
-          {addresses.length === 0 ? (
+          {visibleAddresses.length === 0 ? (
             <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-4 text-center text-xs text-slate-400">
-              Guarda direcciones para acceder con 1 toque.
+              {query ? "No hay direcciones que coincidan con tu búsqueda." : "Guarda direcciones para acceder con 1 toque."}
             </div>
           ) : (
             <div className="grid grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2.5">
-              {addresses.slice(0, 8).map((addr) => (
-                <button key={addr.id} className="bg-white p-3 lg:p-4 rounded-2xl border border-slate-100 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition-all text-center group" style={{ boxShadow: "3px 3px 8px #e2e8f0, -3px -3px 8px #ffffff" }}>
+              {visibleAddresses.slice(0, 8).map((addr) => (
+                <button
+                  key={addr.id}
+                  onClick={() => onRequestRide?.(addr)}
+                  className="bg-white p-3 lg:p-4 rounded-2xl border border-slate-100 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition-all text-center group"
+                  style={{ boxShadow: "3px 3px 8px #e2e8f0, -3px -3px 8px #ffffff" }}
+                >
                   <div className={`w-10 h-10 lg:w-12 lg:h-12 rounded-xl ${addr.iconBg} flex items-center justify-center shadow-inner group-hover:opacity-90 transition-colors`}>
                     <svg className="w-5 h-5 lg:w-6 lg:h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                       <path d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </div>
                   <span className="text-xs lg:text-sm font-bold text-slate-800">{addr.name}</span>
-                  <span className="text-[10px] lg:text-[11px] text-slate-400 font-medium truncate w-full">{addr.address}</span>
+                  <span className="text-[11px] text-slate-400 font-medium truncate w-full lg:text-xs">{addr.address}</span>
                 </button>
               ))}
             </div>
@@ -119,11 +152,24 @@ export default function SavedAddresses({ addresses, onBack, onCreate, onDelete, 
           </div>
 
           <div className="lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-5 space-y-3.5 lg:space-y-0">
-            {addresses.map((addr) => (
+            {visibleAddresses.length === 0 && (
+              <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-8 text-center lg:col-span-2 xl:col-span-3">
+                <span className="material-symbols-outlined text-[32px] text-slate-300">location_off</span>
+                <p className="mt-1 text-sm font-bold text-slate-600">
+                  {query ? "Sin coincidencias" : "Aún no tienes direcciones guardadas"}
+                </p>
+                <p className="mt-1 text-xs text-slate-400">
+                  {query
+                    ? "Prueba con el alias, la calle o el sector."
+                    : "Agrega tu casa o trabajo para pedir un viaje con un toque."}
+                </p>
+              </div>
+            )}
+            {visibleAddresses.map((addr) => (
               <article key={addr.id} className={`bg-white rounded-3xl p-4 lg:p-5 border border-slate-100 transition-all ${addr.isDefault ? "shadow-xl shadow-slate-200/60 relative overflow-hidden" : "shadow-xl shadow-slate-200/60"}`}>
                 {addr.isDefault && (
                   <div className="absolute top-0 right-0">
-                    <span className="bg-emerald-500 text-white text-[10px] lg:text-[11px] font-bold px-3 py-1 rounded-bl-xl tracking-wider shadow-sm flex items-center gap-1">
+                    <span className="bg-emerald-500 text-white text-[11px] font-bold px-3 py-1 lg:text-xs rounded-bl-xl tracking-wider shadow-sm flex items-center gap-1">
                       <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                         <path clipRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" fillRule="evenodd" />
                       </svg>
@@ -145,7 +191,7 @@ export default function SavedAddresses({ addresses, onBack, onCreate, onDelete, 
                   <div className="flex-1 pr-4">
                     <div className="flex items-center gap-2">
                       <h3 className="font-bold text-slate-900 text-base lg:text-lg leading-tight">{addr.name}</h3>
-                      {addr.badge && <span className={`text-[9px] lg:text-[10px] font-bold px-1.5 py-0.5 rounded ${addr.badgeColor}`}>{addr.badge}</span>}
+                      {addr.badge && <span className={`text-[10px] lg:text-[11px] font-bold px-1.5 py-0.5 rounded ${addr.badgeColor}`}>{addr.badge}</span>}
                     </div>
                     <p className="text-xs lg:text-sm text-slate-600 mt-1 font-medium leading-relaxed">{addr.address}</p>
                     {addr.reference && (
@@ -168,18 +214,13 @@ export default function SavedAddresses({ addresses, onBack, onCreate, onDelete, 
                 {addr.isDefault && (
                   <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
                     <div className="flex items-center gap-1">
-                      <button className="p-2 text-slate-400 hover:text-purple-600 active:scale-95 transition-colors" title="Editar">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                          <path d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      </button>
                       <button onClick={() => { void onDelete?.(addr.id); }} className="p-2 text-slate-400 hover:text-rose-500 active:scale-95 transition-colors" title="Eliminar">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                           <path d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                       </button>
                     </div>
-                    <button onClick={() => onRequestRide?.(addr.address)} className="bg-gradient-to-r from-purple-700 to-indigo-700 text-white font-semibold text-xs lg:text-sm py-2 px-4 rounded-xl shadow-md shadow-purple-500/20 active:scale-95 transition-all flex items-center gap-1.5">
+                    <button onClick={() => onRequestRide?.(addr)} className="bg-gradient-to-r from-purple-700 to-indigo-700 text-white font-semibold text-xs lg:text-sm py-2 px-4 rounded-xl shadow-md shadow-purple-500/20 active:scale-95 transition-all flex items-center gap-1.5">
                       <span>Pedir Chofer Aquí</span>
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
                         <path d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />

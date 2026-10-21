@@ -11,7 +11,6 @@ interface DriverMapViewProps {
   pickupCoords?: [number, number] | null;
   destinationCoords?: [number, number] | null;
   ridePhase?: "idle" | "going_to_pickup" | "at_pickup" | "in_trip" | "at_destination";
-  onArrivedAtPickup?: () => void;
   onArrivedAtDestination?: () => void;
 }
 
@@ -20,7 +19,6 @@ export default function DriverMapView({
   pickupCoords = null,
   destinationCoords = null,
   ridePhase = "idle",
-  onArrivedAtPickup,
   onArrivedAtDestination,
 }: DriverMapViewProps) {
   const { latitude, longitude, heading, isTracking, startTracking, stopTracking } = useGeolocation();
@@ -32,6 +30,7 @@ export default function DriverMapView({
   const [remainingMin, setRemainingMin] = useState(0);
   const [currentStep, setCurrentStep] = useState<NavStep | null>(null);
   const [arrived, setArrived] = useState(false);
+  const [traveledRoute, setTraveledRoute] = useState<[number, number][]>([]);
 
   const pickupRouteRef = useRef<NavRoute | null>(null);
   const tripRouteRef = useRef<NavRoute | null>(null);
@@ -60,6 +59,20 @@ export default function DriverMapView({
     }
     prevPosRef.current = cur;
   }, [latitude, longitude]);
+
+  useEffect(() => {
+    if (ridePhase !== "in_trip" || !latitude || !longitude) return;
+    setTraveledRoute((prev) => {
+      const last = prev[prev.length - 1];
+      const point: [number, number] = [latitude, longitude];
+      if (last && haversineKm(last, point) < 0.012) return prev;
+      return [...prev, point].slice(-900);
+    });
+  }, [ridePhase, latitude, longitude]);
+
+  useEffect(() => {
+    if (ridePhase === "idle" || ridePhase === "going_to_pickup") setTraveledRoute([]);
+  }, [ridePhase]);
 
   useEffect(() => {
     if (isOnline && latitude && longitude) {
@@ -103,7 +116,7 @@ export default function DriverMapView({
         }
       });
       setArrived(false);
-    } else {
+    } else if (ridePhase !== "at_destination") {
       setPickupRoute(null);
       setTripRoute(null);
       pickupRouteRef.current = null;
@@ -131,9 +144,7 @@ export default function DriverMapView({
 
       if (distToDest < ARRIVAL_THRESHOLD) {
         setArrived(true);
-        if (ridePhaseRef.current === "going_to_pickup" && onArrivedAtPickup) {
-          onArrivedAtPickup();
-        } else if (ridePhaseRef.current === "in_trip" && onArrivedAtDestination) {
+        if (ridePhaseRef.current === "in_trip" && onArrivedAtDestination) {
           onArrivedAtDestination();
         }
         return;
@@ -181,6 +192,7 @@ export default function DriverMapView({
         carPosition={carPosition}
         route={tripRoute ?? undefined}
         routeSecondary={pickupRoute ?? undefined}
+        traveledRoute={traveledRoute.length > 1 ? traveledRoute : undefined}
         origin={pickupCoords ? { lat: pickupCoords[0], lng: pickupCoords[1], label: "Recoger" } : null}
         destination={destinationCoords ? { lat: destinationCoords[0], lng: destinationCoords[1], label: "Destino" } : null}
         showPulse={!carPosition}
@@ -248,17 +260,19 @@ export default function DriverMapView({
       )}
 
       {arrived && (
-        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl p-6 shadow-2xl text-center mx-6 max-w-sm w-full">
-            <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-3">
-              <span className="material-symbols-outlined text-[32px] text-emerald-600">check_circle</span>
+        <div className="pointer-events-none absolute inset-x-3 top-[calc(4.75rem+env(safe-area-inset-top))] z-30 flex justify-center">
+          <div className="flex w-full max-w-sm items-center gap-3 rounded-2xl border border-emerald-200 bg-white/95 p-3 shadow-2xl backdrop-blur-xl">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
+              <span className="material-symbols-outlined text-[24px]">check_circle</span>
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-black text-slate-900">
+                {ridePhase === "going_to_pickup" ? "Llegaste al pasajero" : "Llegaste al destino"}
+              </p>
+              <p className="text-[11px] font-medium text-slate-500">
+                {ridePhase === "going_to_pickup" ? "Marca la llegada y recoge al cliente" : "Confirma el cobro para completar el viaje"}
+              </p>
             </div>
-            <p className="text-lg font-black text-slate-900">
-              {ridePhase === "going_to_pickup" ? "Llegaste al pasajero" : "Llegaste al destino"}
-            </p>
-            <p className="text-xs text-slate-500 mt-1">
-              {ridePhase === "going_to_pickup" ? "Recoge al cliente para iniciar el viaje" : "Viaje completado"}
-            </p>
           </div>
         </div>
       )}

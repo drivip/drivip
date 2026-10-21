@@ -16,6 +16,7 @@ interface Props {
   onStartCarrera: (id: string) => void;
   onCompleteCarrera: (id: string) => void;
   onArrivedAtPickup?: (id: string) => void;
+  onQuoteCarrera?: (id: string, precio: number) => Promise<boolean>;
   carreraActiva: string | null;
   domain: string;
   profileName: string;
@@ -35,6 +36,7 @@ export default function ChoferDashboard({
   onStartCarrera,
   onCompleteCarrera,
   onArrivedAtPickup,
+  onQuoteCarrera,
   carreraActiva,
   domain,
   profileName,
@@ -136,11 +138,24 @@ export default function ChoferDashboard({
   };
 
   useEffect(() => {
-    if (!carreraActiva && ridePhase !== "idle") {
-      setRidePhase("idle");
-      setShowTopCard(true);
+    if (!carreraActiva) {
+      if (ridePhase !== "idle") {
+        setRidePhase("idle");
+        setShowTopCard(true);
+      }
+      return;
     }
-  }, [carreraActiva]);
+
+    if (ridePhase !== "idle" || !carreraEnCurso) return;
+
+    if (carreraEnCurso.estado === "aceptada") {
+      setRidePhase("going_to_pickup");
+      setShowTopCard(false);
+    } else if (carreraEnCurso.estado === "en_curso") {
+      setRidePhase("in_trip");
+      setShowTopCard(false);
+    }
+  }, [carreraActiva, carreraEnCurso?.estado, ridePhase]);
 
   const isNavigating = ridePhase === "going_to_pickup" || ridePhase === "in_trip";
 
@@ -157,7 +172,6 @@ export default function ChoferDashboard({
         pickupCoords={pickupCoords}
         destinationCoords={destinationCoords}
         ridePhase={ridePhase}
-        onArrivedAtPickup={handleArrivedAtPickup}
         onArrivedAtDestination={handleArrivedAtDestination}
       />
 
@@ -202,7 +216,11 @@ export default function ChoferDashboard({
                     </div>
                   </div>
                   <div className="text-right flex-shrink-0 ml-2">
-                    <p className="text-base font-black text-slate-900">${(carreraPendiente.precio ?? 0).toFixed(2)}</p>
+                    {carreraPendiente.tipo_servicio === "compra" && !carreraPendiente.precio ? (
+                      <p className="text-[11px] font-black text-amber-600">Por cotizar</p>
+                    ) : (
+                      <p className="text-base font-black text-slate-900">${(carreraPendiente.precio ?? 0).toFixed(2)}</p>
+                    )}
                     <p className="text-[9px] font-bold text-purple-600">{carreraPendiente.distancia_km ?? 0} km</p>
                   </div>
                 </div>
@@ -246,6 +264,45 @@ export default function ChoferDashboard({
         </div>
       )}
 
+      {ridePhase === "going_to_pickup" && (
+        <div className="absolute inset-x-0 bottom-0 z-20 p-3">
+          <div className="mx-auto max-w-2xl rounded-3xl border border-white/70 bg-white/95 p-4 shadow-[0_-12px_40px_rgba(15,23,42,0.18)] backdrop-blur-xl">
+            <div className="mb-3 flex items-start gap-3">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+                <span className="material-symbols-outlined text-[22px]">near_me</span>
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 animate-pulse rounded-full bg-amber-400" />
+                  <p className="text-sm font-black text-slate-900">Vas al punto de recogida</p>
+                </div>
+                <p className="mt-0.5 line-clamp-2 text-[11px] font-medium leading-snug text-slate-500">
+                  {carreraEnCurso?.origen_direccion ?? "Origen del pasajero"}
+                </p>
+              </div>
+              <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-black text-amber-700">
+                En camino
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleArrivedAtPickup}
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 py-3.5 text-sm font-black text-white shadow-lg shadow-orange-500/25 transition active:scale-[0.98]"
+            >
+              <span className="material-symbols-outlined text-[20px]">where_to_vote</span>
+              Ya llegué
+            </button>
+
+            {carreraActiva && (
+              <div className="mt-2">
+                <CarreraChat carreraId={carreraActiva} rol="conductor" />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {ridePhase === "at_pickup" && (
         <div className="absolute bottom-0 left-0 right-0 z-20 p-3">
           <div className="bg-white rounded-2xl p-4 shadow-2xl border border-slate-100 max-w-2xl mx-auto">
@@ -264,7 +321,7 @@ export default function ChoferDashboard({
               className="w-full py-3 rounded-xl bg-gradient-to-r from-purple-700 to-indigo-600 text-white text-sm font-black active:scale-[0.98] transition flex items-center justify-center gap-2 shadow-lg shadow-purple-600/30"
             >
               <span className="material-symbols-outlined text-[18px]">person_add</span>
-              Recogi al Pasajero
+              Recogí al pasajero · Iniciar viaje
             </button>
             {carreraActiva && (
               <div className="mt-2">
@@ -342,6 +399,7 @@ export default function ChoferDashboard({
           isOpen={showIncomingModal}
           onAccept={handleAcceptTrip}
           onReject={handleRejectTrip}
+          onQuote={(precio) => onQuoteCarrera?.(carreraPendiente.id, precio) ?? Promise.resolve(false)}
           carrera={carreraPendiente}
         />
       )}

@@ -15,7 +15,7 @@ ON profiles FOR INSERT
 TO authenticated
 WITH CHECK (
     id = auth.uid()
-    AND rol IN ('conductor', 'cliente', 'comercio')
+    AND rol IN ('conductor', 'cliente')
 );
 
 -- El tenant de registro siempre nace inactivo y sin pausa.

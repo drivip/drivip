@@ -3,8 +3,7 @@ $apps = @(
   @{name="conductor"; port=3001; path="E:\drivip\apps\conductor"},
   @{name="linea"; port=3002; path="E:\drivip\apps\linea"},
   @{name="superadmin"; port=3003; path="E:\drivip\apps\superadmin"},
-  @{name="cliente"; port=3004; path="E:\drivip\apps\cliente"},
-  @{name="comercio"; port=3005; path="E:\drivip\apps\comercio"}
+  @{name="cliente"; port=3004; path="E:\drivip\apps\cliente"}
 )
 
 foreach ($app in $apps) {
