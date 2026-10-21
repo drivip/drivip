@@ -30,3 +30,16 @@ export interface ConversacionCliente {
   ultimo_emisor_rol: MensajeEmisorRol | null;
   no_leidos: number;
 }
+
+export interface ConversacionConductor {
+  conversacion_id: string;
+  cliente_id: string;
+  cliente_nombre: string;
+  cliente_telefono: string | null;
+  ultima_carrera_id: string | null;
+  ultimo_mensaje: string | null;
+  ultimo_mensaje_at: string | null;
+  ultimo_emisor_id: string | null;
+  ultimo_emisor_rol: MensajeEmisorRol | null;
+  no_leidos: number;
+}

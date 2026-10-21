@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ConversacionCliente, MensajeDirecto, MensajeEmisorRol } from "@drivip/types";
+import type {
+  ConversacionCliente,
+  ConversacionConductor,
+  MensajeDirecto,
+  MensajeEmisorRol,
+} from "@drivip/types";
 import { supabase } from "./client";
 import { enviarPushCarrera } from "./notificacionesCarrera";
 
@@ -237,4 +242,133 @@ export function useMensajesDirectos(
   );
 
   return { mensajes, userId, loading, error, noLeidos, enviar, marcarLeidos };
+}
+
+export function useConversacionesConductor() {
+  const [conversaciones, setConversaciones] = useState<ConversacionConductor[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const fetchAll = useCallback(async () => {
+    const { data, error: queryError } = await supabase.rpc("listar_conversaciones_conductor");
+    if (queryError) {
+      setError(queryError.message);
+      setLoading(false);
+      return;
+    }
+    setConversaciones((data as ConversacionConductor[] | null) ?? []);
+    setError(null);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    supabase.auth.getUser().then(({ data }) => {
+      if (!cancelled) setUserId(data.user?.id ?? null);
+    });
+    void fetchAll();
+    return () => { cancelled = true; };
+  }, [fetchAll]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel("conversaciones-conductor-live")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "mensajes_directos" },
+        () => {
+          if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+          refreshTimerRef.current = setTimeout(() => { void fetchAll(); }, 120);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+      supabase.removeChannel(channel);
+    };
+  }, [fetchAll]);
+
+  const marcarLeida = useCallback(async (conversacionId: string) => {
+    setConversaciones((prev) =>
+      prev.map((conversacion) =>
+        conversacion.conversacion_id === conversacionId
+          ? { ...conversacion, no_leidos: 0 }
+          : conversacion
+      )
+    );
+    await supabase.rpc("marcar_mensajes_directos_leidos", {
+      p_conversacion_id: conversacionId,
+    });
+  }, []);
+
+  const crearConversacion = useCallback(async (clienteId: string) => {
+    const { data, error: rpcError } = await supabase.rpc(
+      "obtener_o_crear_conversacion_conductor",
+      { p_cliente_id: clienteId }
+    );
+    if (rpcError) {
+      setError(rpcError.message);
+      return null;
+    }
+    await fetchAll();
+    return (data as string | null) ?? null;
+  }, [fetchAll]);
+
+  const totalNoLeidos = useMemo(
+    () => conversaciones.reduce((total, conversacion) => total + (conversacion.no_leidos ?? 0), 0),
+    [conversaciones]
+  );
+
+  return {
+    conversaciones,
+    userId,
+    loading,
+    error,
+    totalNoLeidos,
+    marcarLeida,
+    crearConversacion,
+    refetch: fetchAll,
+  };
+}
+
+/** Envía un mensaje directo a un cliente desde el panel del conductor. */
+export async function enviarMensajeDirectoAConductor(
+  clienteId: string,
+  contenido: string
+): Promise<{ ok: boolean; conversacionId?: string; error?: string }> {
+  const texto = contenido.trim().slice(0, 1000);
+  if (!texto) return { ok: false, error: "El mensaje está vacío" };
+
+  const { data: conversacionId, error: conversacionError } = await supabase.rpc(
+    "obtener_o_crear_conversacion_conductor",
+    { p_cliente_id: clienteId }
+  );
+
+  if (conversacionError || !conversacionId) {
+    return {
+      ok: false,
+      error:
+        conversacionError?.message === "cliente_sin_servicios"
+          ? "El cliente aún no tiene chat contigo"
+          : "No se pudo abrir la conversación",
+    };
+  }
+
+  const { data: authData } = await supabase.auth.getUser();
+  const emisorId = authData.user?.id;
+  if (!emisorId) return { ok: false, error: "Inicia sesión para enviar mensajes" };
+
+  const { error: insertError } = await supabase.from("mensajes_directos").insert({
+    conversacion_id: conversacionId,
+    emisor_id: emisorId,
+    emisor_rol: "conductor",
+    contenido: texto,
+  });
+
+  if (insertError) return { ok: false, error: insertError.message };
+
+  return { ok: true, conversacionId: conversacionId as string };
 }

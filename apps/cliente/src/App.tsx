@@ -566,6 +566,7 @@ function PassengerApp() {
 
   const [origin, setOrigin] = useState("Mi ubicación actual");
   const [originCoords, setOriginCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [originFromGps, setOriginFromGps] = useState(true);
   const [destination, setDestination] = useState("");
   const [destinationCoords, setDestinationCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [stops, setStops] = useState<{ lat: number; lng: number; address: string }[]>([]);
@@ -644,6 +645,7 @@ function PassengerApp() {
       if (cancelled) return;
       setOriginCoords({ lat: VENEZUELA_CENTER[0], lng: VENEZUELA_CENTER[1] });
       setOrigin("Caracas, Venezuela");
+      setOriginFromGps(false);
     };
 
     if (!("geolocation" in navigator)) {
@@ -663,6 +665,7 @@ function PassengerApp() {
         }
 
         setOriginCoords({ lat, lng });
+        setOriginFromGps(true);
         const place = await reverseVenezuelaPlace(lat, lng);
         if (!cancelled) setOrigin(place?.displayName || "Mi ubicación actual");
       },
@@ -738,6 +741,34 @@ function PassengerApp() {
     },
     [originCoords, stops]
   );
+
+  const handleUseCurrentLocation = useCallback(() => {
+    if (!("geolocation" in navigator)) {
+      showToast("Tu dispositivo no permite obtener la ubicación. Elige el origen en el mapa.");
+      return;
+    }
+
+    showToast("Obteniendo tu ubicación actual...");
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude: lat, longitude: lng } = pos.coords;
+        if (!isInVenezuela(lat, lng)) {
+          showToast("Drivip solo opera en Venezuela. Elige el origen en el mapa.");
+          return;
+        }
+
+        setOriginCoords({ lat, lng });
+        setOriginFromGps(true);
+        const place = await reverseVenezuelaPlace(lat, lng);
+        setOrigin(place?.displayName || "Mi ubicación actual");
+        if (destinationCoords) {
+          void resolveRouteFor(destinationCoords, { lat, lng });
+        }
+      },
+      () => showToast("No pudimos obtener tu ubicación. Activa el GPS e intenta de nuevo."),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 10000 }
+    );
+  }, [destinationCoords, resolveRouteFor, showToast]);
 
   const handleRequestRide = async (
     driverArg?: Driver | null,
@@ -954,6 +985,7 @@ function PassengerApp() {
     if (pointType === "origin") {
       setOrigin(place.address);
       setOriginCoords({ lat: place.lat, lng: place.lng });
+      setOriginFromGps(false);
       if (destinationCoords) void resolveRouteFor(destinationCoords, { lat: place.lat, lng: place.lng });
     } else {
       setDestination(place.address);
@@ -1068,6 +1100,8 @@ function PassengerApp() {
     <RouteCalculator
       onOpenMap={() => handleOpenMap("destination")}
       onOpenOriginMap={() => handleOpenMap("origin")}
+      onUseCurrentLocation={handleUseCurrentLocation}
+      originIsCurrent={originFromGps}
       origin={origin}
       destination={destination}
       stops={stops.map((s) => s.address)}
@@ -1432,7 +1466,12 @@ function PassengerApp() {
             onUseGps={(coords) => {
               if (mapPointType !== "origin") return;
               setOriginCoords(coords);
+              setOriginFromGps(true);
               setOrigin("Mi ubicación GPS");
+              if (destinationCoords) void resolveRouteFor(destinationCoords, coords);
+              void reverseVenezuelaPlace(coords.lat, coords.lng).then((place) => {
+                if (place?.displayName) setOrigin(place.displayName);
+              });
               showToast("Ubicación GPS detectada");
             }}
             onConfirmPin={handleConfirmMapPin}

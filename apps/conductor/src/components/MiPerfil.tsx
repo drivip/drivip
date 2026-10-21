@@ -4,9 +4,10 @@ import { MOCK_DRIVER_PROFILE } from "../mockData/driverMockData";
 interface MiPerfilProps {
   tenant?: Tenant | null;
   demo?: boolean;
+  embedded?: boolean;
 }
 
-export default function MiPerfil({ tenant, demo = false }: MiPerfilProps) {
+export default function MiPerfil({ tenant, demo = false, embedded = false }: MiPerfilProps) {
   const p = demo ? MOCK_DRIVER_PROFILE : null;
 
   const nombre = tenant?.nombre || p?.nombre || "Conductor";
@@ -24,8 +25,8 @@ export default function MiPerfil({ tenant, demo = false }: MiPerfilProps) {
   const direccion = tenant?.direccion || null;
 
   return (
-    <div className="px-4 py-4 space-y-4 lg:px-8 lg:py-6 max-w-2xl mx-auto w-full">
-      <h1 className="text-xl lg:text-2xl font-black text-slate-900">Mi Perfil</h1>
+    <div className={embedded ? "space-y-4" : "px-4 py-4 space-y-4 lg:px-8 lg:py-6 max-w-2xl mx-auto w-full"}>
+      {!embedded && <h1 className="text-xl lg:text-2xl font-black text-slate-900">Mi Perfil</h1>}
 
       <div className="bg-white rounded-3xl p-6 lg:p-8 shadow-xl shadow-slate-200/60 border border-slate-100 flex flex-col items-center gap-4">
         <div className="relative">

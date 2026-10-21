@@ -1,4 +1,5 @@
 import type { TarifaModo } from "./tarifa";
+import type { DisponibilidadConductor } from "./disponibilidad";
 
 export type TenantType = "conductor";
 
@@ -29,6 +30,18 @@ export interface Tenant {
   total_carreras: number;
   pausado: boolean;
   pausado_motivo: string | null;
+  disponibilidad?: DisponibilidadConductor;
+  disponibilidad_nota?: string | null;
+  disponibilidad_hasta?: string | null;
+  pago_movil_activo?: boolean;
+  pago_movil_banco?: string | null;
+  pago_movil_cedula?: string | null;
+  pago_movil_telefono?: string | null;
+  zelle_activo?: boolean;
+  zelle_email?: string | null;
+  zelle_nombre?: string | null;
+  efectivo_activo?: boolean;
+  metodos_pago_actualizado_at?: string | null;
   modulos_activos: string[];
   codigo_referido?: string | null;
   tarifa_modo: TarifaModo;

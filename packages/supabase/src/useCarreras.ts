@@ -14,6 +14,8 @@ export function useCarreras(conductorId?: string) {
     loading: true,
     error: null,
   });
+  const carrerasRef = useRef<Carrera[]>([]);
+  carrerasRef.current = state.carreras;
 
   useEffect(() => {
     let cancelled = false;
@@ -75,35 +77,84 @@ export function useCarreras(conductorId?: string) {
   }, []);
 
   const updateCarreraEstado = useCallback(async (id: string, estado: Carrera["estado"]) => {
+    const now = new Date().toISOString();
     const updates: Record<string, unknown> = { estado };
-    if (estado === "aceptada") updates.aceptada_at = new Date().toISOString();
-    if (estado === "completada") updates.completada_at = new Date().toISOString();
-    if (estado === "cancelada") updates.cancelada_at = new Date().toISOString();
+    if (estado === "aceptada") updates.aceptada_at = now;
+    if (estado === "completada") updates.completada_at = now;
+    if (estado === "cancelada") updates.cancelada_at = now;
+
+    const anterior = carrerasRef.current.find((c) => c.id === id);
+
+    setState((s) => ({
+      ...s,
+      carreras: s.carreras.map((c) =>
+        c.id === id ? ({ ...c, ...updates } as Carrera) : c
+      ),
+    }));
 
     const { error } = await supabase
       .from("carreras")
       .update(updates)
       .eq("id", id);
 
+    if (error && anterior) {
+      setState((s) => ({
+        ...s,
+        carreras: s.carreras.map((c) => (c.id === id ? anterior : c)),
+        error: error.message,
+      }));
+    }
+
     return !error;
   }, []);
 
   const marcarLlegadaCarrera = useCallback(async (id: string) => {
+    const llego_at = new Date().toISOString();
+    const anterior = carrerasRef.current.find((c) => c.id === id);
+
+    setState((s) => ({
+      ...s,
+      carreras: s.carreras.map((c) => (c.id === id ? { ...c, llego_at } : c)),
+    }));
+
     const { error } = await supabase
       .from("carreras")
-      .update({ llego_at: new Date().toISOString() })
+      .update({ llego_at })
       .eq("id", id)
       .eq("estado", "aceptada");
+
+    if (error && anterior) {
+      setState((s) => ({
+        ...s,
+        carreras: s.carreras.map((c) => (c.id === id ? anterior : c)),
+        error: error.message,
+      }));
+    }
 
     return !error;
   }, []);
 
   const quoteCarrera = useCallback(async (id: string, precio: number) => {
     if (!Number.isFinite(precio) || precio <= 0) return false;
+    const anterior = carrerasRef.current.find((c) => c.id === id);
+
+    setState((s) => ({
+      ...s,
+      carreras: s.carreras.map((c) => (c.id === id ? { ...c, precio } : c)),
+    }));
+
     const { error } = await supabase
       .from("carreras")
       .update({ precio })
       .eq("id", id);
+
+    if (error && anterior) {
+      setState((s) => ({
+        ...s,
+        carreras: s.carreras.map((c) => (c.id === id ? anterior : c)),
+        error: error.message,
+      }));
+    }
 
     return !error;
   }, []);

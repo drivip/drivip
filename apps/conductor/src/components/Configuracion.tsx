@@ -1,5 +1,10 @@
 import { useState } from "react";
+import type { Tenant } from "@drivip/types";
 import { PushNotificationCard, useAuthContext } from "@drivip/supabase";
+import { useScrollLock } from "../hooks/useScrollLock";
+import MisPrecios from "./MisPrecios";
+import CouponsManager from "./CouponsManager";
+import PaymentMethodsSetup from "./driver/PaymentMethodsSetup";
 
 interface Toggle {
   label: string;
@@ -9,10 +14,52 @@ interface Toggle {
 interface ConfiguracionProps {
   isPaused?: boolean;
   tenantId?: string | null;
+  tenant?: Tenant | null;
+  demo?: boolean;
+  onSaved?: () => void;
 }
 
-export default function Configuracion({ isPaused, tenantId }: ConfiguracionProps) {
+type ServicePanel = "tarifas" | "cupones" | "pagos" | null;
+
+const SERVICE_OPTIONS: {
+  id: Exclude<ServicePanel, null>;
+  label: string;
+  desc: string;
+  icon: string;
+  color: string;
+}[] = [
+  {
+    id: "tarifas",
+    label: "Precios y tarifas",
+    desc: "Por kilómetro o por zona",
+    icon: "route",
+    color: "from-purple-500 to-indigo-600",
+  },
+  {
+    id: "cupones",
+    label: "Cupones y descuentos",
+    desc: "Códigos promocionales",
+    icon: "confirmation_number",
+    color: "from-amber-500 to-orange-500",
+  },
+  {
+    id: "pagos",
+    label: "Métodos de pago",
+    desc: "Pago Móvil, Zelle y efectivo",
+    icon: "payments",
+    color: "from-emerald-500 to-teal-600",
+  },
+];
+
+export default function Configuracion({
+  isPaused,
+  tenantId,
+  tenant,
+  demo = false,
+  onSaved,
+}: ConfiguracionProps) {
   const { signOut } = useAuthContext();
+  const [panel, setPanel] = useState<ServicePanel>(null);
   const [notifToggles, setNotifToggles] = useState<Toggle[]>([
     { label: "Nueva carrera", checked: true },
     { label: "Mensajes del cliente", checked: true },
@@ -25,6 +72,8 @@ export default function Configuracion({ isPaused, tenantId }: ConfiguracionProps
     { label: "Sonidos de alerta", checked: true },
   ]);
 
+  useScrollLock(Boolean(panel));
+
   const toggleNotif = (idx: number) => {
     if (isPaused) return;
     setNotifToggles(notifToggles.map((t, i) => i === idx ? { ...t, checked: !t.checked } : t));
@@ -33,6 +82,15 @@ export default function Configuracion({ isPaused, tenantId }: ConfiguracionProps
     if (isPaused) return;
     setGeneralToggles(generalToggles.map((t, i) => i === idx ? { ...t, checked: !t.checked } : t));
   };
+
+  const panelTitle =
+    panel === "tarifas"
+      ? "Precios y tarifas"
+      : panel === "cupones"
+        ? "Cupones y descuentos"
+        : "Métodos de pago";
+
+  const modoTarifa = tenant?.tarifa_modo === "zona" ? "Zona fija" : "Por kilómetro";
 
   return (
     <div className="px-4 py-4 space-y-4 lg:px-8 lg:py-6 max-w-2xl mx-auto w-full">
@@ -47,6 +105,29 @@ export default function Configuracion({ isPaused, tenantId }: ConfiguracionProps
           </div>
         </div>
       )}
+
+      <div className="bg-white rounded-3xl p-4 lg:p-5 shadow-xl shadow-slate-200/60 border border-slate-100 space-y-2">
+        <p className="text-[10px] lg:text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Servicio y cobros</p>
+        {SERVICE_OPTIONS.map((option) => (
+          <button
+            key={option.id}
+            type="button"
+            onClick={() => setPanel(option.id)}
+            className="flex w-full items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3 text-left active:scale-[0.99] transition"
+          >
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${option.color} text-white shadow-md`}>
+              <span className="material-symbols-outlined text-[19px]">{option.icon}</span>
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs lg:text-sm font-black text-slate-900">{option.label}</p>
+              <p className="text-[10px] lg:text-[11px] font-semibold text-slate-500">
+                {option.id === "tarifas" ? `${option.desc} · ${modoTarifa}` : option.desc}
+              </p>
+            </div>
+            <span className="material-symbols-outlined text-[19px] text-slate-400">chevron_right</span>
+          </button>
+        ))}
+      </div>
 
       <div className="bg-white rounded-3xl p-4 lg:p-5 shadow-xl shadow-slate-200/60 border border-slate-100 space-y-1">
         <p className="text-[10px] lg:text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Notificaciones</p>
@@ -108,6 +189,58 @@ export default function Configuracion({ isPaused, tenantId }: ConfiguracionProps
           Cerrar Sesion
         </button>
       </div>
+
+      {panel && (
+        <div className="fixed inset-0 z-[75] flex items-end justify-center sm:items-center">
+          <div
+            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+            onClick={() => setPanel(null)}
+          />
+
+          <div className="relative flex h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-[#f1f4f8] shadow-2xl sm:h-[86dvh] sm:rounded-3xl">
+            <div className="flex items-center gap-3 border-b border-slate-200/70 bg-white px-4 py-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-100 text-purple-700">
+                <span className="material-symbols-outlined text-[20px]">
+                  {panel === "tarifas" ? "route" : panel === "cupones" ? "confirmation_number" : "payments"}
+                </span>
+              </div>
+              <h2 className="min-w-0 flex-1 truncate text-sm font-black text-slate-900">
+                {panelTitle}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setPanel(null)}
+                className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-600 active:scale-95"
+                aria-label="Cerrar configuración"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {panel === "tarifas" && (
+                <MisPrecios tenant={tenant} demo={demo} onSaved={onSaved} />
+              )}
+              {panel === "cupones" && (
+                <CouponsManager
+                  tenantId={tenantId}
+                  demo={demo}
+                  conductorNombre={tenant?.nombre}
+                />
+              )}
+              {panel === "pagos" && (
+                <PaymentMethodsSetup
+                  inline
+                  tenant={tenant}
+                  tenantId={tenantId}
+                  demo={demo}
+                  onSaved={onSaved}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

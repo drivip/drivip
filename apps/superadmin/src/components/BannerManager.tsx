@@ -14,17 +14,24 @@ function Toast({ message, onClose }: { message: string; onClose: () => void }) {
   );
 }
 
+const FORM_INICIAL = {
+  tenant_id: "",
+  titulo: "",
+  descripcion: "",
+  imagen_url: "",
+  enlace_url: "",
+  cta_texto: "",
+  prioridad: "normal" as BannerPrioridad,
+  orden: 0,
+};
+
 export default function BannerManager({ tenants = [] }: { tenants?: Tenant[] }) {
-  const { banners, loading, crearBanner, toggleBanner, eliminarBanner } = useAllBanners();
+  const { banners, loading, crearBanner, actualizarBanner, toggleBanner, eliminarBanner } = useAllBanners();
   const [toast, setToast] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({
-    tenant_id: "",
-    titulo: "",
-    descripcion: "",
-    prioridad: "normal" as BannerPrioridad,
-  });
+  const [form, setForm] = useState(FORM_INICIAL);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -33,31 +40,78 @@ export default function BannerManager({ tenants = [] }: { tenants?: Tenant[] }) 
 
   const tenantName = (id: string) => tenants.find((t) => t.id === id)?.nombre ?? id.slice(0, 8);
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const activosDelTenant = banners.filter(
+    (banner) => banner.tenant_id === form.tenant_id && banner.activo && banner.id !== editingId
+  ).length;
+
+  const resetForm = () => {
+    setForm(FORM_INICIAL);
+    setEditingId(null);
+    setShowForm(false);
+  };
+
+  const handleEdit = (banner: TenantBanner) => {
+    setForm({
+      tenant_id: banner.tenant_id,
+      titulo: banner.titulo,
+      descripcion: banner.descripcion ?? "",
+      imagen_url: banner.imagen_url ?? "",
+      enlace_url: banner.enlace_url ?? "",
+      cta_texto: banner.cta_texto ?? "",
+      prioridad: banner.prioridad,
+      orden: banner.orden ?? 0,
+    });
+    setEditingId(banner.id);
+    setShowForm(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.tenant_id || !form.titulo.trim()) return;
+
+    if (activosDelTenant >= 4) {
+      showToast("Este conductor ya tiene 4 banners activos. Desactiva uno para agregar otro.");
+      return;
+    }
+
     setSaving(true);
-    const ok = await crearBanner({
+    const payload = {
       tenant_id: form.tenant_id,
       titulo: form.titulo.trim(),
       descripcion: form.descripcion.trim() || null,
-      imagen_url: null,
+      imagen_url: form.imagen_url.trim() || null,
+      enlace_url: form.enlace_url.trim() || null,
+      cta_texto: form.cta_texto.trim() || null,
       activo: true,
       prioridad: form.prioridad,
-    });
+      orden: Number(form.orden) || 0,
+    };
+
+    const ok = editingId
+      ? await actualizarBanner(editingId, payload)
+      : await crearBanner(payload);
+
     setSaving(false);
     if (ok) {
-      setForm({ tenant_id: "", titulo: "", descripcion: "", prioridad: "normal" });
-      setShowForm(false);
-      showToast("Banner creado");
+      showToast(editingId ? "Banner actualizado" : "Banner creado");
+      resetForm();
     } else {
-      showToast("No se pudo crear el banner");
+      showToast(editingId ? "No se pudo actualizar el banner" : "No se pudo crear el banner");
     }
   };
 
-  const handleToggle = async (b: TenantBanner) => {
-    const ok = await toggleBanner(b.id, !b.activo);
-    if (ok) showToast(`${b.titulo} ${b.activo ? "ocultado" : "visible"}`);
+  const handleToggle = async (banner: TenantBanner) => {
+    if (!banner.activo) {
+      const activos = banners.filter(
+        (item) => item.tenant_id === banner.tenant_id && item.activo && item.id !== banner.id
+      ).length;
+      if (activos >= 4) {
+        showToast("Este conductor ya tiene 4 banners activos. Desactiva uno para mostrar otro.");
+        return;
+      }
+    }
+    const ok = await toggleBanner(banner.id, !banner.activo);
+    if (ok) showToast(`${banner.titulo} ${banner.activo ? "ocultado" : "visible"}`);
   };
 
   const handleDelete = async (b: TenantBanner) => {
@@ -69,9 +123,20 @@ export default function BannerManager({ tenants = [] }: { tenants?: Tenant[] }) 
     <div className="px-4 lg:px-8 py-4 lg:py-6 space-y-4 pb-24 lg:pb-6">
       <Toast message={toast} onClose={() => setToast("")} />
       <div className="flex items-center justify-between">
-        <h2 className="text-base lg:text-lg font-black text-slate-900">Gestion de Banners</h2>
+        <div>
+          <h2 className="text-base lg:text-lg font-black text-slate-900">Gestion de Banners</h2>
+          <p className="text-[10px] text-slate-500">Máximo 4 banners activos por conductor.</p>
+        </div>
         <button
-          onClick={() => setShowForm((v) => !v)}
+          onClick={() => {
+            if (showForm) {
+              resetForm();
+            } else {
+              setForm(FORM_INICIAL);
+              setEditingId(null);
+              setShowForm(true);
+            }
+          }}
           className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[10px] font-bold active:scale-95 transition shadow-md"
         >
           {showForm ? "Cancelar" : "+ Nuevo Banner"}
@@ -79,11 +144,25 @@ export default function BannerManager({ tenants = [] }: { tenants?: Tenant[] }) 
       </div>
 
       {showForm && (
-        <form onSubmit={handleCreate} className="bg-white rounded-2xl p-4 space-y-3 border border-slate-100">
+        <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-4 space-y-3 border border-slate-100">
+          <div className="flex items-center justify-between">
+            <p className="text-[12px] font-black text-slate-900">
+              {editingId ? "Editar banner" : "Nuevo banner"}
+            </p>
+            {form.imagen_url.trim() && (
+              <img
+                src={form.imagen_url}
+                alt=""
+                className="h-10 w-16 rounded-lg object-cover border border-slate-200"
+              />
+            )}
+          </div>
+
           <select
             value={form.tenant_id}
+            disabled={Boolean(editingId)}
             onChange={(e) => setForm({ ...form, tenant_id: e.target.value })}
-            className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-[12px]"
+            className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-[12px] disabled:opacity-60"
           >
             <option value="">Selecciona un conductor</option>
             {tenants.map((t) => <option key={t.id} value={t.id}>{t.nombre}</option>)}
@@ -101,17 +180,49 @@ export default function BannerManager({ tenants = [] }: { tenants?: Tenant[] }) 
             rows={2}
             className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-[12px]"
           />
-          <select
-            value={form.prioridad}
-            onChange={(e) => setForm({ ...form, prioridad: e.target.value as BannerPrioridad })}
+          <input
+            value={form.imagen_url}
+            onChange={(e) => setForm({ ...form, imagen_url: e.target.value })}
+            placeholder="URL de imagen (opcional)"
             className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-[12px]"
-          >
-            <option value="alta">Alta</option>
-            <option value="normal">Normal</option>
-            <option value="baja">Baja</option>
-          </select>
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              value={form.cta_texto}
+              onChange={(e) => setForm({ ...form, cta_texto: e.target.value })}
+              placeholder="Texto del botón"
+              className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-[12px]"
+            />
+            <input
+              value={form.enlace_url}
+              onChange={(e) => setForm({ ...form, enlace_url: e.target.value })}
+              placeholder="Enlace del botón (URL)"
+              className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-[12px]"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <select
+              value={form.prioridad}
+              onChange={(e) => setForm({ ...form, prioridad: e.target.value as BannerPrioridad })}
+              className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-[12px]"
+            >
+              <option value="alta">Prioridad alta</option>
+              <option value="normal">Prioridad normal</option>
+              <option value="baja">Prioridad baja</option>
+            </select>
+            <input
+              type="number"
+              value={form.orden}
+              onChange={(e) => setForm({ ...form, orden: Number(e.target.value) })}
+              placeholder="Orden"
+              className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-[12px]"
+            />
+          </div>
+          <p className="text-[10px] text-slate-400">
+            Orden menor aparece primero. Los banners activos se muestran en el panel del conductor.
+          </p>
           <button type="submit" disabled={saving} className="w-full py-2 rounded-xl bg-emerald-600 text-white text-[12px] font-bold disabled:opacity-60">
-            {saving ? "Guardando..." : "Guardar Banner"}
+            {saving ? "Guardando..." : editingId ? "Guardar cambios" : "Guardar Banner"}
           </button>
         </form>
       )}
@@ -127,8 +238,20 @@ export default function BannerManager({ tenants = [] }: { tenants?: Tenant[] }) 
       <div className="space-y-2">
         {banners.map((b) => (
           <div key={b.id} className="bg-white rounded-2xl p-4 space-y-2 border border-slate-100" style={{ boxShadow: "4px 4px 10px #d9dde2, -4px -4px 10px #ffffff" }}>
-            <div className="flex items-center justify-between">
-              <span className="text-[13px] lg:text-[14px] font-bold text-slate-900">{b.titulo}</span>
+            <div className="flex items-center gap-3">
+              {b.imagen_url ? (
+                <img src={b.imagen_url} alt="" className="h-12 w-16 rounded-xl object-cover border border-slate-200" />
+              ) : (
+                <div className="h-12 w-16 rounded-xl bg-gradient-to-br from-purple-700 to-indigo-800 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-[20px] text-white">campaign</span>
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <span className="text-[13px] lg:text-[14px] font-bold text-slate-900 block truncate">{b.titulo}</span>
+                <span className="text-[10px] text-slate-500 block truncate">
+                  {tenantName(b.tenant_id)} · Orden {b.orden ?? 0} · {b.prioridad}
+                </span>
+              </div>
               <div className="flex items-center gap-2">
                 <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${b.activo ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
                   {b.activo ? "Visible" : "Oculto"}
@@ -143,12 +266,17 @@ export default function BannerManager({ tenants = [] }: { tenants?: Tenant[] }) 
             </div>
             <p className="text-[11px] lg:text-[12px] text-slate-500">{b.descripcion ?? "Sin descripción"}</p>
             <div className="flex items-center justify-between">
-              <span className="font-mono text-[10px] lg:text-[11px] text-slate-500">
-                {tenantName(b.tenant_id)} · Prioridad: {b.prioridad}
+              <span className="font-mono text-[10px] lg:text-[11px] text-slate-500 truncate max-w-[55%]">
+                {b.cta_texto || "Sin botón"}{b.enlace_url ? ` · ${b.enlace_url}` : ""}
               </span>
-              <button onClick={() => handleDelete(b)} className="text-[10px] font-bold text-red-600 active:scale-95">
-                Eliminar
-              </button>
+              <div className="flex items-center gap-3">
+                <button onClick={() => handleEdit(b)} className="text-[10px] font-bold text-purple-600 active:scale-95">
+                  Editar
+                </button>
+                <button onClick={() => handleDelete(b)} className="text-[10px] font-bold text-red-600 active:scale-95">
+                  Eliminar
+                </button>
+              </div>
             </div>
           </div>
         ))}

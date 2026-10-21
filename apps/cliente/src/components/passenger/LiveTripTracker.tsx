@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Carrera } from "@drivip/types";
 import { formatearUsd, formatearBs } from "@drivip/types";
 import { CarreraChat } from "@drivip/supabase";
@@ -24,9 +24,35 @@ interface LiveTripTrackerProps {
 
 const LIGHT_STYLE = "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json";
 
+const BANCOS: Record<string, string> = {
+  "0102": "Banco de Venezuela",
+  "0104": "Venezolano de Crédito",
+  "0105": "Mercantil",
+  "0108": "BBVA Provincial",
+  "0134": "Banesco",
+  "0138": "Banco Plaza",
+  "0146": "Bangente",
+  "0151": "BFC Banco Fondo Común",
+  "0163": "Banco del Tesoro",
+  "0166": "Banco Agrícola de Venezuela",
+  "0168": "Bancrecer",
+  "0169": "Mi Banco",
+  "0171": "Banco Activo",
+  "0172": "Bancamiga",
+  "0174": "Banplus",
+  "0175": "Banco Bicentenario",
+  "0177": "Banfanb",
+  "0191": "Banco Nacional de Crédito",
+};
+
 function minutos(value: number | null): string {
-  if (value === null) return "—";
+  if (value === null) return "-";
   return Math.max(1, Math.round(value)) + " min";
+}
+
+function bancoLabel(codigo: string | null | undefined): string {
+  if (!codigo) return "Sin banco";
+  return `${codigo} · ${BANCOS[codigo] ?? "Banco"}`;
 }
 
 export default function LiveTripTracker({
@@ -49,6 +75,10 @@ export default function LiveTripTracker({
   const [tripMin, setTripMin] = useState<number | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
+  const [minimized, setMinimized] = useState(false);
+  const [copiado, setCopiado] = useState<string | null>(null);
+  const autoExpandRef = useRef(0);
+  const estadoAnteriorRef = useRef(carrera.estado);
 
   const waiting = carrera.estado === "pendiente";
   const accepted = carrera.estado === "aceptada";
@@ -86,6 +116,55 @@ export default function LiveTripTracker({
         ? "Transferencia"
         : "Efectivo";
 
+  const pagoMovil = driver.paymentData?.pagoMovil;
+  const pagoMovilCompleto = Boolean(
+    pagoMovil?.activo &&
+      pagoMovil.banco &&
+      pagoMovil.cedula &&
+      pagoMovil.telefono
+  );
+  const montoBs = formatearBs(priceUsd, tasa ?? undefined);
+
+  const copiar = async (texto: string | null | undefined, key: string) => {
+    if (!texto) return;
+    try {
+      await navigator.clipboard.writeText(texto);
+    } catch {
+      const input = document.createElement("textarea");
+      input.value = texto;
+      input.style.position = "fixed";
+      input.style.opacity = "0";
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand("copy");
+      document.body.removeChild(input);
+    }
+    setCopiado(key);
+    window.setTimeout(() => {
+      setCopiado((actual) => (actual === key ? null : actual));
+    }, 1800);
+  };
+
+  const minimizar = () => {
+    autoExpandRef.current = Date.now();
+    setMinimized(true);
+  };
+
+  const copiarPagoMovil = () => {
+    if (!pagoMovil) return;
+    void copiar(
+      [
+        `Banco: ${bancoLabel(pagoMovil.banco)}`,
+        `Cédula: ${pagoMovil.cedula ?? ""}`,
+        `Teléfono: ${pagoMovil.telefono ?? ""}`,
+        priceUsd > 0 ? `Monto: ${montoBs}` : null,
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      "todo"
+    );
+  };
+
   const whatsappHref = useMemo(() => {
     const digits = (driver.whatsapp || "").replace(/\D/g, "");
     if (digits.length < 7) return null;
@@ -105,7 +184,23 @@ export default function LiveTripTracker({
     setTripMin(null);
     setChatOpen(false);
     setPaymentOpen(false);
+    setMinimized(false);
+    setCopiado(null);
   }, [carrera.id]);
+
+  useEffect(() => {
+    if (estadoAnteriorRef.current === carrera.estado) return;
+    estadoAnteriorRef.current = carrera.estado;
+    setMinimized(false);
+  }, [carrera.estado]);
+
+  useEffect(() => {
+    if (!minimized || !conductorUpdatedAt) return;
+    const ahora = Date.now();
+    if (ahora - autoExpandRef.current < 25000) return;
+    autoExpandRef.current = ahora;
+    setMinimized(false);
+  }, [conductorUpdatedAt, minimized]);
 
   useEffect(() => {
     if (!accepted || !conductorLocation) return;
@@ -324,8 +419,53 @@ export default function LiveTripTracker({
       </div>
 
       <div className="absolute inset-x-0 bottom-0 z-30 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        {minimized ? (
+          <button
+            type="button"
+            onClick={() => setMinimized(false)}
+            className="mx-auto flex w-full max-w-lg items-center gap-3 rounded-2xl border border-white/80 bg-white/[0.97] p-3 text-left shadow-[0_-12px_40px_rgba(15,23,42,0.25)] backdrop-blur-2xl active:scale-[0.99]"
+          >
+            <span className="relative shrink-0">
+              {driver.image ? (
+                <img
+                  alt={`Conductor ${driver.name}`}
+                  className="h-11 w-11 rounded-2xl border-2 border-white object-cover shadow-md"
+                  src={driver.image}
+                />
+              ) : (
+                <span className={`flex h-11 w-11 items-center justify-center rounded-2xl text-sm font-black shadow-md ${driver.color}`}>
+                  {driver.initials}
+                </span>
+              )}
+              {active && (
+                <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 animate-pulse rounded-full border-2 border-white bg-emerald-500" />
+              )}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[13px] font-black text-slate-900">
+                {driver.name} · {etaText}
+              </span>
+              <span className="block truncate text-[11px] font-semibold text-slate-500">
+                {statusTitle} · toca para ver el mapa
+              </span>
+            </span>
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-purple-100 text-purple-700">
+              <span className="material-symbols-outlined text-[20px]">keyboard_arrow_up</span>
+            </span>
+          </button>
+        ) : (
         <div className="mx-auto max-h-[64dvh] w-full max-w-lg overflow-y-auto overscroll-contain rounded-[28px] border border-white/80 bg-white/[0.97] shadow-[0_-20px_60px_rgba(15,23,42,0.28)] backdrop-blur-2xl">
-          <div className="mx-auto mt-2.5 h-1.5 w-10 rounded-full bg-slate-200" />
+          <div className="flex items-center justify-between px-4 pt-2.5">
+            <span className="h-1.5 w-10 rounded-full bg-slate-200" />
+            <button
+              type="button"
+              onClick={minimizar}
+              aria-label="Minimizar seguimiento del viaje"
+              className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 text-slate-500 active:scale-95"
+            >
+              <span className="material-symbols-outlined text-[20px]">keyboard_arrow_down</span>
+            </button>
+          </div>
 
           <div className="space-y-3 p-4">
             <div className="flex items-start gap-3">
@@ -435,6 +575,38 @@ export default function LiveTripTracker({
                 </div>
               </div>
             </div>
+
+            {active && (
+              <button
+                type="button"
+                onClick={() => setPaymentOpen(true)}
+                className="flex w-full items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50/80 p-3 text-left transition active:scale-[0.99]"
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-400 text-white shadow-md">
+                  <span className="material-symbols-outlined text-[20px]">
+                    {carrera.metodo_pago === "pago_movil" ? "contactless" : "payments"}
+                  </span>
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[11px] font-black uppercase tracking-wider text-amber-700">
+                    Método de pago
+                  </span>
+                  <span className="block truncate text-[13px] font-black text-amber-950">
+                    {metodoPago}
+                  </span>
+                  <span className="block truncate text-[10px] font-semibold text-amber-700">
+                    {carrera.metodo_pago === "pago_movil"
+                      ? pagoMovilCompleto
+                        ? "Datos del conductor listos para copiar"
+                        : "Solicita los datos al conductor"
+                      : "Pago directo al conductor, sin comisiones"}
+                  </span>
+                </span>
+                <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[10px] font-black text-amber-700 shadow-sm">
+                  Ver datos
+                </span>
+              </button>
+            )}
 
             {active && (
               <div className="grid grid-cols-3 gap-2">
@@ -564,6 +736,7 @@ export default function LiveTripTracker({
             )}
           </div>
         </div>
+        )}
       </div>
 
       {chatOpen && (
@@ -634,19 +807,95 @@ export default function LiveTripTracker({
               )}
             </div>
 
-            <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-3.5">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-[19px] text-amber-700">
-                  {metodoPago === "Pago Móvil" ? "qr_code_scanner" : "payments"}
-                </span>
-                <p className="text-xs font-black text-amber-950">{metodoPago}</p>
+            {metodoPago === "Pago Móvil" && pagoMovilCompleto && pagoMovil ? (
+              <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-3.5">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[19px] text-emerald-700">
+                      contactless
+                    </span>
+                    <p className="text-xs font-black text-emerald-950">Datos Pago Móvil</p>
+                  </div>
+                  <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-white">
+                    Listo
+                  </span>
+                </div>
+
+                <div className="mt-2.5 rounded-xl bg-emerald-600 px-3 py-2 text-white">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-100">
+                    Monto a pagar
+                  </p>
+                  <p className="text-lg font-black leading-tight">{montoBs}</p>
+                </div>
+
+                <div className="mt-2 space-y-1.5">
+                  {[
+                    { key: "banco", label: "Banco", value: bancoLabel(pagoMovil.banco) },
+                    { key: "cedula", label: "Cédula", value: pagoMovil.cedula ?? "" },
+                    { key: "telefono", label: "Teléfono", value: pagoMovil.telefono ?? "" },
+                  ].map((item) => (
+                    <div
+                      key={item.key}
+                      className="flex items-center gap-2 rounded-xl bg-white px-3 py-2 shadow-sm"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
+                          {item.label}
+                        </p>
+                        <p className="truncate text-sm font-black text-slate-900">{item.value}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void copiar(item.value, item.key)}
+                        aria-label={`Copiar ${item.label}`}
+                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition active:scale-90 ${
+                          copiado === item.key
+                            ? "bg-emerald-600 text-white"
+                            : "bg-slate-100 text-slate-600"
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-[17px]">
+                          {copiado === item.key ? "check" : "content_copy"}
+                        </span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={copiarPagoMovil}
+                  className={`mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-black transition active:scale-[0.98] ${
+                    copiado === "todo"
+                      ? "bg-emerald-700 text-white"
+                      : "bg-white text-emerald-700 shadow-sm"
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[17px]">
+                    {copiado === "todo" ? "check" : "content_copy"}
+                  </span>
+                  {copiado === "todo" ? "Datos copiados" : "Copiar todos los datos"}
+                </button>
+
+                <p className="mt-2 text-[10px] font-medium leading-relaxed text-emerald-800">
+                  Realiza el Pago Móvil y envía el comprobante por WhatsApp al conductor.
+                </p>
               </div>
-              <p className="mt-1 text-xs font-medium leading-relaxed text-amber-800">
-                {metodoPago === "Pago Móvil"
-                  ? "Paga directamente al conductor. Solicita sus datos por WhatsApp y envía el comprobante."
-                  : "Paga directamente al conductor al finalizar el viaje. Drivip no cobra comisiones."}
-              </p>
-            </div>
+            ) : (
+              <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-3.5">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[19px] text-amber-700">
+                    {metodoPago === "Pago Móvil" ? "qr_code_scanner" : "payments"}
+                  </span>
+                  <p className="text-xs font-black text-amber-950">{metodoPago}</p>
+                </div>
+                <p className="mt-1 text-xs font-medium leading-relaxed text-amber-800">
+                  {metodoPago === "Pago Móvil"
+                    ? "El conductor aún no ha cargado sus datos de Pago Móvil. Solicítalos por WhatsApp y envía el comprobante."
+                    : "Paga directamente al conductor al finalizar el viaje. Drivip no cobra comisiones."}
+                </p>
+              </div>
+            )}
 
             <a
               href={whatsappHref ?? undefined}

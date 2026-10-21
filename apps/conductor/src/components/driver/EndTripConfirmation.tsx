@@ -32,7 +32,7 @@ export default function EndTripConfirmation({ isOpen, onClose, onConfirm, rideDe
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 sm:p-6 lg:p-8">
+    <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-4 sm:p-6 lg:p-8">
       <div className="absolute inset-0 bg-slate-900/75 backdrop-blur-sm" onClick={handleClose} />
 
       <div className="relative bg-white w-full max-w-sm sm:max-w-md lg:max-w-lg rounded-3xl p-5 sm:p-6 lg:p-8 shadow-2xl border border-slate-100 space-y-5">

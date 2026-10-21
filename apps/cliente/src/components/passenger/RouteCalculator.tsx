@@ -13,6 +13,8 @@ import {
 interface RouteCalculatorProps {
   onOpenMap: () => void;
   onOpenOriginMap?: () => void;
+  onUseCurrentLocation?: () => void;
+  originIsCurrent?: boolean;
   distanceKm: number;
   distance: string;
   tarifas?: TarifasTenant | null;
@@ -43,6 +45,8 @@ function localDateInput(date: Date): string {
 export default function RouteCalculator({
   onOpenMap,
   onOpenOriginMap,
+  onUseCurrentLocation,
+  originIsCurrent = false,
   distanceKm,
   distance,
   tarifas,
@@ -259,9 +263,16 @@ export default function RouteCalculator({
               </svg>
             </div>
             <div className="min-w-0 flex-1">
-              <span className="block text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                Punto de origen
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="block text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  Punto de origen
+                </span>
+                {originIsCurrent && (
+                  <span className="rounded-full bg-purple-100 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-purple-700">
+                    Predeterminada
+                  </span>
+                )}
+              </div>
               <button
                 type="button"
                 onClick={onOpenOriginMap ?? onOpenMap}
@@ -270,6 +281,25 @@ export default function RouteCalculator({
                 {origin || "Mi ubicación actual"}
               </button>
             </div>
+            {onUseCurrentLocation && (
+              <button
+                type="button"
+                title="Usar mi ubicación actual"
+                aria-label="Usar mi ubicación actual"
+                onClick={onUseCurrentLocation}
+                className={`flex flex-shrink-0 items-center gap-1 rounded-xl border px-2.5 py-1.5 text-[11px] font-bold shadow-sm transition active:scale-95 lg:text-xs ${
+                  originIsCurrent
+                    ? "border-purple-300 bg-purple-100 text-purple-700"
+                    : "border-emerald-200 bg-white text-emerald-700"
+                }`}
+              >
+                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="3" strokeWidth="2" />
+                  <path d="M12 2v3m0 14v3m10-10h-3M5 12H2" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+                </svg>
+                <span className="hidden lg:inline">Actual</span>
+              </button>
+            )}
             <button
               type="button"
               className="flex flex-shrink-0 items-center gap-1 rounded-xl border border-emerald-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-emerald-700 shadow-sm transition active:scale-95 lg:text-xs"

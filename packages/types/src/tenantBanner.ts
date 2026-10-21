@@ -6,7 +6,10 @@ export interface TenantBanner {
   titulo: string;
   descripcion: string | null;
   imagen_url: string | null;
+  enlace_url?: string | null;
+  cta_texto?: string | null;
   activo: boolean;
   prioridad: BannerPrioridad;
+  orden?: number;
   created_at: string;
 }

@@ -629,6 +629,14 @@ function AppContent() {
   const [authView, setAuthView] = useState<"landing" | "login" | "register">("landing");
   const [registered, setRegistered] = useState<{ nombre: string; apellido: string; cedula: string; plan: string; slug: string } | null>(null);
 
+  const demoParam =
+    typeof window !== "undefined" &&
+    ["1", "true"].includes(new URLSearchParams(window.location.search).get("demo") ?? "");
+
+  if (demoParam) {
+    return <DriverApp demo />;
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-[#f4f6f8]">

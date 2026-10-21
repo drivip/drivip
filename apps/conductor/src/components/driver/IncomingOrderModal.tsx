@@ -10,8 +10,11 @@ interface IncomingOrderModalProps {
   isOpen: boolean;
   onAccept: () => void;
   onReject: (reason?: string) => void;
+  onDismiss?: () => void;
   onQuote?: (precio: number) => Promise<boolean>;
   carrera: Carrera;
+  clienteNombre?: string;
+  clienteTelefono?: string | null;
 }
 
 const QUICK_REJECTIONS = [
@@ -20,7 +23,16 @@ const QUICK_REJECTIONS = [
   "Zona fuera de cobertura",
 ];
 
-export default function IncomingOrderModal({ isOpen, onAccept, onReject, onQuote, carrera }: IncomingOrderModalProps) {
+export default function IncomingOrderModal({
+  isOpen,
+  onAccept,
+  onReject,
+  onDismiss,
+  onQuote,
+  carrera,
+  clienteNombre,
+  clienteTelefono,
+}: IncomingOrderModalProps) {
   const [showRejectOptions, setShowRejectOptions] = useState(false);
   const [routePreview, setRoutePreview] = useState<[number, number][] | null>(null);
   const [distanceKm, setDistanceKm] = useState(carrera.distancia_km ?? 0);
@@ -84,7 +96,10 @@ export default function IncomingOrderModal({ isOpen, onAccept, onReject, onQuote
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 sm:p-6 lg:p-8">
-      <div className="absolute inset-0 bg-slate-900/75 backdrop-blur-sm" onClick={() => onReject()} />
+      <div
+        className="absolute inset-0 bg-slate-900/75 backdrop-blur-sm"
+        onClick={() => (onDismiss ? onDismiss() : onReject())}
+      />
 
       <div className="relative bg-white w-full max-w-sm sm:max-w-md lg:max-w-lg rounded-3xl overflow-hidden shadow-2xl border border-slate-100 animate-in slide-in-from-bottom duration-300 max-h-[90vh] flex flex-col">
         <div className="relative h-44 flex-shrink-0">
@@ -101,8 +116,9 @@ export default function IncomingOrderModal({ isOpen, onAccept, onReject, onQuote
             <h3 className="text-sm font-black text-white bg-slate-900/70 backdrop-blur-sm px-3 py-1 rounded-full">Nueva Solicitud</h3>
           </div>
           <button
-            onClick={() => onReject()}
+            onClick={() => (onDismiss ? onDismiss() : onReject())}
             className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-slate-900/50 backdrop-blur-sm flex items-center justify-center text-white active:scale-95"
+            aria-label="Cerrar detalle"
           >
             <span className="material-symbols-outlined text-[18px]">close</span>
           </button>
@@ -114,14 +130,26 @@ export default function IncomingOrderModal({ isOpen, onAccept, onReject, onQuote
         <div className="p-5 space-y-4 overflow-y-auto flex-1">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-purple-100 flex items-center justify-center border-2 border-white shadow-md">
-                <span className="text-base font-bold text-purple-700">
-                  {carrera.cliente_id?.charAt(0)?.toUpperCase() ?? "C"}
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-600 to-indigo-700 flex items-center justify-center border-2 border-white shadow-md">
+                <span className="text-base font-black text-white">
+                  {(clienteNombre || carrera.cliente_id || "C").charAt(0).toUpperCase()}
                 </span>
               </div>
-              <div>
-                <p className="text-sm font-black text-slate-900">Cliente</p>
-                <p className="text-[10px] text-slate-500">ID: {carrera.cliente_id}</p>
+              <div className="min-w-0">
+                <p className="text-sm font-black text-slate-900 truncate">
+                  {clienteNombre || "Cliente"}
+                </p>
+                {clienteTelefono ? (
+                  <a
+                    href={`tel:${clienteTelefono}`}
+                    className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-bold text-purple-600"
+                  >
+                    <span className="material-symbols-outlined text-[12px]">call</span>
+                    {clienteTelefono}
+                  </a>
+                ) : (
+                  <p className="text-[10px] text-slate-500">Cliente de tu red</p>
+                )}
               </div>
             </div>
             <div className="text-right">

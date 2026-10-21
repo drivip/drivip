@@ -1,8 +1,22 @@
-import { useState, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { DisponibilidadConductor } from "@drivip/types";
 import { cn } from "@drivip/ui";
-import { useAuthContext, useCarreras, useUbicaciones, useMiTenant, APP_URLS, enviarPushCarrera } from "@drivip/supabase";
+import {
+  actualizarDisponibilidadConductor,
+  APP_URLS,
+  enviarPushCarrera,
+  useAuthContext,
+  useCarreras,
+  useConversacionesConductor,
+  useMiTenant,
+  leerDisponibilidadLocal,
+  limpiarDisponibilidadLocal,
+  useUbicaciones,
+} from "@drivip/supabase";
 import DriverHeader from "../components/driver/DriverHeader";
 import DriverFullGridMenu from "../components/driver/DriverFullGridMenu";
+import DriverProfileModal from "../components/driver/DriverProfileModal";
+import DriverReviewsModal from "../components/driver/DriverReviewsModal";
 import ChoferDashboard from "../components/ChoferDashboard";
 import Carreras from "../components/Carreras";
 import Historial from "../components/Historial";
@@ -14,8 +28,12 @@ import MisClientes from "../components/MisClientes";
 import MisPagos from "../components/MisPagos";
 import Referidos from "../components/Referidos";
 import Configuracion from "../components/Configuracion";
+import CouponsManager from "../components/CouponsManager";
 import QRSection from "../components/QRSection";
-import { MOCK_DRIVER_PROFILE } from "../mockData/driverMockData";
+import {
+  MOCK_CLIENTES_TENANT,
+  MOCK_DRIVER_PROFILE,
+} from "../mockData/driverMockData";
 
 type Module =
   | "dashboard"
@@ -28,6 +46,7 @@ type Module =
   | "perfil"
   | "plan"
   | "referidos"
+  | "cupones"
   | "config"
   | "qr"
   | "reportes"
@@ -48,31 +67,133 @@ const MOCK_CARRERAS_CONDUCTOR = [
   { id: "cc3", tenant_id: "tc1", conductor_id: "tc1", cliente_id: "u3", estado: "pendiente" as const, origen_lat: 10.4750, origen_lng: -66.9100, origen_direccion: "Los Palos Grandes", destino_lat: 10.4900, destino_lng: -66.8700, destino_direccion: "Las Mercedes", distancia_km: 5.0, duracion_min: 20, precio: 8.50, metodo_pago: "efectivo" as const, comprobante_url: null, calificacion: null, comentario_calificacion: null, created_at: new Date().toISOString(), aceptada_at: null, completada_at: null, cancelada_at: null },
 ];
 
+
 export default function DriverApp({ demo }: { demo?: boolean }) {
-  const { user, signOut } = useAuthContext();
+  const { user } = useAuthContext();
   const [activeModule, setActiveModule] = useState<Module>("dashboard");
   const [menuOpen, setMenuOpen] = useState(false);
-  const [isOnline, setIsOnline] = useState(true);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profileTab, setProfileTab] = useState<"perfil" | "mensajes">("perfil");
+  const [reviewsOpen, setReviewsOpen] = useState(false);
   const [carreraActiva, setCarreraActiva] = useState<string | null>(null);
+  const [disponibilidad, setDisponibilidad] = useState<DisponibilidadConductor>("disponible");
+  const [disponibilidadNota, setDisponibilidadNota] = useState<string | null>(null);
+  const [disponibilidadHasta, setDisponibilidadHasta] = useState<string | null>(null);
+  const [disponibilidadError, setDisponibilidadError] = useState<string | null>(null);
+  const [guardandoDisponibilidad, setGuardandoDisponibilidad] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
   const arrivedNotifiedRef = useRef<Set<string>>(new Set());
+  const terminalPendingRef = useRef<Set<string>>(new Set());
 
   const { tenant, refetch: refetchTenant } = useMiTenant(demo ? null : user?.id);
   const { carreras, updateCarreraEstado, marcarLlegadaCarrera, quoteCarrera } = useCarreras(tenant?.id);
   const { reportarUbicacion } = useUbicaciones(tenant?.id ?? "");
+  const {
+    conversaciones,
+    userId,
+    loading: conversacionesLoading,
+    totalNoLeidos,
+    marcarLeida,
+    refetch: refetchConversaciones,
+  } = useConversacionesConductor();
 
   const effectiveCarreras = demo ? MOCK_CARRERAS_CONDUCTOR : carreras;
   const isPaused = !demo && !!tenant?.pausado;
 
   useEffect(() => {
-    if (!carreraActiva) return;
-    const activa = effectiveCarreras.find((c) => c.id === carreraActiva);
-    if (activa && (activa.estado === "completada" || activa.estado === "cancelada")) {
-      setCarreraActiva(null);
+    if (!tenant) return;
+
+    const local = leerDisponibilidadLocal(tenant.id);
+    if (local && tenant.disponibilidad === undefined) {
+      setDisponibilidad(local.estado);
+      setDisponibilidadNota(local.nota);
+      setDisponibilidadHasta(local.hasta);
+      setIsOnline(local.estado === "disponible" && !tenant.pausado);
+      return;
     }
-  }, [carreraActiva, effectiveCarreras]);
+    if (tenant.disponibilidad !== undefined) {
+      limpiarDisponibilidadLocal(tenant.id);
+    }
+
+    const estado = tenant.disponibilidad ?? "disponible";
+    setDisponibilidad(estado);
+    setDisponibilidadNota(tenant.disponibilidad_nota ?? null);
+    setDisponibilidadHasta(tenant.disponibilidad_hasta ?? null);
+    setIsOnline(estado === "disponible" && !tenant.pausado);
+  }, [
+    tenant?.id,
+    tenant?.disponibilidad,
+    tenant?.disponibilidad_nota,
+    tenant?.disponibilidad_hasta,
+    tenant?.pausado,
+  ]);
+
+  const cambiarDisponibilidad = useCallback(
+    async (estado: DisponibilidadConductor, nota?: string | null) => {
+      const notaFinal =
+        estado === "personalizado"
+          ? nota?.trim() || "No disponible"
+          : estado === "pausa_30"
+            ? nota?.trim() || "Se desocupa en 30 min"
+            : null;
+      const hasta = estado === "pausa_30" ? new Date(Date.now() + 30 * 60000).toISOString() : null;
+
+      setDisponibilidad(estado);
+      setDisponibilidadNota(notaFinal);
+      setDisponibilidadHasta(hasta);
+      setIsOnline(estado === "disponible" && !isPaused);
+      setDisponibilidadError(null);
+
+      if (demo) return;
+
+      setGuardandoDisponibilidad(true);
+
+      const resultado = await actualizarDisponibilidadConductor(
+        estado,
+        nota,
+        tenant?.id
+      );
+      setGuardandoDisponibilidad(false);
+
+      if (!resultado.ok) {
+        // Mantenemos el estado elegido en pantalla para que los botones
+        // respondan aunque la migración SQL aún no esté aplicada.
+        setDisponibilidadError(
+          "El estado se guardó en este dispositivo, pero no se pudo sincronizar con el servidor."
+        );
+      }
+    },
+    [demo, isPaused, tenant?.id]
+  );
 
   useEffect(() => {
-    if (!isOnline || !tenant?.id) return;
+    if (disponibilidad !== "pausa_30" || !disponibilidadHasta) return;
+    const restante = new Date(disponibilidadHasta).getTime() - Date.now();
+    if (restante <= 0) {
+      void cambiarDisponibilidad("disponible");
+      return;
+    }
+    const timer = setTimeout(() => { void cambiarDisponibilidad("disponible"); }, restante);
+    return () => clearTimeout(timer);
+  }, [disponibilidad, disponibilidadHasta, cambiarDisponibilidad]);
+
+  useEffect(() => {
+    if (!carreraActiva) return;
+    const activa = effectiveCarreras.find((c) => c.id === carreraActiva);
+    if (
+      activa &&
+      (activa.estado === "completada" || activa.estado === "cancelada") &&
+      !terminalPendingRef.current.has(activa.id)
+    ) {
+      setCarreraActiva(null);
+      if (disponibilidad === "ocupado" || disponibilidad === "personalizado") {
+        void cambiarDisponibilidad("disponible");
+      }
+    }
+  }, [carreraActiva, effectiveCarreras, disponibilidad, cambiarDisponibilidad]);
+
+  useEffect(() => {
+    if ((!isOnline && !carreraActiva) || !tenant?.id) return;
 
     const watchId = navigator.geolocation.watchPosition(
       (pos) => {
@@ -92,9 +213,26 @@ export default function DriverApp({ demo }: { demo?: boolean }) {
     return () => {
       navigator.geolocation.clearWatch(watchId);
     };
-  }, [isOnline, tenant?.id, reportarUbicacion]);
+  }, [isOnline, carreraActiva, tenant?.id, reportarUbicacion]);
+
+  const openProfile = (tab: "perfil" | "mensajes" = "perfil") => {
+    setProfileTab(tab);
+    setProfileOpen(true);
+  };
 
   const handleNavigate = (module: string) => {
+    if (module === "mensajes") {
+      openProfile("mensajes");
+      return;
+    }
+    if (module === "perfil") {
+      openProfile("perfil");
+      return;
+    }
+    if (module === "resenas") {
+      setReviewsOpen(true);
+      return;
+    }
     setActiveModule(module as Module);
   };
 
@@ -102,10 +240,11 @@ export default function DriverApp({ demo }: { demo?: boolean }) {
     const ok = await updateCarreraEstado(id, "aceptada");
     if (ok) {
       setCarreraActiva(id);
+      void cambiarDisponibilidad("ocupado", "En servicio");
       void enviarPushCarrera({
         carrera_id: id,
         title: "Solicitud aceptada",
-        body: "Tu conductor acepto el viaje y va en camino al punto de recogida.",
+        body: "Tu conductor aceptó el viaje y va en camino al punto de recogida.",
         tag: `carrera-${id}`,
         data: { carrera_id: id },
       });
@@ -127,17 +266,22 @@ export default function DriverApp({ demo }: { demo?: boolean }) {
   };
 
   const rejectCarrera = async (id: string) => {
+    const eraActiva = carreraActiva === id;
+    terminalPendingRef.current.add(id);
     const ok = await updateCarreraEstado(id, "cancelada");
-    if (ok) {
-      void enviarPushCarrera({
-        carrera_id: id,
-        title: "Solicitud no aceptada",
-        body: "El conductor no pudo tomar tu solicitud. Elige otro conductor de tu red.",
-        tag: `carrera-${id}`,
-        data: { carrera_id: id },
-      });
-    }
+    terminalPendingRef.current.delete(id);
+    if (!ok) return;
+    void enviarPushCarrera({
+      carrera_id: id,
+      title: "Solicitud no aceptada",
+      body: "El conductor no pudo tomar tu solicitud. Elige otro conductor de tu red.",
+      tag: `carrera-${id}`,
+      data: { carrera_id: id },
+    });
     setCarreraActiva(null);
+    if (eraActiva && (disponibilidad === "ocupado" || disponibilidad === "personalizado")) {
+      void cambiarDisponibilidad("disponible");
+    }
   };
 
   const startCarrera = async (id: string) => {
@@ -146,7 +290,7 @@ export default function DriverApp({ demo }: { demo?: boolean }) {
       void enviarPushCarrera({
         carrera_id: id,
         title: "Viaje iniciado",
-        body: "El conductor marco el inicio del viaje. Buen camino.",
+        body: "El conductor marcó el inicio del viaje. Buen camino.",
         tag: `carrera-${id}`,
         data: { carrera_id: id },
       });
@@ -158,135 +302,199 @@ export default function DriverApp({ demo }: { demo?: boolean }) {
     arrivedNotifiedRef.current.add(id);
 
     const ok = await marcarLlegadaCarrera(id);
-    if (!ok) arrivedNotifiedRef.current.delete(id);
+    if (!ok) {
+      arrivedNotifiedRef.current.delete(id);
+      return;
+    }
 
     void enviarPushCarrera({
       carrera_id: id,
-      title: "Tu conductor llego",
-      body: "El conductor esta en el punto de recogida.",
+      title: "Tu conductor llegó",
+      body: "El conductor está en el punto de recogida.",
       tag: `carrera-${id}`,
       data: { carrera_id: id },
     });
   };
 
   const completeCarrera = async (id: string) => {
+    terminalPendingRef.current.add(id);
     const ok = await updateCarreraEstado(id, "completada");
-    if (ok) {
-      void enviarPushCarrera({
-        carrera_id: id,
-        title: "Viaje completado",
-        body: "Llegaste a tu destino. Califica tu viaje.",
-        tag: `carrera-${id}`,
-        data: { carrera_id: id },
-      });
-    }
+    terminalPendingRef.current.delete(id);
+    if (!ok) return;
+    void enviarPushCarrera({
+      carrera_id: id,
+      title: "Viaje completado",
+      body: "Llegaste a tu destino. Califica tu viaje.",
+      tag: `carrera-${id}`,
+      data: { carrera_id: id },
+    });
     setCarreraActiva(null);
+    void cambiarDisponibilidad("disponible");
   };
 
   const profile = {
     name: demo ? MOCK_DRIVER_PROFILE.nombre : (tenant?.nombre ?? user?.email ?? "Conductor"),
     slug: demo ? MOCK_DRIVER_PROFILE.slug : (tenant?.slug ?? "conductor"),
-    initial: demo ? MOCK_DRIVER_PROFILE.nombre.charAt(0) : (tenant?.nombre?.charAt(0) ?? user?.email?.charAt(0)?.toUpperCase() ?? "C"),
+    initial: demo
+      ? MOCK_DRIVER_PROFILE.nombre.charAt(0)
+      : (tenant?.nombre?.charAt(0) ?? user?.email?.charAt(0)?.toUpperCase() ?? "C"),
   };
 
   const domain = APP_URLS.conductor;
 
-  const isDashboard = activeModule === "dashboard";
-
   return (
-    <div className="h-[100dvh] w-full overflow-hidden bg-[#f4f6f8]">
-      {isPaused && !isDashboard && (
-        <div className="bg-amber-500 text-white text-[11px] font-bold text-center py-2 px-4 flex items-center justify-center gap-2">
+    <div
+      className="min-h-[100dvh] w-full bg-[#f1f4f8]"
+      style={{
+        backgroundImage:
+          "radial-gradient(circle at 1px 1px, rgba(100,116,139,0.16) 1px, transparent 0)",
+        backgroundSize: "18px 18px",
+      }}
+    >
+      {isPaused && (
+        <div className="flex items-center justify-center gap-2 bg-amber-500 px-4 py-2 text-center text-[11px] font-bold text-white">
           <span className="material-symbols-outlined text-[16px]">pause_circle</span>
-          Tu cuenta esta pausada por el administrador. Algunas funciones estan deshabilitadas.
+          Tu cuenta está pausada por el administrador. No puedes recibir carreras nuevas.
         </div>
       )}
-      {isDashboard ? (
-        <ChoferDashboard
-          onNavigate={handleNavigate}
-          carreras={effectiveCarreras}
-          isOnline={isOnline && !isPaused}
-          onToggleOnline={() => !isPaused && setIsOnline(!isOnline)}
-          onAcceptCarrera={acceptCarrera}
-          onRejectCarrera={rejectCarrera}
-          onStartCarrera={startCarrera}
-          onCompleteCarrera={completeCarrera}
-          onArrivedAtPickup={notifyArrivedAtPickup}
-          onQuoteCarrera={sendQuote}
-          carreraActiva={carreraActiva}
-          domain={domain}
-          profileName={profile.name}
-          isPaused={isPaused}
-        />
-      ) : (
-        <>
-          <div className="lg:hidden">
-            <DriverHeader
-              domain={domain}
-              isOnline={isOnline && !isPaused}
-              profileInitial={profile.initial}
-              onMenuClick={() => setMenuOpen(true)}
-              onProfileClick={() => handleNavigate("perfil")}
-            />
-          </div>
 
-          <main className="pt-[calc(4rem+env(safe-area-inset-top,0px))] pb-[calc(5rem+env(safe-area-inset-bottom,0px))] h-[100dvh] overflow-y-auto lg:pt-0 lg:pb-0">
-            {activeModule === "clientes" && <MisClientes tenantId={tenant?.id} />}
-            {activeModule === "aliados" && <MisAliados tenantId={tenant?.id} />}
-            {activeModule === "precios" && <MisPrecios tenant={tenant} demo={demo} onSaved={refetchTenant} />}
-            {activeModule === "pagos" && <MisPagos carreras={effectiveCarreras} tenant={tenant} tenantId={tenant?.id} />}
-            {activeModule === "carreras" && (
-              <Carreras
-                carreras={effectiveCarreras}
-                onAccept={acceptCarrera}
-                onReject={rejectCarrera}
-                onComplete={completeCarrera}
-              />
-            )}
-            {activeModule === "historial" && <Historial carreras={effectiveCarreras} tenantId={tenant?.id} />}
-            {activeModule === "perfil" && <MiPerfil tenant={tenant} demo={demo} />}
-            {activeModule === "plan" && <MiPlan tenant={tenant} demo={demo} />}
-            {activeModule === "referidos" && <Referidos tenant={tenant} />}
-            {activeModule === "config" && <Configuracion isPaused={isPaused} tenantId={tenant?.id} />}
-            {activeModule === "qr" && (
-              <QRSection profileSlug={profile.slug} profileName={profile.name} isOnline={isOnline && !isPaused} />
-            )}
-            {activeModule === "reportes" && <Historial carreras={effectiveCarreras} tenantId={tenant?.id} />}
-            {activeModule === "rutas" && <MisPrecios tenant={tenant} demo={demo} onSaved={refetchTenant} />}
-            {activeModule === "tarifas" && <MisPrecios tenant={tenant} demo={demo} onSaved={refetchTenant} />}
-          </main>
+      <DriverHeader
+        domain={domain}
+        isOnline={isOnline && !isPaused}
+        profileInitial={profile.initial}
+        onMenuClick={() => setMenuOpen(true)}
+        onProfileClick={() => openProfile("perfil")}
+      />
 
-          <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-lg border-t border-slate-200/80 px-4 py-2 lg:hidden">
-            <div className="max-w-3xl mx-auto flex items-center justify-between">
-              {bottomNavItems.map((item) => {
-                const isActive = activeModule === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => handleNavigate(item.id)}
-                    className={cn(
-                      "flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-all active:scale-95",
-                      isActive ? "text-purple-700" : "text-slate-500"
-                    )}
-                  >
-                    <span className="material-symbols-outlined text-[22px]" style={isActive ? { fontVariationSettings: "'FILL' 1" } : undefined}>
-                      {item.icon}
-                    </span>
-                    <span className={cn("text-[10px] font-semibold", isActive && "font-bold")}>{item.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </nav>
-        </>
-      )}
+      <main className="pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
+        {activeModule === "dashboard" && (
+          <ChoferDashboard
+            onNavigate={handleNavigate}
+            tenantId={tenant?.id}
+            carreras={effectiveCarreras}
+            disponibilidad={disponibilidad}
+            disponibilidadNota={disponibilidadNota}
+            disponibilidadHasta={disponibilidadHasta}
+            guardandoDisponibilidad={guardandoDisponibilidad}
+            disponibilidadError={disponibilidadError}
+            onDisponibilidadChange={cambiarDisponibilidad}
+            onAcceptCarrera={acceptCarrera}
+            onRejectCarrera={rejectCarrera}
+            onStartCarrera={startCarrera}
+            onCompleteCarrera={completeCarrera}
+            onArrivedAtPickup={notifyArrivedAtPickup}
+            onQuoteCarrera={sendQuote}
+            carreraActiva={carreraActiva}
+            profileName={profile.name}
+            isPaused={isPaused}
+            totalNoLeidos={totalNoLeidos}
+          />
+        )}
+        {activeModule === "clientes" && (
+          <MisClientes
+            tenantId={tenant?.id}
+            carreras={effectiveCarreras}
+            clientesMock={demo ? MOCK_CLIENTES_TENANT : undefined}
+          />
+        )}
+        {activeModule === "aliados" && <MisAliados tenantId={tenant?.id} />}
+        {activeModule === "precios" && <MisPrecios tenant={tenant} demo={demo} onSaved={refetchTenant} />}
+        {activeModule === "pagos" && <MisPagos carreras={effectiveCarreras} tenant={tenant} tenantId={tenant?.id} />}
+        {activeModule === "carreras" && (
+          <Carreras
+            carreras={effectiveCarreras}
+            onAccept={acceptCarrera}
+            onReject={rejectCarrera}
+            onComplete={completeCarrera}
+          />
+        )}
+        {activeModule === "historial" && <Historial carreras={effectiveCarreras} tenantId={tenant?.id} />}
+        {activeModule === "perfil" && <MiPerfil tenant={tenant} demo={demo} />}
+        {activeModule === "plan" && <MiPlan tenant={tenant} demo={demo} />}
+        {activeModule === "referidos" && <Referidos tenant={tenant} />}
+        {activeModule === "cupones" && (
+          <CouponsManager
+            tenantId={tenant?.id}
+            demo={demo}
+            conductorNombre={profile.name}
+            onNavigateMessages={() => openProfile("mensajes")}
+          />
+        )}
+        {activeModule === "config" && (
+          <Configuracion
+            isPaused={isPaused}
+            tenantId={tenant?.id}
+            tenant={tenant}
+            demo={demo}
+            onSaved={refetchTenant}
+          />
+        )}
+        {activeModule === "qr" && (
+          <QRSection profileSlug={profile.slug} profileName={profile.name} isOnline={isOnline && !isPaused} />
+        )}
+        {activeModule === "reportes" && <Historial carreras={effectiveCarreras} tenantId={tenant?.id} />}
+        {activeModule === "rutas" && <MisPrecios tenant={tenant} demo={demo} onSaved={refetchTenant} />}
+        {activeModule === "tarifas" && <MisPrecios tenant={tenant} demo={demo} onSaved={refetchTenant} />}
+      </main>
+
+      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200/80 bg-white/95 px-4 py-2 backdrop-blur-lg">
+        <div className="mx-auto flex max-w-3xl items-center justify-between">
+          {bottomNavItems.map((item) => {
+            const isActive = activeModule === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => handleNavigate(item.id)}
+                className={cn(
+                  "flex flex-col items-center gap-0.5 rounded-xl px-3 py-1 transition-all active:scale-95",
+                  isActive ? "text-purple-700" : "text-slate-500"
+                )}
+              >
+                <span
+                  className="material-symbols-outlined text-[22px]"
+                  style={isActive ? { fontVariationSettings: "'FILL' 1" } : undefined}
+                >
+                  {item.icon}
+                </span>
+                <span className={cn("text-[10px] font-semibold", isActive && "font-bold")}>
+                  {item.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </nav>
 
       <DriverFullGridMenu
         isOpen={menuOpen}
         onClose={() => setMenuOpen(false)}
         driverName={profile.name}
         driverInitial={profile.initial}
+        unreadMessages={totalNoLeidos}
         onNavigate={handleNavigate}
+      />
+
+      <DriverProfileModal
+        isOpen={profileOpen}
+        initialTab={profileTab}
+        onClose={() => setProfileOpen(false)}
+        tenant={tenant}
+        demo={demo}
+        profileName={profile.name}
+        profileSlug={profile.slug}
+        profileInitial={profile.initial}
+        conversaciones={conversaciones}
+        loadingConversaciones={conversacionesLoading}
+        userId={userId}
+        onMarcarLeida={marcarLeida}
+        onRefetchConversaciones={refetchConversaciones}
+        onNavigate={handleNavigate}
+      />
+
+      <DriverReviewsModal
+        isOpen={reviewsOpen}
+        onClose={() => setReviewsOpen(false)}
+        tenantId={tenant?.id}
       />
     </div>
   );

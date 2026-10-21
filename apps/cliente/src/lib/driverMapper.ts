@@ -26,9 +26,47 @@ function initialsOf(value: string): string {
 export function toDriver(c: ConductorRed): Driver {
   const name = c.apodo?.trim() || c.nombre;
   const vehicle = [c.vehiculo_modelo, c.vehiculo_tipo].filter(Boolean).join(" ") || "Vehículo";
-  const disponible = !c.pausado && c.suscripcion_activa;
+  const estado = c.disponibilidad ?? "disponible";
+  const disponible = !c.pausado && c.suscripcion_activa && estado === "disponible";
   const vehicleType: Driver["vehicleType"] =
     c.vehiculo_tipo === "moto" || c.vehiculo_tipo === "camioneta" ? c.vehiculo_tipo : "carro";
+
+  let availability = "Disponible ahora";
+  if (c.pausado) {
+    availability = "Pausado por el administrador";
+  } else if (estado === "pausa_30") {
+    const minutos = c.disponibilidad_hasta
+      ? Math.max(0, Math.ceil((new Date(c.disponibilidad_hasta).getTime() - Date.now()) / 60000))
+      : 30;
+    availability = minutos > 0 ? `Se desocupa en ${minutos} min` : "Disponible ahora";
+  } else if (estado === "personalizado") {
+    availability = c.disponibilidad_nota || "No disponible";
+  } else if (estado === "ocupado") {
+    availability = "Ocupado";
+  }
+
+  const paymentData = {
+    pagoMovil: {
+      activo: c.pago_movil_activo ?? true,
+      banco: c.pago_movil_banco ?? null,
+      cedula: c.pago_movil_cedula ?? null,
+      telefono: c.pago_movil_telefono ?? null,
+    },
+    zelle: {
+      activo: c.zelle_activo ?? false,
+      email: c.zelle_email ?? null,
+      nombre: c.zelle_nombre ?? null,
+    },
+    efectivo: {
+      activo: c.efectivo_activo ?? true,
+    },
+  };
+
+  const paymentMethods: string[] = [];
+  if (paymentData.efectivo.activo) paymentMethods.push("Efectivo");
+  if (paymentData.pagoMovil.activo) paymentMethods.push("Pago Móvil");
+  if (paymentData.zelle.activo) paymentMethods.push("Zelle");
+  if (paymentMethods.length === 0) paymentMethods.push("Efectivo");
 
   return {
     id: c.conductor_tenant_id,
@@ -42,9 +80,10 @@ export function toDriver(c: ConductorRed): Driver {
     rating: c.calificacion ?? 0,
     reviews: Number(c.total_resenas ?? 0),
     trips: 0,
-    status: disponible ? "available" : c.pausado ? "busy" : "offline",
-    availability: disponible ? "Disponible ahora" : c.pausado ? "Se desocupa pronto" : "No disponible",
-    paymentMethods: ["Efectivo", "Pago Móvil"],
+    status: disponible ? "available" : "busy",
+    availability,
+    paymentMethods,
+    paymentData,
     phone: c.telefono || "",
     whatsapp: (c.telefono || "").replace(/[^\d]/g, ""),
     ci: "",

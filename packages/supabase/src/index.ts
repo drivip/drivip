@@ -19,7 +19,26 @@ export { useTenantNotificaciones } from "./useTenantNotificaciones";
 export { usePushNotifications } from "./usePushNotifications";
 export { PushNotificationCard } from "./PushNotificationCard";
 export { useMensajesCarrera } from "./useMensajesCarrera";
-export { useConversacionesCliente, useMensajesDirectos } from "./useConversaciones";
+export {
+  useConversacionesCliente,
+  useConversacionesConductor,
+  useMensajesDirectos,
+  enviarMensajeDirectoAConductor,
+} from "./useConversaciones";
+export {
+  actualizarDisponibilidadConductor,
+  leerDisponibilidadLocal,
+  limpiarDisponibilidadLocal,
+  useDisponibilidadConductor,
+} from "./useDisponibilidadConductor";
+export type { DisponibilidadLocal, ResultadoDisponibilidad } from "./useDisponibilidadConductor";
+export { useResenasConductor } from "./useResenasConductor";
+export { useCuponesConductor, useCuponesCliente } from "./useCupones";
+export type {
+  NuevoCupon,
+  ResultadoCupon,
+  ResultadoCanje,
+} from "./useCupones";
 export { CarreraChat } from "./CarreraChat";
 export { enviarPushCarrera } from "./notificacionesCarrera";
 export type { PushCarreraInput } from "./notificacionesCarrera";

@@ -1,4 +1,6 @@
 export type { Tenant, TenantType, VehiculoTipo, PublicTenant } from "./tenant";
+export type { DisponibilidadConductor } from "./disponibilidad";
+export type { ResenaConductor } from "./resena";
 export type { TarifaModo, ZonaTarifa, TarifasTenant, TasaCambio } from "./tarifa";
 export {
   DEFAULT_TARIFA_BASE,
@@ -9,7 +11,19 @@ export {
   formatearBs,
 } from "./tarifa";
 export type { Carrera, CarreraEstado, MetodoPago } from "./carrera";
-export type { ConversacionCliente, MensajeCarrera, MensajeDirecto, MensajeEmisorRol } from "./mensaje";
+export type {
+  Cupon,
+  CuponCliente,
+  EstadoCuponCliente,
+  TipoCupon,
+} from "./cupon";
+export type {
+  ConversacionCliente,
+  ConversacionConductor,
+  MensajeCarrera,
+  MensajeDirecto,
+  MensajeEmisorRol,
+} from "./mensaje";
 export type { RedCliente, Cliente, ConductorRed } from "./cliente";
 export type { Aliado, AliadoTipo, Referido, ReferidoEstado } from "./aliado";
 export type { PedidoB2B, PedidoB2BEstado } from "./pedidoB2B";

@@ -1,16 +1,22 @@
-import { useState, useCallback, useEffect } from "react";
-import type { Carrera } from "@drivip/types";
-import { CarreraChat } from "@drivip/supabase";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { Carrera, DisponibilidadConductor } from "@drivip/types";
+import { useClientesTenant, useResenasConductor } from "@drivip/supabase";
+import DriverAdCarousel from "./driver/DriverAdCarousel";
 import StatusHeroCard from "./driver/StatusHeroCard";
-import DriverMapView from "./driver/DriverMapView";
+import IncomingServiceCard from "./driver/IncomingServiceCard";
 import IncomingOrderModal from "./driver/IncomingOrderModal";
-import EndTripConfirmation from "./driver/EndTripConfirmation";
+import ActiveServiceModal from "./driver/ActiveServiceModal";
 
 interface Props {
   onNavigate: (module: string) => void;
+  tenantId?: string | null;
   carreras: Carrera[];
-  isOnline: boolean;
-  onToggleOnline: () => void;
+  disponibilidad: DisponibilidadConductor;
+  disponibilidadNota?: string | null;
+  disponibilidadHasta?: string | null;
+  guardandoDisponibilidad?: boolean;
+  disponibilidadError?: string | null;
+  onDisponibilidadChange: (estado: DisponibilidadConductor, nota?: string | null) => void;
   onAcceptCarrera: (id: string) => void;
   onRejectCarrera: (id: string) => void;
   onStartCarrera: (id: string) => void;
@@ -18,19 +24,21 @@ interface Props {
   onArrivedAtPickup?: (id: string) => void;
   onQuoteCarrera?: (id: string, precio: number) => Promise<boolean>;
   carreraActiva: string | null;
-  domain: string;
   profileName: string;
   isPaused?: boolean;
+  totalNoLeidos?: number;
 }
-
-type DriverStatus = "disponible" | "no_trabajo" | "disponible_15" | "disponible_30";
-type RidePhase = "idle" | "going_to_pickup" | "at_pickup" | "in_trip" | "at_destination";
 
 export default function ChoferDashboard({
   onNavigate,
+  tenantId,
   carreras,
-  isOnline,
-  onToggleOnline,
+  disponibilidad,
+  disponibilidadNota,
+  disponibilidadHasta,
+  guardandoDisponibilidad,
+  disponibilidadError,
+  onDisponibilidadChange,
   onAcceptCarrera,
   onRejectCarrera,
   onStartCarrera,
@@ -38,384 +46,324 @@ export default function ChoferDashboard({
   onArrivedAtPickup,
   onQuoteCarrera,
   carreraActiva,
-  domain,
   profileName,
   isPaused,
+  totalNoLeidos = 0,
 }: Props) {
-  const [driverStatus, setDriverStatus] = useState<DriverStatus>("disponible");
-  const [showIncomingModal, setShowIncomingModal] = useState(false);
-  const [showEndTrip, setShowEndTrip] = useState(false);
-  const [ridePhase, setRidePhase] = useState<RidePhase>("idle");
-  const [showTopCard, setShowTopCard] = useState(true);
+  const [incomingModalId, setIncomingModalId] = useState<string | null>(null);
+  const seenIncomingRef = useRef<Set<string>>(new Set());
 
-  const carrerasHoy = carreras.filter((c) => {
-    const today = new Date().toDateString();
-    return new Date(c.created_at).toDateString() === today;
-  });
+  const { clientes } = useClientesTenant(tenantId);
+  const { promedio, total: totalResenas } = useResenasConductor(tenantId);
 
+  const clientesMap = useMemo(() => {
+    const map = new Map<string, { nombre: string; telefono: string | null }>();
+    clientes.forEach((cliente) => {
+      map.set(cliente.profile_id ?? cliente.id, {
+        nombre: cliente.nombre,
+        telefono: cliente.telefono,
+      });
+    });
+    return map;
+  }, [clientes]);
+
+  const hoy = new Date().toDateString();
+  const carrerasHoy = carreras.filter(
+    (carrera) => new Date(carrera.created_at).toDateString() === hoy
+  );
   const ingresosHoy = carrerasHoy
-    .filter((c) => c.estado === "completada")
-    .reduce((sum, c) => sum + (c.precio ?? 0), 0);
+    .filter((carrera) => carrera.estado === "completada")
+    .reduce((sum, carrera) => sum + (carrera.precio ?? 0), 0);
+  const completadasHoy = carrerasHoy.filter((carrera) => carrera.estado === "completada").length;
 
-  const carrerasCompletadas = carrerasHoy.filter((c) => c.estado === "completada").length;
+  const pendientes = useMemo(
+    () =>
+      carreras
+        .filter((carrera) => carrera.estado === "pendiente" && carrera.id !== carreraActiva)
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()),
+    [carreras, carreraActiva]
+  );
 
-  const carrerasCalificadas = carreras.filter((c) => c.calificacion != null);
-  const ratingPromedio = carrerasCalificadas.length
-    ? carrerasCalificadas.reduce((sum, c) => sum + (c.calificacion ?? 0), 0) / carrerasCalificadas.length
-    : 0;
+  const carreraPendiente = pendientes[0] ?? null;
+  const carreraEnCurso = carreraActiva
+    ? carreras.find((carrera) => carrera.id === carreraActiva) ?? null
+    : null;
 
-  const carreraPendiente = carreras.find((c) => c.estado === "pendiente" && c.id !== carreraActiva);
-  const carreraEnCurso = carreraActiva ? carreras.find((c) => c.id === carreraActiva) : null;
+  const puedeRecibir = disponibilidad === "disponible" && !isPaused;
+  const pendienteModal = pendientes.find((carrera) => carrera.id === incomingModalId) ?? null;
 
-  const pickupCoords: [number, number] | null = (() => {
-    if (ridePhase === "going_to_pickup" && carreraEnCurso) {
-      return [carreraEnCurso.origen_lat, carreraEnCurso.origen_lng];
-    }
-    if (ridePhase === "in_trip" && carreraEnCurso) {
-      return [carreraEnCurso.origen_lat, carreraEnCurso.origen_lng];
-    }
-    return null;
-  })();
-
-  const destinationCoords: [number, number] | null = (() => {
-    if (ridePhase === "in_trip" && carreraEnCurso && carreraEnCurso.destino_lat && carreraEnCurso.destino_lng) {
-      return [carreraEnCurso.destino_lat, carreraEnCurso.destino_lng];
-    }
-    return null;
-  })();
-
-  const handleStatusChange = (status: DriverStatus) => {
-    setDriverStatus(status);
-    if (status === "no_trabajo") {
-      onToggleOnline();
-    } else if (!isOnline) {
-      onToggleOnline();
-    }
-  };
-
-  const handleAcceptTrip = useCallback(() => {
-    if (carreraPendiente) {
-      onAcceptCarrera(carreraPendiente.id);
-      setRidePhase("going_to_pickup");
-      setShowIncomingModal(false);
-      setShowTopCard(false);
-    }
-  }, [carreraPendiente, onAcceptCarrera]);
-
-  const handleRejectTrip = useCallback((_reason?: string) => {
-    if (carreraPendiente) {
-      onRejectCarrera(carreraPendiente.id);
-    }
-    setShowIncomingModal(false);
-    setRidePhase("idle");
-  }, [carreraPendiente, onRejectCarrera]);
-
-  const handleArrivedAtPickup = useCallback(() => {
-    setRidePhase("at_pickup");
-    if (carreraActiva) onArrivedAtPickup?.(carreraActiva);
-  }, [carreraActiva, onArrivedAtPickup]);
-
-  const handleArrivedAtDestination = useCallback(() => {
-    setRidePhase("at_destination");
-  }, []);
-
-  const handlePickupConfirmed = () => {
-    if (carreraActiva) onStartCarrera(carreraActiva);
-    setRidePhase("in_trip");
-  };
-
-  const handleCompleteTrip = () => {
-    setShowEndTrip(true);
-  };
-
-  const handleEndTripConfirm = (_method: string, _verified: boolean) => {
-    if (carreraActiva) {
-      onCompleteCarrera(carreraActiva);
-    }
-    setShowEndTrip(false);
-    setRidePhase("idle");
-    setShowTopCard(true);
+  const infoCliente = (carrera: Carrera | null) => {
+    if (!carrera?.cliente_id) return { nombre: "Cliente", telefono: null as string | null };
+    const cliente = clientesMap.get(carrera.cliente_id);
+    return {
+      nombre: cliente?.nombre ?? "Cliente",
+      telefono: cliente?.telefono ?? null,
+    };
   };
 
   useEffect(() => {
-    if (!carreraActiva) {
-      if (ridePhase !== "idle") {
-        setRidePhase("idle");
-        setShowTopCard(true);
-      }
-      return;
+    if (!carreraPendiente || !puedeRecibir || carreraActiva) return;
+    if (seenIncomingRef.current.has(carreraPendiente.id)) return;
+    seenIncomingRef.current.add(carreraPendiente.id);
+    setIncomingModalId(carreraPendiente.id);
+  }, [carreraPendiente?.id, puedeRecibir, carreraActiva]);
+
+  useEffect(() => {
+    if (incomingModalId && !pendientes.some((carrera) => carrera.id === incomingModalId)) {
+      setIncomingModalId(null);
     }
+  }, [incomingModalId, pendientes]);
 
-    if (ridePhase !== "idle" || !carreraEnCurso) return;
+  const aceptar = (id: string) => {
+    onAcceptCarrera(id);
+    setIncomingModalId(null);
+  };
 
-    if (carreraEnCurso.estado === "aceptada") {
-      setRidePhase("going_to_pickup");
-      setShowTopCard(false);
-    } else if (carreraEnCurso.estado === "en_curso") {
-      setRidePhase("in_trip");
-      setShowTopCard(false);
-    }
-  }, [carreraActiva, carreraEnCurso?.estado, ridePhase]);
+  const rechazar = (id: string, _motivo?: string) => {
+    onRejectCarrera(id);
+    setIncomingModalId(null);
+  };
 
-  const isNavigating = ridePhase === "going_to_pickup" || ridePhase === "in_trip";
+  const clientePendiente = infoCliente(carreraPendiente);
+  const clienteModal = infoCliente(pendienteModal);
+  const clienteActivo = infoCliente(carreraEnCurso);
+
+  const primerNombre = profileName.trim().split(/\s+/)[0] || "Conductor";
+  const fecha = new Date().toLocaleDateString("es-VE", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
 
   return (
-    <div className="h-[100dvh] w-full relative overflow-hidden bg-slate-100">
-      {isPaused && (
-        <div className="absolute top-0 left-0 right-0 z-30 bg-amber-500 text-white text-[11px] font-bold text-center py-2 px-4 flex items-center justify-center gap-2">
-          <span className="material-symbols-outlined text-[16px]">pause_circle</span>
-          Tu cuenta esta pausada. No puedes recibir carreras nuevas.
+    <div className="mx-auto w-full max-w-2xl space-y-4 px-4 py-4 lg:px-8 lg:py-6">
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-purple-600">
+            Panel del conductor
+          </p>
+          <h1 className="text-xl font-black leading-tight text-slate-900 lg:text-2xl">
+            Hola, {primerNombre}
+          </h1>
+          <p className="mt-0.5 text-[11px] font-semibold capitalize text-slate-500">{fecha}</p>
         </div>
-      )}
-      <DriverMapView
-        isOnline={isOnline}
-        pickupCoords={pickupCoords}
-        destinationCoords={destinationCoords}
-        ridePhase={ridePhase}
-        onArrivedAtDestination={handleArrivedAtDestination}
+        <span
+          className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[10px] font-black ${
+            puedeRecibir ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"
+          }`}
+        >
+          <span className={`h-2 w-2 rounded-full ${puedeRecibir ? "bg-emerald-500 animate-pulse" : "bg-slate-400"}`} />
+          {isPaused ? "Pausado" : puedeRecibir ? "En línea" : "Sin solicitudes"}
+        </span>
+      </div>
+
+      <DriverAdCarousel tenantId={tenantId} onNavigate={onNavigate} />
+
+      <StatusHeroCard
+        estado={disponibilidad}
+        nota={disponibilidadNota}
+        hasta={disponibilidadHasta}
+        guardando={guardandoDisponibilidad}
+        isPaused={isPaused}
+        syncError={disponibilidadError}
+        onChange={onDisponibilidadChange}
+        dailyEarnings={ingresosHoy}
+        dailyRides={completadasHoy}
+        rating={promedio}
+        totalResenas={totalResenas}
+        onOpenReviews={() => onNavigate("resenas")}
       />
 
-      {showTopCard && !isNavigating && (
-        <div className="absolute top-0 left-0 right-0 z-20 p-3">
-          <StatusHeroCard
-            currentStatus={driverStatus}
-            onStatusChange={handleStatusChange}
-            dailyEarnings={ingresosHoy}
-            dailyRides={carrerasCompletadas}
-            rating={ratingPromedio}
-            onlineTime="-"
-          />
-        </div>
-      )}
-
-      {!isNavigating && ridePhase === "idle" && (
-        <div className="absolute bottom-0 left-0 right-0 z-20 p-3">
-          <div className="space-y-2 max-w-2xl mx-auto">
-            {carreraPendiente && (
-              <div className="bg-white rounded-2xl p-4 shadow-2xl border border-slate-100 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" />
-                    <h3 className="text-sm font-black text-slate-900">Nueva Solicitud</h3>
-                  </div>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 animate-pulse">
-                    Entrante
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center border-2 border-white shadow-md flex-shrink-0">
-                      <span className="text-sm font-bold text-purple-700">
-                        {carreraPendiente.cliente_id?.charAt(0)?.toUpperCase() ?? "C"}
-                      </span>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-black text-slate-900 truncate">{carreraPendiente.origen_direccion ?? "Origen"}</p>
-                      <p className="text-[10px] text-slate-500 truncate">→ {carreraPendiente.destino_direccion ?? "Destino"}</p>
-                    </div>
-                  </div>
-                  <div className="text-right flex-shrink-0 ml-2">
-                    {carreraPendiente.tipo_servicio === "compra" && !carreraPendiente.precio ? (
-                      <p className="text-[11px] font-black text-amber-600">Por cotizar</p>
-                    ) : (
-                      <p className="text-base font-black text-slate-900">${(carreraPendiente.precio ?? 0).toFixed(2)}</p>
-                    )}
-                    <p className="text-[9px] font-bold text-purple-600">{carreraPendiente.distancia_km ?? 0} km</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-5 gap-2">
-                  <button
-                    onClick={() => setShowIncomingModal(true)}
-                    className="col-span-2 py-2.5 rounded-xl bg-slate-100 border border-slate-200 text-slate-600 text-xs font-bold active:scale-[0.98] transition flex items-center justify-center gap-1"
-                  >
-                    <span className="material-symbols-outlined text-[14px]">visibility</span>
-                    Detalle
-                  </button>
-                  <button
-                    onClick={handleAcceptTrip}
-                    className="col-span-3 py-2.5 rounded-xl bg-gradient-to-r from-purple-700 via-indigo-600 to-purple-800 text-white text-xs font-black active:scale-[0.98] transition flex items-center justify-center gap-1.5 shadow-lg shadow-purple-600/30"
-                  >
-                    <span className="material-symbols-outlined text-[16px] animate-bounce">check_circle</span>
-                    Aceptar
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {!carreraPendiente && (
-              <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-3 shadow-lg border border-slate-100 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-600 to-indigo-700 flex items-center justify-center">
-                    <span className="material-symbols-outlined text-[20px] text-white">local_taxi</span>
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-900">Esperando carreras...</p>
-                    <p className="text-[9px] text-slate-500">Te notificaremos cuando haya una solicitud</p>
-                  </div>
-                </div>
-                <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-[18px] text-emerald-600">local_taxi</span>
-                </div>
-              </div>
+      <section className="space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-black text-slate-900">Solicitudes</h2>
+            {pendientes.length > 0 && (
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-black text-amber-700">
+                {pendientes.length}
+              </span>
             )}
           </div>
+          <span className="text-[10px] font-bold text-slate-400">Tiempo real</span>
         </div>
-      )}
 
-      {ridePhase === "going_to_pickup" && (
-        <div className="absolute inset-x-0 bottom-0 z-20 p-3">
-          <div className="mx-auto max-w-2xl rounded-3xl border border-white/70 bg-white/95 p-4 shadow-[0_-12px_40px_rgba(15,23,42,0.18)] backdrop-blur-xl">
-            <div className="mb-3 flex items-start gap-3">
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
-                <span className="material-symbols-outlined text-[22px]">near_me</span>
+        {carreraEnCurso && (
+          <button
+            type="button"
+            onClick={() => onNavigate("carreras")}
+            className="flex w-full items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-left active:scale-[0.99]"
+          >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500 text-white">
+              <span className="material-symbols-outlined text-[20px]">local_taxi</span>
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-black text-emerald-900">Servicio en curso</p>
+              <p className="truncate text-[10px] font-semibold text-emerald-700">
+                {carreraEnCurso.destino_direccion ?? "Ver detalles del servicio"}
+              </p>
+            </div>
+            <span className="material-symbols-outlined text-[18px] text-emerald-600">chevron_right</span>
+          </button>
+        )}
+
+        {carreraPendiente && puedeRecibir && !carreraActiva && (
+          <IncomingServiceCard
+            carrera={carreraPendiente}
+            clienteNombre={clientePendiente.nombre}
+            clienteTelefono={clientePendiente.telefono}
+            onAccept={() => aceptar(carreraPendiente.id)}
+            onOpenMap={() => setIncomingModalId(carreraPendiente.id)}
+            onReject={() => setIncomingModalId(carreraPendiente.id)}
+          />
+        )}
+
+        {carreraPendiente && !puedeRecibir && !carreraActiva && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
+                <span className="material-symbols-outlined text-[20px]">notifications_active</span>
               </span>
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 animate-pulse rounded-full bg-amber-400" />
-                  <p className="text-sm font-black text-slate-900">Vas al punto de recogida</p>
-                </div>
-                <p className="mt-0.5 line-clamp-2 text-[11px] font-medium leading-snug text-slate-500">
-                  {carreraEnCurso?.origen_direccion ?? "Origen del pasajero"}
+                <p className="text-xs font-black text-amber-900">
+                  Tienes {pendientes.length} {pendientes.length === 1 ? "solicitud esperando" : "solicitudes esperando"}
                 </p>
+                <p className="mt-0.5 text-[10px] font-medium leading-snug text-amber-700">
+                  Actívate como Disponible para ver y aceptar servicios nuevos.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => onDisponibilidadChange("disponible")}
+                  disabled={isPaused}
+                  className="mt-2 rounded-xl bg-amber-500 px-3 py-1.5 text-[10px] font-black text-white active:scale-95 disabled:opacity-50"
+                >
+                  Estar disponible
+                </button>
               </div>
-              <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-black text-amber-700">
-                En camino
+            </div>
+          </div>
+        )}
+
+        {!carreraPendiente && !carreraEnCurso && (
+          <div className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-md shadow-slate-200/50">
+            <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-600 to-indigo-700 text-white">
+              <span className="material-symbols-outlined text-[22px]">local_taxi</span>
+              {puedeRecibir && (
+                <span className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-white bg-emerald-400" />
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-black text-slate-900">
+                {puedeRecibir ? "Esperando servicios..." : "No estás recibiendo solicitudes"}
+              </p>
+              <p className="mt-0.5 text-[10px] font-medium text-slate-500">
+                {puedeRecibir
+                  ? "Te avisaremos en cuanto un cliente de tu red solicite un servicio."
+                  : "Cambia tu estado a Disponible cuando quieras volver a recibir carreras."}
+              </p>
+            </div>
+            <span
+              className={`h-2.5 w-2.5 shrink-0 rounded-full ${
+                puedeRecibir ? "bg-emerald-500 animate-pulse" : "bg-slate-300"
+              }`}
+            />
+          </div>
+        )}
+      </section>
+
+      <section className="space-y-2">
+        <h2 className="text-sm font-black text-slate-900">Accesos rápidos</h2>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => onNavigate("mensajes")}
+            className="relative flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3 text-left shadow-md shadow-slate-200/40 active:scale-[0.98]"
+          >
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-100 text-purple-700">
+              <span className="material-symbols-outlined text-[20px]">forum</span>
+            </span>
+            <div>
+              <p className="text-[11px] font-black text-slate-900">Mensajes</p>
+              <p className="text-[9px] font-semibold text-slate-500">
+                {totalNoLeidos > 0 ? `${totalNoLeidos} sin leer` : "Centro de chat"}
+              </p>
+            </div>
+            {totalNoLeidos > 0 && (
+              <span className="absolute right-2 top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-black text-white">
+                {totalNoLeidos}
               </span>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleArrivedAtPickup}
-              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 py-3.5 text-sm font-black text-white shadow-lg shadow-orange-500/25 transition active:scale-[0.98]"
-            >
-              <span className="material-symbols-outlined text-[20px]">where_to_vote</span>
-              Ya llegué
-            </button>
-
-            {carreraActiva && (
-              <div className="mt-2">
-                <CarreraChat carreraId={carreraActiva} rol="conductor" />
-              </div>
             )}
-          </div>
-        </div>
-      )}
+          </button>
 
-      {ridePhase === "at_pickup" && (
-        <div className="absolute bottom-0 left-0 right-0 z-20 p-3">
-          <div className="bg-white rounded-2xl p-4 shadow-2xl border border-slate-100 max-w-2xl mx-auto">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-purple-500 animate-pulse" />
-                <h3 className="text-sm font-black text-slate-900">Punto de Recogida</h3>
-              </div>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-700">
-                Recoger
-              </span>
+          <button
+            type="button"
+            onClick={() => onNavigate("resenas")}
+            className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3 text-left shadow-md shadow-slate-200/40 active:scale-[0.98]"
+          >
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
+              <span className="material-symbols-outlined text-[20px]">reviews</span>
+            </span>
+            <div>
+              <p className="text-[11px] font-black text-slate-900">Mis reseñas</p>
+              <p className="text-[9px] font-semibold text-slate-500">
+                {totalResenas > 0 ? `${promedio.toFixed(1)} de 5` : "Sin reseñas"}
+              </p>
             </div>
-            <p className="text-xs text-slate-600 mb-3">{carreraEnCurso?.origen_direccion ?? "Destino del pasajero"}</p>
-            <button
-              onClick={handlePickupConfirmed}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-purple-700 to-indigo-600 text-white text-sm font-black active:scale-[0.98] transition flex items-center justify-center gap-2 shadow-lg shadow-purple-600/30"
-            >
-              <span className="material-symbols-outlined text-[18px]">person_add</span>
-              Recogí al pasajero · Iniciar viaje
-            </button>
-            {carreraActiva && (
-              <div className="mt-2">
-                <CarreraChat carreraId={carreraActiva} rol="conductor" />
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+          </button>
 
-      {ridePhase === "in_trip" && (
-        <div className="absolute bottom-0 left-0 right-0 z-20 p-3">
-          <div className="bg-white rounded-2xl p-4 shadow-2xl border border-slate-100 max-w-2xl mx-auto">
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <h3 className="text-sm font-black text-slate-900">Viaje en Curso</h3>
-                <p className="text-[10px] text-slate-500">→ {carreraEnCurso?.destino_direccion ?? "Destino"}</p>
-              </div>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700">
-                En Curso
-              </span>
+          <button
+            type="button"
+            onClick={() => onNavigate("clientes")}
+            className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3 text-left shadow-md shadow-slate-200/40 active:scale-[0.98]"
+          >
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
+              <span className="material-symbols-outlined text-[20px]">group</span>
+            </span>
+            <div>
+              <p className="text-[11px] font-black text-slate-900">Mis clientes</p>
+              <p className="text-[9px] font-semibold text-slate-500">{clientes.length} en tu red</p>
             </div>
-            <div className="flex items-center justify-between mb-3 p-2 rounded-lg bg-slate-50 border border-slate-100">
-              <span className="text-xs text-slate-500">Tarifa</span>
-              <span className="text-base font-black text-slate-900">${(carreraEnCurso?.precio ?? 0).toFixed(2)}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onNavigate("qr")}
+            className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3 text-left shadow-md shadow-slate-200/40 active:scale-[0.98]"
+          >
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600">
+              <span className="material-symbols-outlined text-[20px]">qr_code_2</span>
+            </span>
+            <div>
+              <p className="text-[11px] font-black text-slate-900">Mi QR</p>
+              <p className="text-[9px] font-semibold text-slate-500">Comparte tu perfil</p>
             </div>
-            <button
-              onClick={handleCompleteTrip}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-sm font-black active:scale-[0.98] transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/30"
-            >
-              <span className="material-symbols-outlined text-[18px]">check_circle</span>
-              Finalizar Viaje
-            </button>
-            {carreraActiva && (
-              <div className="mt-2">
-                <CarreraChat carreraId={carreraActiva} rol="conductor" />
-              </div>
-            )}
-          </div>
+          </button>
         </div>
-      )}
+      </section>
 
-      {ridePhase === "at_destination" && (
-        <div className="absolute bottom-0 left-0 right-0 z-20 p-3">
-          <div className="bg-white rounded-2xl p-6 shadow-2xl border border-slate-100 max-w-2xl mx-auto text-center">
-            <div className="w-14 h-14 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-3">
-              <span className="material-symbols-outlined text-[28px] text-emerald-600">celebration</span>
-            </div>
-            <p className="text-base font-black text-slate-900 mb-1">Viaje Completado</p>
-            <p className="text-xs text-slate-500 mb-4">Cobra ${((carreraEnCurso?.precio ?? 0)).toFixed(2)} al pasajero</p>
-            <button
-              onClick={handleCompleteTrip}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-sm font-black active:scale-[0.98] transition flex items-center justify-center gap-2"
-            >
-              <span className="material-symbols-outlined text-[18px]">check_circle</span>
-              Confirmar Cobro
-            </button>
-          </div>
-        </div>
-      )}
-
-      {ridePhase === "going_to_pickup" && carreraActiva && (
-        <CarreraChat carreraId={carreraActiva} rol="conductor" floating />
-      )}
-
-      <button
-        onClick={() => onNavigate("menu")}
-        className="absolute bottom-4 right-4 z-30 w-12 h-12 rounded-full bg-white/90 backdrop-blur-sm shadow-lg border border-slate-200 flex items-center justify-center active:scale-90 transition lg:hidden"
-      >
-        <span className="material-symbols-outlined text-[20px] text-slate-700">grid_view</span>
-      </button>
-
-      {carreraPendiente && (
+      {pendienteModal && (
         <IncomingOrderModal
-          isOpen={showIncomingModal}
-          onAccept={handleAcceptTrip}
-          onReject={handleRejectTrip}
-          onQuote={(precio) => onQuoteCarrera?.(carreraPendiente.id, precio) ?? Promise.resolve(false)}
-          carrera={carreraPendiente}
+          isOpen
+          onAccept={() => aceptar(pendienteModal.id)}
+          onReject={(motivo) => rechazar(pendienteModal.id, motivo)}
+          onDismiss={() => setIncomingModalId(null)}
+          onQuote={(precio) => onQuoteCarrera?.(pendienteModal.id, precio) ?? Promise.resolve(false)}
+          carrera={pendienteModal}
+          clienteNombre={clienteModal.nombre}
+          clienteTelefono={clienteModal.telefono}
         />
       )}
 
-      <EndTripConfirmation
-        isOpen={showEndTrip}
-        onClose={() => setShowEndTrip(false)}
-        onConfirm={handleEndTripConfirm}
-        rideDetails={{
-          cliente: carreraEnCurso?.cliente_id ?? "Pasajero",
-          origen: carreraEnCurso?.origen_direccion ?? "Origen",
-          destino: carreraEnCurso?.destino_direccion ?? "Destino",
-          precioUsd: carreraEnCurso?.precio ?? 0,
-          precioBs: (carreraEnCurso?.precio ?? 0) * 58,
-        }}
-      />
+      {carreraEnCurso && (
+        <ActiveServiceModal
+          carrera={carreraEnCurso}
+          clienteNombre={clienteActivo.nombre}
+          clienteTelefono={clienteActivo.telefono}
+          onArrived={() => onArrivedAtPickup?.(carreraEnCurso.id)}
+          onStart={() => onStartCarrera(carreraEnCurso.id)}
+          onComplete={() => onCompleteCarrera(carreraEnCurso.id)}
+          onCancel={() => onRejectCarrera(carreraEnCurso.id)}
+        />
+      )}
     </div>
   );
 }

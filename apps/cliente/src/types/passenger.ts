@@ -1,3 +1,20 @@
+export interface DriverPaymentData {
+  pagoMovil: {
+    activo: boolean;
+    banco: string | null;
+    cedula: string | null;
+    telefono: string | null;
+  };
+  zelle: {
+    activo: boolean;
+    email: string | null;
+    nombre: string | null;
+  };
+  efectivo: {
+    activo: boolean;
+  };
+}
+
 export interface Driver {
   id: string;
   slug: string;
@@ -13,6 +30,7 @@ export interface Driver {
   status: "available" | "busy" | "offline";
   availability: string;
   paymentMethods: string[];
+  paymentData: DriverPaymentData;
   phone: string;
   whatsapp: string;
   ci: string;
