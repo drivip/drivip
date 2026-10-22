@@ -48,6 +48,7 @@ export default function ActiveServiceModal({
   const [showChat, setShowChat] = useState(false);
   const [showEndTrip, setShowEndTrip] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [minimized, setMinimized] = useState(false);
 
   useScrollLock(true);
 
@@ -57,6 +58,7 @@ export default function ActiveServiceModal({
 
   useEffect(() => {
     setAtDestination(false);
+    setMinimized(false);
   }, [carrera.id]);
 
   const enCurso = carrera.estado === "en_curso";
@@ -104,8 +106,43 @@ export default function ActiveServiceModal({
         onArrivedAtDestination={() => setAtDestination(true)}
       />
 
+      {minimized ? (
+        <button
+          type="button"
+          onClick={() => setMinimized(false)}
+          aria-label="Mostrar detalle del servicio"
+          className="absolute inset-x-0 bottom-0 z-30 flex w-full items-center gap-3 border-t border-white/70 bg-white px-4 pb-[calc(0.9rem+env(safe-area-inset-bottom))] pt-3 text-left shadow-[0_-16px_50px_rgba(15,23,42,0.28)] active:scale-[0.99]"
+        >
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-600 to-indigo-700 text-xs font-black text-white shadow-lg">
+            {initials(clienteNombre)}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5">
+              <span className={`h-2 w-2 rounded-full ${faseColor}`} />
+              <span className="truncate text-[11px] font-bold text-slate-500">{faseLabel}</span>
+            </div>
+            <p className="truncate text-sm font-bold text-slate-900">{clienteNombre}</p>
+            <p className="truncate text-[11px] font-semibold text-slate-500">
+              ${(carrera.precio ?? 0).toFixed(2)} · {TIPO_LABEL[tipo] ?? tipo}
+            </p>
+          </div>
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-purple-100 text-purple-700">
+            <span className="material-symbols-outlined text-[20px]">keyboard_arrow_up</span>
+          </span>
+        </button>
+      ) : (
       <div className="absolute inset-x-0 bottom-0 z-30 max-h-[62dvh] overflow-y-auto rounded-t-3xl border-t border-white/70 bg-white p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-[0_-16px_50px_rgba(15,23,42,0.28)]">
-        <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-slate-200" />
+        <div className="mb-3 flex items-center justify-between">
+          <span className="h-1.5 w-12 rounded-full bg-slate-200" />
+          <button
+            type="button"
+            onClick={() => setMinimized(true)}
+            aria-label="Minimizar detalle del servicio"
+            className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 text-slate-500 active:scale-95"
+          >
+            <span className="material-symbols-outlined text-[20px]">keyboard_arrow_down</span>
+          </button>
+        </div>
 
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
@@ -264,6 +301,7 @@ export default function ActiveServiceModal({
           </div>
         )}
       </div>
+      )}
 
       <EndTripConfirmation
         isOpen={showEndTrip}

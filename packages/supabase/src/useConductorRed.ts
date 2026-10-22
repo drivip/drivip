@@ -41,6 +41,7 @@ export interface CrearCarreraClienteInput {
   duracion_min: number;
   precio: number;
   metodo_pago: MetodoPago;
+  cupon_codigo?: string | null;
 }
 
 /** Crea una carrera real validando que el conductor este en la red. */
@@ -57,6 +58,7 @@ export async function crearCarreraCliente(input: CrearCarreraClienteInput): Prom
     p_duracion_min: input.duracion_min,
     p_precio: input.precio,
     p_metodo_pago: input.metodo_pago,
+    p_cupon_codigo: input.cupon_codigo ?? null,
   });
   if (error || !data) return null;
   return data as Carrera;

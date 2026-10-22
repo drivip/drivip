@@ -34,7 +34,7 @@ interface MapPickerModalProps {
   isOpen: boolean;
   onClose: () => void;
   onUseGps?: (coords: { lat: number; lng: number }) => void;
-  onConfirmPin: (place: MapPickerPlace, point: "origin" | "destination") => void;
+  onConfirmPin: (place: MapPickerPlace, point: "origin" | "destination" | "stop") => void;
   onConfirmRoute?: (
     origin: MapPickerPlace,
     stops: MapPickerPlace[],
@@ -43,7 +43,8 @@ interface MapPickerModalProps {
     totalMin: number
   ) => void;
   initialOrigin?: { lat: number; lng: number; address: string } | null;
-  pointType?: "origin" | "destination";
+  initialStops?: MapPickerPlace[];
+  pointType?: "origin" | "destination" | "stop";
   suggestions?: MapPickerSuggestion[];
 }
 
@@ -116,6 +117,7 @@ export default function MapPickerModal({
   onConfirmPin,
   onConfirmRoute,
   initialOrigin,
+  initialStops = [],
   pointType: initialPointType = "origin",
   suggestions = [],
 }: MapPickerModalProps) {
@@ -180,12 +182,12 @@ export default function MapPickerModal({
     setAddressLoading(false);
     setOutsideVenezuela(!isInVenezuela(startLat, startLng));
     setGpsLoading(false);
-    setExtraStops([]);
+    setExtraStops(initialStops);
     setRouteGeometry(null);
     setTotalKm(0);
     setTotalMin(0);
     setCalculating(false);
-  }, [initialOrigin, initialPointType]);
+  }, [initialOrigin, initialPointType, initialStops]);
 
   const wasOpenRef = useRef(false);
   useEffect(() => {
@@ -510,7 +512,7 @@ export default function MapPickerModal({
 
   const pinLabel = addressLoading
     ? "Obteniendo dirección..."
-    : primary || address || (outsideVenezuela ? "Fuera de Venezuela" : "Mueve el mapa");
+    : primary || address || (outsideVenezuela ? "Fuera de Venezuela" : initialPointType === "stop" ? "Mueve el mapa hasta la escala" : "Mueve el mapa");
 
   const showSearchPanel = searchFocused || query.trim().length > 0;
   const savedSuggestions = suggestions.filter(
@@ -806,24 +808,31 @@ export default function MapPickerModal({
             className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${
               initialPointType === "origin"
                 ? "bg-emerald-50 text-emerald-600"
-                : "bg-orange-50 text-orange-600"
+                : initialPointType === "stop"
+                  ? "bg-purple-50 text-purple-600"
+                  : "bg-orange-50 text-orange-600"
             }`}
           >
             <span className="material-symbols-outlined text-[22px]">
-              {initialPointType === "origin" ? "my_location" : "location_on"}
+              {initialPointType === "origin" ? "my_location" : initialPointType === "stop" ? "add_location_alt" : "location_on"}
             </span>
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-[11px] font-black uppercase tracking-wider text-slate-400">
-              {initialPointType === "origin" ? "¿Dónde estás?" : "Destino"}
+              {initialPointType === "origin" ? "¿Dónde estás?" : initialPointType === "stop" ? "Escala del viaje" : "Destino"}
             </p>
-            <p className="truncate text-[15px] font-black leading-tight text-slate-900">
+            <p className="line-clamp-2 text-[15px] font-black leading-tight text-slate-900">
               {addressLoading ? "Ubicando dirección..." : primary || (outsideVenezuela ? "Fuera de Venezuela" : "Selecciona un punto")}
             </p>
             <p className="mt-0.5 line-clamp-2 text-xs font-medium leading-snug text-slate-500">
               {outsideVenezuela
                 ? "Drivip solo está disponible en Venezuela. Mueve el mapa o usa tu GPS."
-                : secondary || (addressLoading ? "Espera un momento" : "Arrastra el mapa para ajustar el pin")}
+                : secondary ||
+                  (addressLoading
+                    ? "Espera un momento"
+                    : initialPointType === "stop"
+                      ? "Ubica la parada intermedia y confirma."
+                      : "Arrastra el mapa para ajustar el pin")}
             </p>
           </div>
           {addressLoading && (
@@ -878,8 +887,14 @@ export default function MapPickerModal({
             disabled={outsideVenezuela || addressLoading || calculating}
             className="flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-purple-700 to-indigo-700 text-sm font-black text-white shadow-lg shadow-purple-600/25 active:scale-[0.98] disabled:opacity-50"
           >
-            <span className="material-symbols-outlined text-[19px]">check_circle</span>
-            {initialPointType === "origin" ? "Confirmar origen" : "Confirmar destino"}
+            <span className="material-symbols-outlined text-[19px]">
+              {initialPointType === "stop" ? "add_location_alt" : "check_circle"}
+            </span>
+            {initialPointType === "origin"
+              ? "Confirmar origen"
+              : initialPointType === "stop"
+                ? "Agregar escala"
+                : "Confirmar destino"}
           </button>
         </div>
       </div>

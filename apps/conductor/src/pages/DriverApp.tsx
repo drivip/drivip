@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DisponibilidadConductor } from "@drivip/types";
 import { cn } from "@drivip/ui";
+import { FloatingMessageBadge } from "@drivip/ui";
 import {
   actualizarDisponibilidadConductor,
   APP_URLS,
@@ -11,6 +12,7 @@ import {
   useMiTenant,
   leerDisponibilidadLocal,
   limpiarDisponibilidadLocal,
+  useMensajeEntrante,
   useUbicaciones,
 } from "@drivip/supabase";
 import DriverHeader from "../components/driver/DriverHeader";
@@ -74,6 +76,7 @@ export default function DriverApp({ demo }: { demo?: boolean }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileTab, setProfileTab] = useState<"perfil" | "mensajes">("perfil");
+  const [profileConversationId, setProfileConversationId] = useState<string | null>(null);
   const [reviewsOpen, setReviewsOpen] = useState(false);
   const [carreraActiva, setCarreraActiva] = useState<string | null>(null);
   const [disponibilidad, setDisponibilidad] = useState<DisponibilidadConductor>("disponible");
@@ -96,6 +99,8 @@ export default function DriverApp({ demo }: { demo?: boolean }) {
     marcarLeida,
     refetch: refetchConversaciones,
   } = useConversacionesConductor();
+  const { mensaje: mensajeEntrante, ocultar: ocultarMensajeEntrante } =
+    useMensajeEntrante(conversaciones, userId, conversacionesLoading);
 
   const effectiveCarreras = demo ? MOCK_CARRERAS_CONDUCTOR : carreras;
   const isPaused = !demo && !!tenant?.pausado;
@@ -215,9 +220,19 @@ export default function DriverApp({ demo }: { demo?: boolean }) {
     };
   }, [isOnline, carreraActiva, tenant?.id, reportarUbicacion]);
 
-  const openProfile = (tab: "perfil" | "mensajes" = "perfil") => {
+  const openProfile = (
+    tab: "perfil" | "mensajes" = "perfil",
+    conversationId: string | null = null
+  ) => {
     setProfileTab(tab);
+    setProfileConversationId(conversationId);
     setProfileOpen(true);
+  };
+
+  const openMensajeEntrante = () => {
+    if (!mensajeEntrante) return;
+    openProfile("mensajes", mensajeEntrante.conversacion.conversacion_id);
+    ocultarMensajeEntrante();
   };
 
   const handleNavigate = (module: string) => {
@@ -474,9 +489,31 @@ export default function DriverApp({ demo }: { demo?: boolean }) {
         onNavigate={handleNavigate}
       />
 
+      {mensajeEntrante && !(profileOpen && profileTab === "mensajes") && (
+        <FloatingMessageBadge
+          title={mensajeEntrante.conversacion.cliente_nombre}
+          message={mensajeEntrante.conversacion.ultimo_mensaje ?? "Nuevo mensaje"}
+          time={
+            mensajeEntrante.conversacion.ultimo_mensaje_at
+              ? new Date(
+                  mensajeEntrante.conversacion.ultimo_mensaje_at
+                ).toLocaleTimeString("es-VE", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
+              : undefined
+          }
+          count={mensajeEntrante.count}
+          onOpen={openMensajeEntrante}
+          onHide={ocultarMensajeEntrante}
+          accent="emerald"
+        />
+      )}
+
       <DriverProfileModal
         isOpen={profileOpen}
         initialTab={profileTab}
+        initialConversationId={profileConversationId}
         onClose={() => setProfileOpen(false)}
         tenant={tenant}
         demo={demo}

@@ -76,6 +76,7 @@ export default function LiveTripTracker({
   const [chatOpen, setChatOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [minimized, setMinimized] = useState(false);
+  const [hidden, setHidden] = useState(false);
   const [copiado, setCopiado] = useState<string | null>(null);
   const autoExpandRef = useRef(0);
   const estadoAnteriorRef = useRef(carrera.estado);
@@ -185,6 +186,7 @@ export default function LiveTripTracker({
     setChatOpen(false);
     setPaymentOpen(false);
     setMinimized(false);
+    setHidden(false);
     setCopiado(null);
   }, [carrera.id]);
 
@@ -192,6 +194,7 @@ export default function LiveTripTracker({
     if (estadoAnteriorRef.current === carrera.estado) return;
     estadoAnteriorRef.current = carrera.estado;
     setMinimized(false);
+    setHidden(false);
   }, [carrera.estado]);
 
   useEffect(() => {
@@ -308,7 +311,7 @@ export default function LiveTripTracker({
   );
 
   const etaText = waiting
-    ? "Leyendo solicitud"
+    ? "Solicitud enviada"
     : accepted
       ? arrived
         ? "Ya está aquí"
@@ -386,7 +389,7 @@ export default function LiveTripTracker({
               <p className="text-[10px] font-black uppercase tracking-[0.14em] text-purple-600">
                 Drivip en vivo
               </p>
-              <p className="truncate text-[13px] font-extrabold text-slate-900">{etaText}</p>
+              <p className="truncate text-sm font-medium text-slate-900">{etaText}</p>
             </div>
           </div>
 
@@ -418,6 +421,44 @@ export default function LiveTripTracker({
         )}
       </div>
 
+      {hidden && (
+        <button
+          type="button"
+          onClick={() => setHidden(false)}
+          aria-label="Mostrar seguimiento del viaje"
+          className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] right-4 z-40 flex items-center gap-2 rounded-full border border-white/80 bg-white/95 py-2 pl-2 pr-3 shadow-[0_12px_40px_rgba(15,23,42,0.35)] backdrop-blur-xl active:scale-95"
+        >
+          <span className="relative shrink-0">
+            {driver.image ? (
+              <img
+                alt={`Conductor ${driver.name}`}
+                className="h-10 w-10 rounded-full border-2 border-white object-cover shadow-md"
+                src={driver.image}
+              />
+            ) : (
+              <span className={`flex h-10 w-10 items-center justify-center rounded-full text-xs font-black shadow-md ${driver.color}`}>
+                {driver.initials}
+              </span>
+            )}
+            {active && (
+              <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 animate-pulse rounded-full border-2 border-white bg-emerald-500" />
+            )}
+          </span>
+          <span className="text-left">
+            <span className="block text-[9px] font-black uppercase tracking-wider text-purple-600">
+              Drivip en vivo
+            </span>
+            <span className="block max-w-[130px] truncate text-xs font-medium text-slate-900">
+              {etaText}
+            </span>
+          </span>
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-100 text-purple-700">
+            <span className="material-symbols-outlined text-[19px]">keyboard_arrow_up</span>
+          </span>
+        </button>
+      )}
+
+      {!hidden && (
       <div className="absolute inset-x-0 bottom-0 z-30 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         {minimized ? (
           <button
@@ -442,10 +483,10 @@ export default function LiveTripTracker({
               )}
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-[13px] font-black text-slate-900">
+              <span className="block truncate text-sm font-black text-slate-900">
                 {driver.name} · {etaText}
               </span>
-              <span className="block truncate text-[11px] font-semibold text-slate-500">
+              <span className="block truncate text-xs font-semibold text-slate-500">
                 {statusTitle} · toca para ver el mapa
               </span>
             </span>
@@ -454,17 +495,27 @@ export default function LiveTripTracker({
             </span>
           </button>
         ) : (
-        <div className="mx-auto max-h-[64dvh] w-full max-w-lg overflow-y-auto overscroll-contain rounded-[28px] border border-white/80 bg-white/[0.97] shadow-[0_-20px_60px_rgba(15,23,42,0.28)] backdrop-blur-2xl">
+        <div className="mx-auto max-h-[60dvh] w-full max-w-lg overflow-y-auto overscroll-contain rounded-[28px] border border-white/80 bg-white/[0.97] shadow-[0_-20px_60px_rgba(15,23,42,0.28)] backdrop-blur-2xl">
           <div className="flex items-center justify-between px-4 pt-2.5">
             <span className="h-1.5 w-10 rounded-full bg-slate-200" />
-            <button
-              type="button"
-              onClick={minimizar}
-              aria-label="Minimizar seguimiento del viaje"
-              className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 text-slate-500 active:scale-95"
-            >
-              <span className="material-symbols-outlined text-[20px]">keyboard_arrow_down</span>
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={minimizar}
+                aria-label="Minimizar seguimiento del viaje"
+                className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-500 active:scale-95"
+              >
+                <span className="material-symbols-outlined text-[20px]">keyboard_arrow_down</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setHidden(true)}
+                aria-label="Cerrar seguimiento del viaje"
+                className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-500 active:scale-95"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
           </div>
 
           <div className="space-y-3 p-4">
@@ -490,17 +541,17 @@ export default function LiveTripTracker({
 
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <h3 className="truncate text-sm font-black text-slate-900">{driver.name}</h3>
+                  <h3 className="truncate text-base font-black text-slate-900">{driver.name}</h3>
                   {arrived && (
                     <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-amber-700">
                       Llegó
                     </span>
                   )}
                 </div>
-                <p className="truncate text-xs font-semibold text-slate-500">
+                <p className="truncate text-[13px] font-semibold text-slate-500">
                   {driver.vehicle} · {driver.plate}
                 </p>
-                <div className="mt-1 flex items-center gap-1.5 text-xs font-bold text-purple-700">
+                <div className="mt-1 flex items-center gap-1.5 text-[13px] font-bold text-purple-700">
                   <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-purple-600" />
                   <span className="truncate">{statusDetail}</span>
                 </div>
@@ -527,15 +578,21 @@ export default function LiveTripTracker({
               <div className="pointer-events-none absolute -right-6 -top-8 h-24 w-24 rounded-full bg-purple-500/25 blur-2xl" />
               <div className="relative flex items-end justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-400">
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                    {waiting ? "Solicitud enviada" : accepted ? "Llegada estimada" : inTrip ? "Tiempo al destino" : "Estado"}
+                    {waiting ? "Buscando conductor" : accepted ? "Llegada estimada" : inTrip ? "Tiempo al destino" : "Estado"}
                   </div>
-                  <p className="mt-1 text-2xl font-black leading-none">{etaText}</p>
-                  <p className="mt-1.5 line-clamp-2 text-xs font-medium leading-snug text-slate-300">
+                  <p
+                    className={`mt-1 leading-none ${
+                      waiting ? "text-lg font-medium" : "text-[26px] font-black"
+                    }`}
+                  >
+                    {etaText}
+                  </p>
+                  <p className="mt-1.5 line-clamp-2 text-[13px] font-medium leading-snug text-slate-300">
                     {waiting ? (
-                      <span className="inline-flex items-center gap-1">
-                        Leyendo
+                      <span className="inline-flex items-center gap-1.5">
+                        Esperando confirmación
                         <span className="inline-flex gap-0.5">
                           {[0, 1, 2].map((i) => (
                             <span
@@ -553,7 +610,7 @@ export default function LiveTripTracker({
                     )}
                   </p>
                   {serviceLabel && (
-                    <p className="mt-1 line-clamp-1 text-[10px] font-bold text-purple-300">
+                    <p className="mt-1 line-clamp-1 text-[11px] font-bold text-purple-300">
                       {serviceLabel}: {carrera.detalle_servicio || "Servicio solicitado"}
                     </p>
                   )}
@@ -566,8 +623,8 @@ export default function LiveTripTracker({
                     <span className="text-sm font-black text-amber-400">Por cotizar</span>
                   ) : (
                     <>
-                      <span className="text-lg font-black text-white">{formatearUsd(priceUsd)}</span>
-                      <span className="block text-[10px] font-bold text-amber-400">
+                      <span className="text-xl font-black text-white">{formatearUsd(priceUsd)}</span>
+                      <span className="block text-[11px] font-bold text-amber-400">
                         {formatearBs(priceUsd, tasa ?? undefined)}
                       </span>
                     </>
@@ -591,10 +648,10 @@ export default function LiveTripTracker({
                   <span className="block text-[11px] font-black uppercase tracking-wider text-amber-700">
                     Método de pago
                   </span>
-                  <span className="block truncate text-[13px] font-black text-amber-950">
+                  <span className="block truncate text-sm font-black text-amber-950">
                     {metodoPago}
                   </span>
-                  <span className="block truncate text-[10px] font-semibold text-amber-700">
+                  <span className="block truncate text-[11px] font-semibold text-amber-700">
                     {carrera.metodo_pago === "pago_movil"
                       ? pagoMovilCompleto
                         ? "Datos del conductor listos para copiar"
@@ -602,7 +659,7 @@ export default function LiveTripTracker({
                       : "Pago directo al conductor, sin comisiones"}
                   </span>
                 </span>
-                <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[10px] font-black text-amber-700 shadow-sm">
+                <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-black text-amber-700 shadow-sm">
                   Ver datos
                 </span>
               </button>
@@ -621,7 +678,7 @@ export default function LiveTripTracker({
                   >
                     <span className="material-symbols-outlined text-[22px]">account_balance_wallet</span>
                   </span>
-                  <span className="text-[11px] font-black text-slate-700">Pago</span>
+                  <span className="text-xs font-black text-slate-700">Pago</span>
                 </button>
 
                 <button
@@ -635,7 +692,7 @@ export default function LiveTripTracker({
                   >
                     <span className="material-symbols-outlined text-[22px]">chat</span>
                   </span>
-                  <span className="text-[11px] font-black text-slate-700">Chat</span>
+                  <span className="text-xs font-black text-slate-700">Chat</span>
                 </button>
 
                 {whatsappHref ? (
@@ -653,7 +710,7 @@ export default function LiveTripTracker({
                         <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.885-9.885 9.885m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
                       </svg>
                     </span>
-                    <span className="text-[11px] font-black text-slate-700">WhatsApp</span>
+                    <span className="text-xs font-black text-slate-700">WhatsApp</span>
                   </a>
                 ) : (
                   <div className="flex flex-col items-center gap-1.5 rounded-2xl border border-slate-200/80 bg-slate-50 p-2.5 opacity-45">
@@ -683,7 +740,7 @@ export default function LiveTripTracker({
                     Viaje en curso
                   </div>
                 )}
-                <span className="rounded-2xl bg-slate-100 px-3 py-3 text-[10px] font-black text-slate-500">
+                <span className="rounded-2xl bg-slate-100 px-3 py-3 text-[11px] font-black text-slate-500">
                   {metodoPago}
                 </span>
               </div>
@@ -738,6 +795,7 @@ export default function LiveTripTracker({
         </div>
         )}
       </div>
+      )}
 
       {chatOpen && (
         <div className="fixed inset-0 z-[125] flex items-end justify-center bg-slate-950/60 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-sm sm:items-center">

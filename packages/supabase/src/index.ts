@@ -25,6 +25,8 @@ export {
   useMensajesDirectos,
   enviarMensajeDirectoAConductor,
 } from "./useConversaciones";
+export { useMensajeEntrante } from "./useMensajeEntrante";
+export type { ConversacionNotificable, MensajeEntrante } from "./useMensajeEntrante";
 export {
   actualizarDisponibilidadConductor,
   leerDisponibilidadLocal,
@@ -33,11 +35,12 @@ export {
 } from "./useDisponibilidadConductor";
 export type { DisponibilidadLocal, ResultadoDisponibilidad } from "./useDisponibilidadConductor";
 export { useResenasConductor } from "./useResenasConductor";
-export { useCuponesConductor, useCuponesCliente } from "./useCupones";
+export { useCuponesConductor, useCuponesCliente, validarCuponCodigo } from "./useCupones";
 export type {
   NuevoCupon,
   ResultadoCupon,
   ResultadoCanje,
+  ResultadoValidarCupon,
 } from "./useCupones";
 export { CarreraChat } from "./CarreraChat";
 export { enviarPushCarrera } from "./notificacionesCarrera";

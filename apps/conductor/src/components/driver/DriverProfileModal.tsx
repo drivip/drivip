@@ -11,6 +11,7 @@ interface DriverProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialTab?: ProfileTab;
+  initialConversationId?: string | null;
   tenant?: Tenant | null;
   demo?: boolean;
   profileName: string;
@@ -35,6 +36,7 @@ export default function DriverProfileModal({
   isOpen,
   onClose,
   initialTab = "perfil",
+  initialConversationId = null,
   tenant,
   demo = false,
   profileName,
@@ -129,6 +131,7 @@ export default function DriverProfileModal({
               embedded
               isOpen
               onClose={onClose}
+              initialConversationId={initialConversationId}
               conversaciones={conversaciones}
               loading={loadingConversaciones}
               userId={userId}

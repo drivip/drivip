@@ -12,6 +12,7 @@ interface DriverMessageCenterProps {
   onMarcarLeida: (conversacionId: string) => void;
   onRefetch: () => void;
   embedded?: boolean;
+  initialConversationId?: string | null;
 }
 
 function hora(iso: string | null): string {
@@ -50,6 +51,7 @@ export default function DriverMessageCenter({
   onMarcarLeida,
   onRefetch,
   embedded = false,
+  initialConversationId = null,
 }: DriverMessageCenterProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [texto, setTexto] = useState("");
@@ -68,6 +70,10 @@ export default function DriverMessageCenter({
       setTexto("");
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen && initialConversationId) setSelectedId(initialConversationId);
+  }, [isOpen, initialConversationId]);
 
   useEffect(() => {
     if (!selectedId) return;

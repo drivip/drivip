@@ -5,8 +5,10 @@ import {
   useTasaCambio, useConductoresRed, useMisCarreras, crearCarreraCliente, calificarCarrera,
   cancelarCarrera, useDireccionesCliente, useReservasCliente, enviarPushCarrera,
   crearSolicitudServicio, conductorInviteUrl, useConversacionesCliente,
+  useMensajeEntrante,
 } from "@drivip/supabase";
 import { TASA_BCV_REFERENCIA } from "@drivip/types";
+import { FloatingMessageBadge } from "@drivip/ui";
 import {
   fetchDrivingRoute,
   isInVenezuela,
@@ -542,7 +544,7 @@ function PassengerApp() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [requestOpen, setRequestOpen] = useState(false);
   const [mapModalOpen, setMapModalOpen] = useState(false);
-  const [mapPointType, setMapPointType] = useState<"origin" | "destination">("destination");
+  const [mapPointType, setMapPointType] = useState<"origin" | "destination" | "stop">("destination");
   const [ratingModalOpen, setRatingModalOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
@@ -562,6 +564,8 @@ function PassengerApp() {
     crearConversacion,
     marcarLeida,
   } = useConversacionesCliente();
+  const { mensaje: mensajeEntrante, ocultar: ocultarMensajeEntrante } =
+    useMensajeEntrante(conversaciones, messagesUserId, messagesLoading);
   const { tarifas } = useTarifasTenant(selectedDriver?.id ?? conductorTenantId);
 
   const [origin, setOrigin] = useState("Mi ubicación actual");
@@ -602,6 +606,16 @@ function PassengerApp() {
     (tenantId: string) => crearConversacion(tenantId),
     [crearConversacion]
   );
+
+  const openMensajeEntrante = useCallback(() => {
+    if (!mensajeEntrante) return;
+    setMessagesTarget({
+      conversationId: mensajeEntrante.conversacion.conversacion_id,
+      tenantId: mensajeEntrante.conversacion.tenant_id,
+    });
+    setMessagesOpen(true);
+    ocultarMensajeEntrante();
+  }, [mensajeEntrante, ocultarMensajeEntrante]);
 
   const handleUnfollowDriver = useCallback(
     async (driver: Driver) => {
@@ -721,16 +735,19 @@ function PassengerApp() {
   const resolveRouteFor = useCallback(
     async (
       target: { lat: number; lng: number },
-      originOverride?: { lat: number; lng: number }
+      originOverride?: { lat: number; lng: number },
+      stopsOverride?: { lat: number; lng: number }[]
     ) => {
       const start = originOverride ?? originCoords;
       if (!start || !isInVenezuela(start.lat, start.lng) || !isInVenezuela(target.lat, target.lng)) {
         return null;
       }
 
+      const routeStops = stopsOverride ?? stops;
+
       const route = await fetchDrivingRoute([
         { lat: start.lat, lng: start.lng },
-        ...stops.map((stop) => ({ lat: stop.lat, lng: stop.lng })),
+        ...routeStops.map((stop) => ({ lat: stop.lat, lng: stop.lng })),
         { lat: target.lat, lng: target.lng },
       ]);
 
@@ -772,7 +789,13 @@ function PassengerApp() {
 
   const handleRequestRide = async (
     driverArg?: Driver | null,
-    detalle?: { precioUsd: number; metodoPago: "usd" | "bs" | "pmovil"; programadaPara?: string }
+    detalle?: {
+      precioUsd: number;
+      precioBaseUsd?: number;
+      metodoPago: "usd" | "bs" | "pmovil";
+      programadaPara?: string;
+      cuponCodigo?: string;
+    }
   ) => {
     const d = driverArg ?? selectedDriver ?? drivers[0] ?? null;
     if (!d) { showToast("Agrega un conductor a tu círculo primero"); setScreen("drivers"); return; }
@@ -839,8 +862,9 @@ function PassengerApp() {
       destino_direccion: destination,
       distancia_km: km,
       duracion_min: min,
-      precio: detalle?.precioUsd ?? 0,
+      precio: detalle?.precioBaseUsd ?? detalle?.precioUsd ?? 0,
       metodo_pago: METODO_PAGO_MAP[detalle?.metodoPago ?? "usd"],
+      cupon_codigo: detalle?.cuponCodigo ?? null,
     });
     if (!carrera) { showToast("No se pudo enviar la solicitud. Intenta de nuevo."); return; }
     setActiveCarrera(carrera);
@@ -973,20 +997,39 @@ function PassengerApp() {
     else setScreen(id as PassengerScreen);
   };
 
-  const handleOpenMap = (pointType: "origin" | "destination") => {
+  const handleOpenMap = (pointType: "origin" | "destination" | "stop") => {
     setMapPointType(pointType);
     setMapModalOpen(true);
   };
 
+  const handleRemoveStop = (index: number) => {
+    const nextStops = stops.filter((_, i) => i !== index);
+    setStops(nextStops);
+    if (destinationCoords && originCoords) {
+      void resolveRouteFor(destinationCoords, undefined, nextStops);
+    }
+    showToast("Escala eliminada");
+  };
+
   const handleConfirmMapPin = (
     place: { address: string; lat: number; lng: number },
-    pointType: "origin" | "destination"
+    pointType: "origin" | "destination" | "stop"
   ) => {
     if (pointType === "origin") {
       setOrigin(place.address);
       setOriginCoords({ lat: place.lat, lng: place.lng });
       setOriginFromGps(false);
       if (destinationCoords) void resolveRouteFor(destinationCoords, { lat: place.lat, lng: place.lng });
+    } else if (pointType === "stop") {
+      const nextStops = [...stops, place];
+      setStops(nextStops);
+      if (destinationCoords && originCoords) {
+        void resolveRouteFor(destinationCoords, undefined, nextStops);
+      }
+      setMapModalOpen(false);
+      setRequestOpen(true);
+      showToast(`Escala agregada: ${place.address}`);
+      return;
     } else {
       setDestination(place.address);
       setDestinationCoords({ lat: place.lat, lng: place.lng });
@@ -1100,6 +1143,8 @@ function PassengerApp() {
     <RouteCalculator
       onOpenMap={() => handleOpenMap("destination")}
       onOpenOriginMap={() => handleOpenMap("origin")}
+      onOpenStopMap={() => handleOpenMap("stop")}
+      onRemoveStop={handleRemoveStop}
       onUseCurrentLocation={handleUseCurrentLocation}
       originIsCurrent={originFromGps}
       origin={origin}
@@ -1413,6 +1458,31 @@ function PassengerApp() {
             onMarkRead={marcarLeida}
           />
 
+          {mensajeEntrante && !messagesOpen && (
+            <FloatingMessageBadge
+              title={
+                drivers.find(
+                  (driver) => driver.id === mensajeEntrante.conversacion.tenant_id
+                )?.name ?? "Mensaje de tu conductor"
+              }
+              message={mensajeEntrante.conversacion.ultimo_mensaje ?? "Nuevo mensaje"}
+              time={
+                mensajeEntrante.conversacion.ultimo_mensaje_at
+                  ? new Date(
+                      mensajeEntrante.conversacion.ultimo_mensaje_at
+                    ).toLocaleTimeString("es-VE", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })
+                  : undefined
+              }
+              count={mensajeEntrante.count}
+              onOpen={openMensajeEntrante}
+              onHide={ocultarMensajeEntrante}
+              accent="purple"
+            />
+          )}
+
           {requestOpen && (
             <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center sm:p-4">
               <button
@@ -1478,6 +1548,7 @@ function PassengerApp() {
             onConfirmRoute={handleConfirmRoute}
             pointType={mapPointType}
             initialOrigin={initialOriginPlace}
+            initialStops={stops}
             suggestions={savedAddresses.map((address) => ({
               id: address.id,
               name: address.name,

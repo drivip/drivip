@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect } from "react";
 import type { TarifasTenant } from "@drivip/types";
+import { validarCuponCodigo } from "@drivip/supabase";
 import type { Driver } from "../../types/passenger";
 import {
   calcularTarifaKm,
@@ -13,6 +14,8 @@ import {
 interface RouteCalculatorProps {
   onOpenMap: () => void;
   onOpenOriginMap?: () => void;
+  onOpenStopMap?: () => void;
+  onRemoveStop?: (index: number) => void;
   onUseCurrentLocation?: () => void;
   originIsCurrent?: boolean;
   distanceKm: number;
@@ -27,8 +30,10 @@ interface RouteCalculatorProps {
   onAddDriver?: () => void;
   onRequestRide: (detalle: {
     precioUsd: number;
+    precioBaseUsd?: number;
     metodoPago: "usd" | "bs" | "pmovil";
     programadaPara?: string;
+    cuponCodigo?: string;
   }) => void;
   onToggleSchedule: (mode: "now" | "schedule") => void;
   initialTripMode?: "now" | "schedule";
@@ -37,14 +42,63 @@ interface RouteCalculatorProps {
   stops?: string[];
 }
 
+const BANCOS: Record<string, string> = {
+  "0102": "Banco de Venezuela",
+  "0104": "Venezolano de Crédito",
+  "0105": "Mercantil",
+  "0108": "BBVA Provincial",
+  "0134": "Banesco",
+  "0138": "Banco Plaza",
+  "0146": "Bangente",
+  "0151": "BFC Banco Fondo Común",
+  "0163": "Banco del Tesoro",
+  "0166": "Banco Agrícola de Venezuela",
+  "0168": "Bancrecer",
+  "0169": "Mi Banco",
+  "0171": "Banco Activo",
+  "0172": "Bancamiga",
+  "0174": "Banplus",
+  "0175": "Banco Bicentenario",
+  "0177": "Banfanb",
+  "0191": "Banco Nacional de Crédito",
+};
+
+function bancoLabel(codigo: string | null | undefined): string {
+  if (!codigo) return "Sin banco";
+  return `${codigo} · ${BANCOS[codigo] ?? "Banco"}`;
+}
+
 function localDateInput(date: Date): string {
   const pad = (value: number) => String(value).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
+const ERRORES_CUPON: Record<string, string> = {
+  codigo_vacio: "Escribe el código del cupón.",
+  cupon_no_encontrado: "Ese código no existe para el conductor seleccionado.",
+  cupon_inactivo: "El conductor desactivó este cupón.",
+  cupon_vencido: "Este cupón venció.",
+  cupon_ya_usado: "Ya usaste este cupón.",
+  conductor_no_en_red: "Ese cupón pertenece a otro conductor.",
+  no_autenticado: "Inicia sesión para usar cupones.",
+};
+
+function calcularDescuento(
+  base: number,
+  cupon: { tipo: "porcentaje" | "monto"; valor: number } | null
+): number {
+  if (!cupon) return 0;
+  const valor = Math.max(0, Number(cupon.valor) || 0);
+  const monto =
+    cupon.tipo === "porcentaje" ? (base * Math.min(valor, 100)) / 100 : valor;
+  return Math.round(Math.min(Math.max(monto, 0), base) * 100) / 100;
+}
+
 export default function RouteCalculator({
   onOpenMap,
   onOpenOriginMap,
+  onOpenStopMap,
+  onRemoveStop,
   onUseCurrentLocation,
   originIsCurrent = false,
   distanceKm,
@@ -69,11 +123,19 @@ export default function RouteCalculator({
   const [destination, setDestination] = useState(destinationProp ?? "");
   const [stops, setStops] = useState<string[]>(stopsProp ?? []);
   const [paymentMethod, setPaymentMethod] = useState<"usd" | "bs" | "pmovil">("usd");
-  const [showPagoMovil, setShowPagoMovil] = useState(false);
+  const [copiado, setCopiado] = useState<string | null>(null);
   const [zonaId, setZonaId] = useState<string>("");
   const [scheduleDate, setScheduleDate] = useState("");
   const [scheduleTime, setScheduleTime] = useState("08:30");
   const [formError, setFormError] = useState("");
+  const [cuponCodigo, setCuponCodigo] = useState("");
+  const [cuponAplicado, setCuponAplicado] = useState<{
+    codigo: string;
+    tipo: "porcentaje" | "monto";
+    valor: number;
+  } | null>(null);
+  const [cuponError, setCuponError] = useState("");
+  const [validandoCupon, setValidandoCupon] = useState(false);
 
   const minDate = useMemo(() => localDateInput(new Date()), []);
 
@@ -106,16 +168,36 @@ export default function RouteCalculator({
     setFormError("");
   }, [initialTripMode]);
 
+  useEffect(() => {
+    setCuponAplicado(null);
+    setCuponCodigo("");
+    setCuponError("");
+  }, [selectedDriverId]);
+
+  useEffect(() => {
+    if (tripMode === "schedule") {
+      setCuponAplicado(null);
+      setCuponError("");
+    }
+  }, [tripMode]);
+
   const zonaSeleccionada = tarifas?.zonas.find((z) => z.id === zonaId) ?? tarifas?.zonas[0];
   const hasDestination = Boolean(destination.trim()) && canRequest;
   const selectedDriver = drivers.find((driver) => driver.id === selectedDriverId) ?? null;
   const hasDriver = Boolean(selectedDriver);
+  const pagoMovil = selectedDriver?.paymentData?.pagoMovil ?? null;
+  const pagoMovilCompleto = Boolean(
+    pagoMovil?.activo && pagoMovil.banco && pagoMovil.cedula && pagoMovil.telefono
+  );
 
-  const precioUsd = tarifas
+  const precioBaseUsd = tarifas
     ? tarifas.modo === "zona"
       ? Number(zonaSeleccionada?.precio ?? 0)
       : calcularTarifaKm(tarifas.base, tarifas.por_km, distanceKm)
     : calcularTarifaKm(DEFAULT_TARIFA_BASE, DEFAULT_TARIFA_POR_KM, distanceKm);
+
+  const descuentoUsd = calcularDescuento(precioBaseUsd, cuponAplicado);
+  const precioUsd = Math.round(Math.max(precioBaseUsd - descuentoUsd, 0) * 100) / 100;
 
   const hasFare =
     hasDestination &&
@@ -128,11 +210,46 @@ export default function RouteCalculator({
     paymentMethod === "usd" ? "Efectivo USD" : paymentMethod === "bs" ? "Efectivo Bs" : "Pago Móvil";
 
   const whatsappHref = useMemo(() => {
-    const digits = (driverWhatsapp ?? "").replace(/\D/g, "");
+    const digits = (driverWhatsapp ?? selectedDriver?.whatsapp ?? "").replace(/\D/g, "");
     if (digits.length < 7) return null;
-    const text = encodeURIComponent("Hola, acabo de solicitar un viaje en Drivip. Te envío el capture del pago.");
+    const text = encodeURIComponent(
+      "Hola, acabo de solicitar un viaje en Drivip. Te envío el capture del pago."
+    );
     return `https://wa.me/${digits}?text=${text}`;
-  }, [driverWhatsapp]);
+  }, [driverWhatsapp, selectedDriver?.whatsapp]);
+
+  const copiar = async (texto: string | null | undefined, key: string) => {
+    if (!texto) return;
+    try {
+      await navigator.clipboard.writeText(texto);
+    } catch {
+      const input = document.createElement("textarea");
+      input.value = texto;
+      input.style.position = "fixed";
+      input.style.opacity = "0";
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand("copy");
+      document.body.removeChild(input);
+    }
+    setCopiado(key);
+    window.setTimeout(() => {
+      setCopiado((actual) => (actual === key ? null : actual));
+    }, 1800);
+  };
+
+  const copiarPagoMovil = () => {
+    if (!pagoMovil) return;
+    void copiar(
+      [
+        `Banco: ${bancoLabel(pagoMovil.banco)}`,
+        `Cédula: ${pagoMovil.cedula ?? ""}`,
+        `Teléfono: ${pagoMovil.telefono ?? ""}`,
+        `Monto: ${formatearBs(precioUsd, tasa ?? undefined)}`,
+      ].join("\n"),
+      "todo"
+    );
+  };
 
   const handleToggle = (mode: "now" | "schedule") => {
     setTripMode(mode);
@@ -142,7 +259,53 @@ export default function RouteCalculator({
 
   const handlePayment = (method: "usd" | "bs" | "pmovil") => {
     setPaymentMethod(method);
-    setShowPagoMovil(method === "pmovil");
+  };
+
+  const aplicarCupon = async () => {
+    setCuponError("");
+    const codigo = cuponCodigo.trim().toUpperCase();
+
+    if (!codigo) {
+      setCuponError("Escribe el código del cupón.");
+      return;
+    }
+
+    if (!selectedDriver) {
+      setCuponError("Elige un conductor para aplicar el cupón.");
+      return;
+    }
+
+    setValidandoCupon(true);
+    try {
+      const resultado = await validarCuponCodigo(codigo, selectedDriver.id);
+      if (!resultado.ok) {
+        setCuponAplicado(null);
+        setCuponError(
+          ERRORES_CUPON[resultado.error ?? ""] ??
+            resultado.error ??
+            "No pudimos validar el cupón."
+        );
+        return;
+      }
+
+      setCuponAplicado({
+        codigo: resultado.codigo ?? codigo,
+        tipo: resultado.tipo ?? "monto",
+        valor: Number(resultado.valor ?? 0),
+      });
+      setCuponCodigo(resultado.codigo ?? codigo);
+    } catch {
+      setCuponAplicado(null);
+      setCuponError("No pudimos validar el cupón. Revisa tu conexión.");
+    } finally {
+      setValidandoCupon(false);
+    }
+  };
+
+  const quitarCupon = () => {
+    setCuponAplicado(null);
+    setCuponCodigo("");
+    setCuponError("");
   };
 
   const handleSubmit = () => {
@@ -184,7 +347,13 @@ export default function RouteCalculator({
       programadaPara = when.toISOString();
     }
 
-    onRequestRide({ precioUsd, metodoPago: paymentMethod, programadaPara });
+    onRequestRide({
+      precioUsd,
+      precioBaseUsd,
+      metodoPago: paymentMethod,
+      programadaPara,
+      cuponCodigo: programadaPara ? undefined : cuponAplicado?.codigo,
+    });
   };
 
   return (
@@ -313,13 +482,23 @@ export default function RouteCalculator({
           </div>
 
           {stops.map((stop, index) => (
-            <div key={`${stop}-${index}`} className="relative z-10 flex items-center gap-3 px-3 py-2 lg:px-4 lg:py-2.5">
+            <div key={`${stop}-${index}`} className="relative z-10 flex items-center gap-2 px-3 py-2 lg:px-4 lg:py-2.5">
               <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl bg-purple-100 text-purple-600 lg:h-10 lg:w-10">
                 <span className="text-xs font-black lg:text-sm">{index + 1}</span>
               </div>
-              <div className="min-w-0 flex-1 truncate rounded-xl border border-slate-200/70 bg-slate-50/90 px-3 py-2 text-xs font-bold text-slate-800 lg:text-sm">
-                {stop || "Escala intermedia"}
+              <div className="min-w-0 flex-1 rounded-xl border border-slate-200/70 bg-slate-50/90 px-3 py-2 text-xs font-bold text-slate-800 lg:text-sm">
+                <span className="line-clamp-2 break-words">{stop || "Escala intermedia"}</span>
               </div>
+              {onRemoveStop && (
+                <button
+                  type="button"
+                  onClick={() => onRemoveStop(index)}
+                  aria-label={`Eliminar escala ${index + 1}`}
+                  className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm transition hover:text-red-500 active:scale-90"
+                >
+                  <span className="material-symbols-outlined text-[17px]">close</span>
+                </button>
+              )}
             </div>
           ))}
 
@@ -358,7 +537,7 @@ export default function RouteCalculator({
           </span>
           <button
             className="text-[11px] font-bold text-purple-600 transition active:scale-95 lg:text-xs"
-            onClick={onOpenMap}
+            onClick={onOpenStopMap ?? onOpenMap}
           >
             + Agregar otra
           </button>
@@ -368,12 +547,12 @@ export default function RouteCalculator({
       {stops.length === 0 && (
         <button
           className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-purple-300 bg-purple-50 py-2.5 text-[11px] font-bold text-purple-700 transition hover:bg-purple-100 active:scale-[0.98] lg:text-xs"
-          onClick={onOpenMap}
+          onClick={onOpenStopMap ?? onOpenMap}
         >
           <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
             <path d="M12 4.5v15m7.5-7.5h-15" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-          Añadir escala desde el mapa
+          Añadir escala a la ruta
         </button>
       )}
 
@@ -411,7 +590,7 @@ export default function RouteCalculator({
             </span>
           </button>
         ) : (
-          <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 no-scrollbar">
+          <div className="grid gap-2 sm:grid-cols-2">
             {drivers.map((driver) => {
               const isSelected = driver.id === selectedDriver?.id;
               return (
@@ -419,7 +598,7 @@ export default function RouteCalculator({
                   key={driver.id}
                   type="button"
                   onClick={() => onSelectDriver?.(driver)}
-                  className={`flex w-[164px] shrink-0 items-center gap-2.5 rounded-2xl border p-2.5 text-left transition active:scale-[0.98] ${
+                  className={`flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition active:scale-[0.98] ${
                     isSelected
                       ? "border-purple-500 bg-purple-50 shadow-md shadow-purple-600/10"
                       : "border-slate-200 bg-white hover:border-slate-300"
@@ -430,36 +609,53 @@ export default function RouteCalculator({
                       <img
                         src={driver.image}
                         alt={driver.name}
-                        className="h-10 w-10 rounded-xl object-cover"
+                        className="h-12 w-12 rounded-2xl object-cover"
                       />
                     ) : (
-                      <span className={`flex h-10 w-10 items-center justify-center rounded-xl text-xs font-black ${driver.color}`}>
+                      <span className={`flex h-12 w-12 items-center justify-center rounded-2xl text-sm font-black ${driver.color}`}>
                         {driver.initials}
                       </span>
                     )}
                     <span
-                      className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white ${
+                      className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white ${
                         driver.status === "available" ? "bg-emerald-500" : "bg-slate-400"
                       }`}
                     />
                   </span>
                   <span className="min-w-0 flex-1">
-                      <span className="block truncate text-xs font-black text-slate-900">
-                        {driver.name}
+                    <span className="block text-[13px] font-black leading-snug text-slate-900 break-words sm:text-sm">
+                      {driver.name}
+                    </span>
+                    <span className="mt-0.5 block text-[11px] font-semibold leading-snug text-slate-500 break-words sm:text-xs">
+                      {driver.vehicle}
+                    </span>
+                    <span className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] font-bold">
+                      <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-amber-700">
+                        ★ {driver.rating}
                       </span>
-                      <span className="block truncate text-[11px] font-semibold text-slate-500">
-                        {driver.vehicle}
+                      <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-slate-600">
+                        Placa {driver.plate}
                       </span>
-                      <span className="mt-0.5 flex items-center gap-1 text-[10px] font-bold text-amber-600">
-                      ★ {driver.rating}
-                      <span className="font-medium text-slate-400">· {driver.plate}</span>
+                      <span
+                        className={`rounded-full px-1.5 py-0.5 ${
+                          driver.status === "available"
+                            ? "bg-emerald-50 text-emerald-700"
+                            : "bg-slate-100 text-slate-500"
+                        }`}
+                      >
+                        {driver.status === "available" ? "Disponible" : driver.availability}
+                      </span>
                     </span>
                   </span>
-                  {isSelected && (
-                    <span className="material-symbols-outlined text-[17px] text-purple-600">
-                      check_circle
+                  <span
+                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
+                      isSelected ? "bg-purple-600 text-white" : "bg-slate-100 text-slate-300"
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[17px]">
+                      {isSelected ? "check" : "radio_button_unchecked"}
                     </span>
-                  )}
+                  </span>
                 </button>
               );
             })}
@@ -511,7 +707,12 @@ export default function RouteCalculator({
             <span>{hasDestination ? distance : "Selecciona tu destino"}</span>
             {tarifas?.nombre && <span className="text-slate-400">• {tarifas.nombre}</span>}
           </div>
-          <div className="mt-0.5 flex items-baseline gap-1">
+          <div className="mt-0.5 flex items-baseline gap-1.5">
+            {descuentoUsd > 0 && (
+              <span className="text-xs font-bold text-slate-400 line-through lg:text-sm">
+                {formatearUsd(precioBaseUsd)}
+              </span>
+            )}
             <span className="text-2xl font-black text-white lg:text-3xl">{fareUsd}</span>
             <span className="text-xs font-bold text-slate-300 lg:text-sm">USD</span>
           </div>
@@ -522,6 +723,11 @@ export default function RouteCalculator({
                 ? `Tarifa fija${zonaSeleccionada ? ` • ${zonaSeleccionada.nombre}` : ""}`
                 : "Base + $/km"}
           </span>
+          {descuentoUsd > 0 && cuponAplicado && (
+            <span className="mt-0.5 block text-[10px] font-bold text-emerald-400 lg:text-[11px]">
+              Cupón {cuponAplicado.codigo} · -{formatearUsd(descuentoUsd)}
+            </span>
+          )}
         </div>
         <div className="text-right">
           <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 lg:text-[11px]">
@@ -533,6 +739,87 @@ export default function RouteCalculator({
           </span>
         </div>
       </div>
+
+      {tripMode === "now" && (
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-xs lg:text-sm">
+            <span className="font-bold text-slate-700">Código de cupón</span>
+            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 lg:text-[11px]">
+              Opcional
+            </span>
+          </div>
+
+          {cuponAplicado ? (
+            <div className="flex items-center gap-2.5 rounded-2xl border border-emerald-200 bg-emerald-50 p-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white">
+                <span className="material-symbols-outlined text-[19px]">confirmation_number</span>
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-mono text-[12px] font-black tracking-wider text-emerald-900">
+                  {cuponAplicado.codigo}
+                </p>
+                <p className="text-[10px] font-semibold leading-snug text-emerald-700">
+                  {cuponAplicado.tipo === "porcentaje"
+                    ? `${cuponAplicado.valor}% de descuento`
+                    : `${formatearUsd(cuponAplicado.valor)} de descuento`}
+                  {descuentoUsd > 0 ? ` · Ahorras ${formatearUsd(descuentoUsd)}` : ""}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={quitarCupon}
+                aria-label="Quitar cupón"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm transition active:scale-90"
+              >
+                <span className="material-symbols-outlined text-[17px]">close</span>
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <input
+                aria-label="Código de cupón"
+                value={cuponCodigo}
+                onChange={(event) => {
+                  setCuponCodigo(event.target.value.toUpperCase());
+                  setCuponError("");
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    void aplicarCupon();
+                  }
+                }}
+                placeholder="Ej. DRIVIP10"
+                className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-slate-900 placeholder:font-sans placeholder:font-medium placeholder:normal-case placeholder:tracking-normal placeholder:text-slate-400 focus:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400"
+              />
+              <button
+                type="button"
+                onClick={() => void aplicarCupon()}
+                disabled={validandoCupon || !cuponCodigo.trim()}
+                className="flex shrink-0 items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-black text-white transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {validandoCupon && (
+                  <span className="material-symbols-outlined animate-spin text-[15px]">sync</span>
+                )}
+                {validandoCupon ? "Validando" : "Aplicar"}
+              </button>
+            </div>
+          )}
+
+          {cuponError ? (
+            <p className="rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-[11px] font-semibold text-rose-600">
+              {cuponError}
+            </p>
+          ) : (
+            !cuponAplicado && (
+              <p className="px-1 text-[10px] font-medium text-slate-400">
+                Ingresa el código que te compartió tu conductor. El descuento se
+                aplica al pedir el viaje.
+              </p>
+            )
+          )}
+        </div>
+      )}
 
       <div className="space-y-1.5">
         <div className="flex items-center justify-between text-xs lg:text-sm">
@@ -562,22 +849,111 @@ export default function RouteCalculator({
           ))}
         </div>
 
-        {showPagoMovil && (
-          <div className="flex items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-3 lg:p-4">
-            <div className="text-[11px] leading-tight text-amber-900 lg:text-xs">
-              <strong className="block font-bold">Pago directo al chofer</strong>
-              {whatsappHref
-                ? "Transfiere y envía el capture por WhatsApp."
-                : "El chofer te compartirá sus datos al confirmar el viaje."}
+        {paymentMethod === "pmovil" && (
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3.5 lg:p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="material-symbols-outlined text-[19px] text-emerald-700">
+                  contactless
+                </span>
+                <div className="min-w-0">
+                  <p className="text-xs font-black text-emerald-950">Datos Pago Móvil</p>
+                  <p className="truncate text-[11px] font-semibold text-emerald-700">
+                    {selectedDriver ? selectedDriver.name : "Elige un conductor"}
+                  </p>
+                </div>
+              </div>
+              {pagoMovilCompleto && (
+                <span className="shrink-0 rounded-full bg-emerald-600 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-white">
+                  Listo
+                </span>
+              )}
             </div>
+
+            {pagoMovilCompleto && pagoMovil ? (
+              <>
+                <div className="mt-2.5 rounded-xl bg-emerald-600 px-3 py-2 text-white">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-100">
+                    Monto a pagar
+                  </p>
+                  <p className="text-lg font-black leading-tight">
+                    {formatearBs(precioUsd, tasa ?? undefined)}
+                  </p>
+                </div>
+
+                <div className="mt-2 space-y-1.5">
+                  {[
+                    { key: "banco", label: "Banco", value: bancoLabel(pagoMovil.banco) },
+                    { key: "cedula", label: "Cédula", value: pagoMovil.cedula ?? "" },
+                    { key: "telefono", label: "Teléfono", value: pagoMovil.telefono ?? "" },
+                  ].map((item) => (
+                    <div
+                      key={item.key}
+                      className="flex items-center gap-2 rounded-xl bg-white px-3 py-2 shadow-sm"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
+                          {item.label}
+                        </p>
+                        <p className="break-words text-[13px] font-black text-slate-900">
+                          {item.value}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void copiar(item.value, item.key)}
+                        aria-label={`Copiar ${item.label}`}
+                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition active:scale-90 ${
+                          copiado === item.key
+                            ? "bg-emerald-600 text-white"
+                            : "bg-slate-100 text-slate-600"
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-[17px]">
+                          {copiado === item.key ? "check" : "content_copy"}
+                        </span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={copiarPagoMovil}
+                  className={`mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-black transition active:scale-[0.98] ${
+                    copiado === "todo"
+                      ? "bg-emerald-700 text-white"
+                      : "bg-white text-emerald-700 shadow-sm"
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[17px]">
+                    {copiado === "todo" ? "check" : "content_copy"}
+                  </span>
+                  {copiado === "todo" ? "Datos copiados" : "Copiar todos los datos"}
+                </button>
+              </>
+            ) : (
+              <div className="mt-2.5 flex items-start gap-2 rounded-xl bg-white px-3 py-2.5 shadow-sm">
+                <span className="material-symbols-outlined text-[17px] text-amber-600">
+                  info
+                </span>
+                <p className="text-[11px] font-semibold leading-relaxed text-amber-800">
+                  {selectedDriver
+                    ? "Este conductor aún no cargó sus datos de Pago Móvil. Solicítalos por WhatsApp."
+                    : "Selecciona un conductor para ver sus datos de Pago Móvil."}
+                </p>
+              </div>
+            )}
+
             {whatsappHref && (
               <a
-                className="flex flex-shrink-0 items-center gap-1 rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow active:scale-95"
+                className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-xl bg-emerald-600 py-2.5 text-xs font-black text-white shadow active:scale-[0.98]"
                 href={whatsappHref}
                 target="_blank"
                 rel="noreferrer"
               >
-                WhatsApp
+                <span className="material-symbols-outlined text-[17px]">chat</span>
+                Coordinar por WhatsApp
               </a>
             )}
           </div>

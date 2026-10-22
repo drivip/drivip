@@ -14,6 +14,7 @@ export { default as ProgressBar } from "./ProgressBar";
 export { default as MetricCard } from "./MetricCard";
 export { default as FilterPills } from "./FilterPills";
 export { default as ConfirmDialog } from "./ConfirmDialog";
+export { default as FloatingMessageBadge } from "./FloatingMessageBadge";
 export { cn, formatCurrency } from "./utils";
 export type { MenuItem } from "./HamburgerMenu";
 export type { DriverStatus } from "./DriverCard";

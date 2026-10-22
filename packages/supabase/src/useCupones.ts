@@ -24,6 +24,35 @@ export interface ResultadoCanje {
   conductor?: string;
 }
 
+export interface ResultadoValidarCupon {
+  ok: boolean;
+  error?: string;
+  cupon_id?: string;
+  codigo?: string;
+  tipo?: TipoCupon;
+  valor?: number;
+  conductor?: string;
+  valido_hasta?: string | null;
+}
+
+/** Valida un codigo de cupon del conductor elegido sin consumirlo. */
+export async function validarCuponCodigo(
+  codigo: string,
+  conductorTenantId: string
+): Promise<ResultadoValidarCupon> {
+  const { data, error } = await supabase.rpc("validar_cupon_codigo", {
+    p_cupon_codigo: codigo.trim().toUpperCase(),
+    p_conductor_tenant_id: conductorTenantId,
+  });
+  if (error) return { ok: false, error: error.message };
+  return (
+    (data as ResultadoValidarCupon | null) ?? {
+      ok: false,
+      error: "cupon_no_encontrado",
+    }
+  );
+}
+
 function normalizarCupon(row: Cupon): Cupon {
   return {
     ...row,
