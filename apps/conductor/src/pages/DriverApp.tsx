@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DisponibilidadConductor } from "@drivip/types";
-import { cn } from "@drivip/ui";
-import { FloatingMessageBadge } from "@drivip/ui";
+import { cn, FloatingMessageBadge, PwaInstallPrompt } from "@drivip/ui";
+import { haversineKm } from "@drivip/maps";
 import {
   actualizarDisponibilidadConductor,
   APP_URLS,
@@ -9,11 +9,12 @@ import {
   useAuthContext,
   useCarreras,
   useConversacionesConductor,
+  useAdminMensajes,
   useMiTenant,
   leerDisponibilidadLocal,
   limpiarDisponibilidadLocal,
   useMensajeEntrante,
-  useUbicaciones,
+  useReportarUbicacion,
 } from "@drivip/supabase";
 import DriverHeader from "../components/driver/DriverHeader";
 import DriverFullGridMenu from "../components/driver/DriverFullGridMenu";
@@ -24,6 +25,7 @@ import Carreras from "../components/Carreras";
 import Historial from "../components/Historial";
 import MiPerfil from "../components/MiPerfil";
 import MisPrecios from "../components/MisPrecios";
+import Reservas from "../components/Reservas";
 import MiPlan from "../components/MiPlan";
 import MisAliados from "../components/MisAliados";
 import MisClientes from "../components/MisClientes";
@@ -51,6 +53,7 @@ type Module =
   | "cupones"
   | "config"
   | "qr"
+  | "reservas"
   | "reportes"
   | "rutas"
   | "tarifas";
@@ -75,7 +78,7 @@ export default function DriverApp({ demo }: { demo?: boolean }) {
   const [activeModule, setActiveModule] = useState<Module>("dashboard");
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [profileTab, setProfileTab] = useState<"perfil" | "mensajes">("perfil");
+  const [profileTab, setProfileTab] = useState<"perfil" | "mensajes" | "soporte">("perfil");
   const [profileConversationId, setProfileConversationId] = useState<string | null>(null);
   const [reviewsOpen, setReviewsOpen] = useState(false);
   const [carreraActiva, setCarreraActiva] = useState<string | null>(null);
@@ -87,10 +90,13 @@ export default function DriverApp({ demo }: { demo?: boolean }) {
   const [isOnline, setIsOnline] = useState(true);
   const arrivedNotifiedRef = useRef<Set<string>>(new Set());
   const terminalPendingRef = useRef<Set<string>>(new Set());
+  const lastReportAtRef = useRef(0);
+  const lastReportPosRef = useRef<[number, number] | null>(null);
+  const restoredCarreraRef = useRef(false);
 
   const { tenant, refetch: refetchTenant } = useMiTenant(demo ? null : user?.id);
   const { carreras, updateCarreraEstado, marcarLlegadaCarrera, quoteCarrera } = useCarreras(tenant?.id);
-  const { reportarUbicacion } = useUbicaciones(tenant?.id ?? "");
+  const { reportarUbicacion } = useReportarUbicacion();
   const {
     conversaciones,
     userId,
@@ -98,9 +104,21 @@ export default function DriverApp({ demo }: { demo?: boolean }) {
     totalNoLeidos,
     marcarLeida,
     refetch: refetchConversaciones,
-  } = useConversacionesConductor();
+  } = useConversacionesConductor(tenant?.id);
   const { mensaje: mensajeEntrante, ocultar: ocultarMensajeEntrante } =
     useMensajeEntrante(conversaciones, userId, conversacionesLoading);
+  const {
+    mensajes: soporteMensajes,
+    userId: soporteUserId,
+    loading: soporteLoading,
+    error: soporteError,
+    available: soporteAvailable,
+    unread: soporteUnread,
+    mensajeEntrante: mensajeSoporteEntrante,
+    ocultarMensajeEntrante: ocultarMensajeSoporteEntrante,
+    enviar: enviarSoporte,
+    marcarLeidos: marcarSoporteLeidos,
+  } = useAdminMensajes(demo ? null : (tenant?.id ?? null));
 
   const effectiveCarreras = demo ? MOCK_CARRERAS_CONDUCTOR : carreras;
   const isPaused = !demo && !!tenant?.pausado;
@@ -172,6 +190,20 @@ export default function DriverApp({ demo }: { demo?: boolean }) {
   );
 
   useEffect(() => {
+    if (demo || restoredCarreraRef.current || carreras.length === 0) return;
+    restoredCarreraRef.current = true;
+    const activa = carreras.find(
+      (c) => c.estado === "aceptada" || c.estado === "en_curso"
+    );
+    if (activa) {
+      setCarreraActiva(activa.id);
+      if (disponibilidad === "disponible") {
+        void cambiarDisponibilidad("ocupado", "En servicio");
+      }
+    }
+  }, [carreras, demo, disponibilidad, cambiarDisponibilidad]);
+
+  useEffect(() => {
     if (disponibilidad !== "pausa_30" || !disponibilidadHasta) return;
     const restante = new Date(disponibilidadHasta).getTime() - Date.now();
     if (restante <= 0) {
@@ -202,13 +234,22 @@ export default function DriverApp({ demo }: { demo?: boolean }) {
 
     const watchId = navigator.geolocation.watchPosition(
       (pos) => {
-        reportarUbicacion({
-          conductor_id: tenant.id,
-          tenant_id: tenant.id,
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          velocidad: pos.coords.speed ?? undefined,
-          direccion: pos.coords.heading ?? undefined,
+        const coords: [number, number] = [pos.coords.latitude, pos.coords.longitude];
+        const now = Date.now();
+        const lastPos = lastReportPosRef.current;
+        const movedKm = lastPos ? haversineKm(lastPos, coords) : Infinity;
+
+        // Evita saturar la red: maximo un reporte cada 5 s o 30 m.
+        if (now - lastReportAtRef.current < 5000 && movedKm < 0.03) return;
+
+        lastReportAtRef.current = now;
+        lastReportPosRef.current = coords;
+        void reportarUbicacion({
+          lat: coords[0],
+          lng: coords[1],
+          velocidad: pos.coords.speed ?? null,
+          direccion: pos.coords.heading ?? null,
+          carrera_id: carreraActiva,
         });
       },
       () => {},
@@ -221,12 +262,14 @@ export default function DriverApp({ demo }: { demo?: boolean }) {
   }, [isOnline, carreraActiva, tenant?.id, reportarUbicacion]);
 
   const openProfile = (
-    tab: "perfil" | "mensajes" = "perfil",
+    tab: "perfil" | "mensajes" | "soporte" = "perfil",
     conversationId: string | null = null
   ) => {
     setProfileTab(tab);
     setProfileConversationId(conversationId);
     setProfileOpen(true);
+    if (tab === "mensajes") ocultarMensajeEntrante();
+    if (tab === "soporte") ocultarMensajeSoporteEntrante();
   };
 
   const openMensajeEntrante = () => {
@@ -235,9 +278,18 @@ export default function DriverApp({ demo }: { demo?: boolean }) {
     ocultarMensajeEntrante();
   };
 
+  const openSoporteEntrante = () => {
+    openProfile("soporte");
+    ocultarMensajeSoporteEntrante();
+  };
+
   const handleNavigate = (module: string) => {
     if (module === "mensajes") {
       openProfile("mensajes");
+      return;
+    }
+    if (module === "soporte") {
+      openProfile("soporte");
       return;
     }
     if (module === "perfil") {
@@ -382,6 +434,12 @@ export default function DriverApp({ demo }: { demo?: boolean }) {
       />
 
       <main className="pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
+        {activeModule === "dashboard" && !demo && (
+          <div className="px-4 pt-3">
+            <PwaInstallPrompt appName="Drivip Conductor" accent="purple" />
+          </div>
+        )}
+
         {activeModule === "dashboard" && (
           <ChoferDashboard
             onNavigate={handleNavigate}
@@ -447,6 +505,7 @@ export default function DriverApp({ demo }: { demo?: boolean }) {
         {activeModule === "qr" && (
           <QRSection profileSlug={profile.slug} profileName={profile.name} isOnline={isOnline && !isPaused} />
         )}
+        {activeModule === "reservas" && <Reservas tenantId={tenant?.id} demo={demo} />}
         {activeModule === "reportes" && <Historial carreras={effectiveCarreras} tenantId={tenant?.id} />}
         {activeModule === "rutas" && <MisPrecios tenant={tenant} demo={demo} onSaved={refetchTenant} />}
         {activeModule === "tarifas" && <MisPrecios tenant={tenant} demo={demo} onSaved={refetchTenant} />}
@@ -486,10 +545,11 @@ export default function DriverApp({ demo }: { demo?: boolean }) {
         driverName={profile.name}
         driverInitial={profile.initial}
         unreadMessages={totalNoLeidos}
+        unreadSupport={soporteUnread}
         onNavigate={handleNavigate}
       />
 
-      {mensajeEntrante && !(profileOpen && profileTab === "mensajes") && (
+      {mensajeEntrante && !mensajeSoporteEntrante && !(profileOpen && profileTab === "mensajes") && (
         <FloatingMessageBadge
           title={mensajeEntrante.conversacion.cliente_nombre}
           message={mensajeEntrante.conversacion.ultimo_mensaje ?? "Nuevo mensaje"}
@@ -510,6 +570,20 @@ export default function DriverApp({ demo }: { demo?: boolean }) {
         />
       )}
 
+      {mensajeSoporteEntrante && !(profileOpen && profileTab === "soporte") && (
+        <FloatingMessageBadge
+          title="Drivip Soporte"
+          message={mensajeSoporteEntrante.contenido}
+          time={new Date(mensajeSoporteEntrante.created_at).toLocaleTimeString("es-VE", {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+          onOpen={openSoporteEntrante}
+          onHide={ocultarMensajeSoporteEntrante}
+          accent="purple"
+        />
+      )}
+
       <DriverProfileModal
         isOpen={profileOpen}
         initialTab={profileTab}
@@ -526,6 +600,14 @@ export default function DriverApp({ demo }: { demo?: boolean }) {
         onMarcarLeida={marcarLeida}
         onRefetchConversaciones={refetchConversaciones}
         onNavigate={handleNavigate}
+        soporteMensajes={soporteMensajes}
+        soporteLoading={soporteLoading}
+        soporteError={soporteError}
+        soporteAvailable={soporteAvailable}
+        soporteUserId={soporteUserId}
+        soporteUnread={soporteUnread}
+        onEnviarSoporte={enviarSoporte}
+        onMarcarSoporteLeido={marcarSoporteLeidos}
       />
 
       <DriverReviewsModal

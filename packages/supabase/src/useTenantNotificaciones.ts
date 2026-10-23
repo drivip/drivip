@@ -40,6 +40,13 @@ export function useTenantNotificaciones(tenantId: string | null) {
 
     if (!error && data) {
       setNotificaciones((prev) => [data as TenantNotificacion, ...prev]);
+      void supabase
+        .rpc("enviar_mensaje_admin", {
+          p_tenant_id: notif.tenant_id,
+          p_titulo: notif.titulo,
+          p_contenido: notif.mensaje,
+        })
+        .then(() => undefined, () => undefined);
       void supabase.functions
         .invoke("send-push", {
           body: {

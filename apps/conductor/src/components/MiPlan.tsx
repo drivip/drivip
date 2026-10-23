@@ -1,4 +1,5 @@
 import type { Tenant } from "@drivip/types";
+import { useCuentaReferido, useConfigReferidos } from "@drivip/supabase";
 import { MOCK_DRIVER_PROFILE } from "../mockData/driverMockData";
 
 interface MiPlanProps {
@@ -11,7 +12,17 @@ export default function MiPlan({ tenant, demo = false }: MiPlanProps) {
   const plan = tenant?.plan || p?.plan || "estandar";
   const activo = tenant?.suscripcion_activa ?? p?.suscripcionActiva ?? false;
   const vencimiento = tenant?.fecha_vencimiento || p?.fechaVencimiento || null;
-  const precio = plan === "profesional" ? "$20" : "$10";
+  const { cuenta } = useCuentaReferido(tenant?.id);
+  const { config } = useConfigReferidos();
+  const precioBase =
+    cuenta?.precio_plan ??
+    (plan === "premium"
+      ? Number(config?.precio_plan_premium ?? 30)
+      : plan === "profesional"
+        ? Number(config?.precio_plan_profesional ?? 20)
+        : Number(config?.precio_plan_estandar ?? 10));
+  const precioFinal = cuenta?.total_mensual ?? precioBase;
+  const precio = cuenta?.es_gratis ? "GRATIS" : `$${precioFinal.toFixed(2)}`;
 
   return (
     <div className="px-4 py-4 space-y-4 lg:px-8 lg:py-6 max-w-2xl mx-auto w-full">
@@ -28,7 +39,17 @@ export default function MiPlan({ tenant, demo = false }: MiPlanProps) {
               {activo ? "ACTIVO" : "INACTIVO"}
             </span>
           </div>
-          <p className="text-3xl lg:text-4xl font-black">{precio}<span className="text-base lg:text-lg font-bold opacity-70">/mes</span></p>
+          <p className="text-3xl lg:text-4xl font-black">{precio}<span className="text-base lg:text-lg font-bold opacity-70">{cuenta?.es_gratis ? "" : "/mes"}</span></p>
+          {cuenta && cuenta.monto_descuento > 0 && !cuenta.es_gratis && (
+            <p className="text-[11px] lg:text-xs font-bold text-emerald-200 mt-1">
+              Descuento por {cuenta.referidos_activos} referidos activos: -${cuenta.monto_descuento.toFixed(2)} ({cuenta.descuento_pct}%)
+            </p>
+          )}
+          {cuenta?.es_gratis && (
+            <p className="text-[11px] lg:text-xs font-bold text-amber-200 mt-1">
+              Mensualidad gratis por tus referidos activos
+            </p>
+          )}
           <p className="text-[11px] lg:text-xs text-white/70 mt-1">
             {activo ? `Renovacion automatica` : "Sin suscripcion activa"}
             {vencimiento && ` · Vence: ${new Date(vencimiento).toLocaleDateString("es-VE")}`}

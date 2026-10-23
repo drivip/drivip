@@ -239,11 +239,13 @@ export default function MapLibreView({
     const map = mapRef.current;
     if (!map || userDraggingRef.current) return;
     const targetZoom = Math.max(map.getZoom(), zoom);
-    if (map.getCenter().lat === center[0] && map.getCenter().lng === center[1] && map.getZoom() === targetZoom) {
+    const current = map.getCenter();
+    const centerMoved = Math.abs(current.lat - center[0]) + Math.abs(current.lng - center[1]);
+    if (centerMoved < 0.00008 && Math.abs(map.getZoom() - targetZoom) < 0.05) {
       return;
     }
     programmaticMoveRef.current = true;
-    map.flyTo({ center: [center[1], center[0]], zoom: targetZoom, duration: 800 });
+    map.easeTo({ center: [center[1], center[0]], zoom: targetZoom, duration: 500 });
   }, [center, zoom]);
 
   useEffect(() => {
@@ -299,8 +301,6 @@ export default function MapLibreView({
     } else {
       carMarkerRef.current.setLngLat([carPosition.lng, carPosition.lat]).setRotation(carPosition.bearing);
     }
-    programmaticMoveRef.current = true;
-    map.flyTo({ center: [carPosition.lng, carPosition.lat], zoom: Math.max(map.getZoom(), 17), duration: 800 });
   }, [carPosition, showPulse]);
 
   // Origin marker

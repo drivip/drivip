@@ -79,6 +79,43 @@ export default function ClienteDetailPanel({ cliente, onBack, onRemoved }: Clien
         </div>
       </div>
 
+      {/* Descarga de la app del cliente */}
+      <div className="bg-white rounded-2xl p-4 border border-slate-100 space-y-3" style={{ boxShadow: "4px 4px 10px #d9dde2, -4px -4px 10px #ffffff" }}>
+        <div className="flex items-center gap-2">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-100 text-purple-700">
+            <span className="material-symbols-outlined text-[18px]">install_mobile</span>
+          </span>
+          <div>
+            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">App del cliente</h3>
+            <p className="text-[10px] text-slate-500">Si aún no la ha descargado, comparte este enlace.</p>
+          </div>
+        </div>
+        <p className="truncate rounded-xl bg-slate-50 px-3 py-2 text-[11px] font-mono text-slate-600">{APP_URLS.cliente}</p>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={() => {
+              void navigator.clipboard?.writeText(APP_URLS.cliente).then(
+                () => showToast("Enlace de descarga copiado"),
+                () => showToast("No se pudo copiar el enlace"),
+              );
+            }}
+            className="flex items-center justify-center gap-1.5 rounded-xl bg-slate-100 py-2.5 text-[11px] font-bold text-slate-700 active:scale-95 transition"
+          >
+            <span className="material-symbols-outlined text-[15px]">content_copy</span>
+            Copiar enlace
+          </button>
+          <a
+            href={APP_URLS.cliente}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-1.5 rounded-xl bg-purple-700 py-2.5 text-[11px] font-bold text-white shadow-md shadow-purple-700/25 active:scale-95 transition"
+          >
+            <span className="material-symbols-outlined text-[15px]">download</span>
+            Descargar aquí
+          </a>
+        </div>
+      </div>
+
       {/* Estadisticas */}
       <div className="bg-white rounded-2xl p-4 border border-slate-100 space-y-3" style={{ boxShadow: "4px 4px 10px #d9dde2, -4px -4px 10px #ffffff" }}>
         <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Estadisticas</h3>

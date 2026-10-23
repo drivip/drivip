@@ -19,7 +19,11 @@ export function useCarreras(conductorId?: string) {
 
   useEffect(() => {
     let cancelled = false;
-    let query = supabase.from("carreras").select("*").order("created_at", { ascending: false });
+    let query = supabase
+      .from("carreras")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(conductorId ? 200 : 500);
     if (conductorId) query = query.eq("conductor_id", conductorId);
 
     query.then(({ data, error }) => {

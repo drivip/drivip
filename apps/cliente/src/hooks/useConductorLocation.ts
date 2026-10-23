@@ -1,12 +1,12 @@
 import { useState, useCallback, useEffect } from "react";
 import { supabase, useRealtimeUbicacionConductor } from "@drivip/supabase";
-import type { Ubicacion } from "@drivip/types";
+import type { UbicacionActual } from "@drivip/types";
 
 export function useConductorLocation(conductorId: string | null) {
   const [location, setLocation] = useState<{ lat: number; lng: number; bearing: number } | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  const handleUbicacion = useCallback((ubicacion: Ubicacion) => {
+  const handleUbicacion = useCallback((ubicacion: UbicacionActual) => {
     setLocation({
       lat: ubicacion.lat,
       lng: ubicacion.lng,
@@ -24,15 +24,13 @@ export function useConductorLocation(conductorId: string | null) {
 
     let cancelled = false;
     void supabase
-      .from("ubicaciones")
+      .from("conductor_ubicacion_actual")
       .select("*")
       .eq("conductor_id", conductorId)
-      .order("timestamp", { ascending: false })
-      .limit(1)
       .maybeSingle()
       .then(({ data, error }) => {
         if (cancelled || error || !data) return;
-        const ubicacion = data as Ubicacion;
+        const ubicacion = data as UbicacionActual;
         setLocation({
           lat: ubicacion.lat,
           lng: ubicacion.lng,

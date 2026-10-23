@@ -113,6 +113,7 @@ export function useTenants() {
       .from("tenants")
       .select("*")
       .order("created_at", { ascending: false })
+      .limit(500)
       .then(({ data }) => {
         if (!cancelled) {
           setTenants((data as Tenant[]) ?? []);

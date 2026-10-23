@@ -1,5 +1,6 @@
-import { useState, useCallback } from "react";
-import { AuthProvider, useAuthContext, supabase, useTenants, useSuscripciones, useCarreras, useClientes } from "@drivip/supabase";
+import { useState, useCallback, useEffect } from "react";
+import { AuthProvider, useAuthContext, supabase, useTenants, useSuscripciones, useCarreras, useClientes, useSuperadminStats, useAdminConversaciones, useAdminReferidos } from "@drivip/supabase";
+import { FloatingMessageBadge } from "@drivip/ui";
 import LoginScreen from "./components/LoginScreen";
 import AdminAppShell from "./components/layout/AdminAppShell";
 import type { AdminModule } from "./components/layout/AdminSidebar";
@@ -14,6 +15,8 @@ import SystemHealthMonitor from "./components/SystemHealthMonitor";
 import DevOpsSection from "./components/DevOpsSection";
 import PlanManager from "./components/PlanManager";
 import ClienteManager from "./components/ClienteManager";
+import AdminSoporteCenter from "./components/AdminSoporteCenter";
+import AdminReferidosCenter from "./components/AdminReferidosCenter";
 
 function Toast({ message, onClose }: { message: string; onClose: () => void }) {
   if (!message) return null;
@@ -32,14 +35,28 @@ function AdminDashboardView() {
   const [activeModule, setActiveModule] = useState<AdminModule>("dashboard");
   const [menuOpen, setMenuOpen] = useState(false);
   const [toast, setToast] = useState("");
+  const [supportTenantId, setSupportTenantId] = useState<string | null>(null);
   const { tenants, loading: tenantsLoading } = useTenants();
   const { pendientes, verificarSuscripcion } = useSuscripciones();
   const { carreras } = useCarreras();
   const { clientes } = useClientes();
+  const { stats, loading: statsLoading } = useSuperadminStats();
+  const {
+    conversaciones: conversacionesSoporte,
+    loading: soporteLoading,
+    error: soporteError,
+    available: soporteAvailable,
+    totalNoLeidos: soporteNoLeidos,
+    mensajeEntrante: mensajeSoporteEntrante,
+    ocultarMensajeEntrante: ocultarMensajeSoporteEntrante,
+    refetch: refetchSoporte,
+  } = useAdminConversaciones();
+  const { alertasPago: alertasPagoReferidos } = useAdminReferidos({ generarComisiones: false });
 
-  const totalTenants = tenants.length;
-  const tenantsActivos = tenants.filter((t) => t.suscripcion_activa).length;
-  const totalClientes = clientes.length;
+  const totalTenants = stats?.totalTenants ?? tenants.length;
+  const tenantsActivos = stats?.activeTenants ?? tenants.filter((t) => t.suscripcion_activa).length;
+  const totalClientes = stats?.totalClients ?? clientes.length;
+  const mrr = stats?.mrr ?? 0;
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -49,6 +66,7 @@ function AdminDashboardView() {
   const handleNavigate = (module: AdminModule) => {
     setActiveModule(module);
     setMenuOpen(false);
+    if (module === "soporte") ocultarMensajeSoporteEntrante();
   };
 
   const handleAprobar = async (id: string) => {
@@ -138,8 +156,11 @@ function AdminDashboardView() {
           <AdminDashboard
             totalTenants={totalTenants}
             tenantsActivos={tenantsActivos}
-            tenantsLoading={tenantsLoading}
+            tenantsLoading={tenantsLoading || statsLoading}
+            mrr={mrr}
             totalClientes={totalClientes}
+            ridesToday={stats?.ridesToday}
+            completedToday={stats?.completedToday}
             onNavigate={handleNavigate}
             carreras={carreras}
             pendientes={pendientes}
@@ -150,7 +171,7 @@ function AdminDashboardView() {
       case "clientes":
         return <ClienteManager />;
       case "planes":
-        return <PlanManager />;
+        return <PlanManager tenants={tenants} />;
       case "plugins":
         return <PluginCatalogGrid />;
       case "promociones":
@@ -301,22 +322,19 @@ function AdminDashboardView() {
             </div>
           </div>
         );
+      case "referidos":
+        return <AdminReferidosCenter />;
       case "soporte":
         return (
-          <div className="px-4 lg:px-8 py-4 lg:py-6 space-y-4 pb-24 lg:pb-6">
-            <h2 className="text-base lg:text-lg font-black text-slate-900">Soporte</h2>
-            <div className="bg-white rounded-2xl p-4 space-y-3 border border-slate-100" style={{ boxShadow: "4px 4px 10px #d9dde2, -4px -4px 10px #ffffff" }}>
-              <p className="text-[12px] lg:text-[13px] text-slate-500">
-                Escríbenos para reportar incidencias o solicitar cambios en la plataforma.
-              </p>
-              <a
-                href="mailto:soporte@drivip.app"
-                className="block text-center w-full py-3 rounded-xl bg-gradient-to-r from-orange-400 to-red-500 text-white font-bold text-[12px] lg:text-[13px] active:scale-[0.98] transition shadow-lg shadow-red-500/30"
-              >
-                soporte@drivip.app
-              </a>
-            </div>
-          </div>
+          <AdminSoporteCenter
+            conversaciones={conversacionesSoporte}
+            loading={soporteLoading}
+            error={soporteError}
+            available={soporteAvailable}
+            totalNoLeidos={soporteNoLeidos}
+            initialTenantId={supportTenantId}
+            onRefetch={refetchSoporte}
+          />
         );
       default:
         return <TenantManager tenants={tenants} loading={tenantsLoading} />;
@@ -326,11 +344,30 @@ function AdminDashboardView() {
   return (
     <>
       <Toast message={toast} onClose={() => setToast("")} />
+      {mensajeSoporteEntrante && activeModule !== "soporte" && (
+        <FloatingMessageBadge
+          title={`Soporte · ${mensajeSoporteEntrante.tenant_nombre}`}
+          message={mensajeSoporteEntrante.contenido}
+          time={new Date(mensajeSoporteEntrante.created_at).toLocaleTimeString("es-VE", {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+          onOpen={() => {
+            setSupportTenantId(mensajeSoporteEntrante.tenant_id);
+            handleNavigate("soporte");
+            ocultarMensajeSoporteEntrante();
+          }}
+          onHide={ocultarMensajeSoporteEntrante}
+          accent="purple"
+        />
+      )}
       <AdminAppShell
         activeModule={activeModule}
         onNavigate={handleNavigate}
         onLogout={signOut}
         pendingCount={pendientes.length}
+        supportUnread={soporteNoLeidos}
+        referralsPending={alertasPagoReferidos.length}
         menuOpen={menuOpen}
         onMenuOpen={() => setMenuOpen(true)}
         onMenuClose={() => setMenuOpen(false)}
@@ -350,9 +387,32 @@ export default function App() {
 }
 
 function AppContent() {
-  const { user, loading, configured } = useAuthContext();
+  const { user, loading, configured, signOut } = useAuthContext();
+  const [roleLoading, setRoleLoading] = useState(Boolean(user));
+  const [isSuperadmin, setIsSuperadmin] = useState(false);
 
-  if (loading) {
+  useEffect(() => {
+    if (!user) {
+      setIsSuperadmin(false);
+      setRoleLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setRoleLoading(true);
+
+    supabase
+      .rpc("is_superadmin")
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        setIsSuperadmin(!error && data === true);
+        setRoleLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [user]);
+
+  if (loading || (user && roleLoading)) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-[#f4f6f8]">
         <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center animate-pulse">
@@ -366,6 +426,28 @@ function AppContent() {
 
   if (!user && configured) {
     return <LoginScreen />;
+  }
+
+  if (user && !isSuperadmin) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#f4f6f8] px-6">
+        <div className="w-full max-w-sm rounded-3xl border border-slate-200 bg-white p-6 text-center shadow-xl">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
+            <span className="material-symbols-outlined text-[24px] text-red-600">shield_lock</span>
+          </div>
+          <h1 className="text-lg font-black text-slate-900">Acceso restringido</h1>
+          <p className="mt-2 text-sm text-slate-500">
+            Esta cuenta no tiene permisos de superadministrador.
+          </p>
+          <button
+            onClick={signOut}
+            className="mt-5 w-full rounded-xl bg-slate-900 py-3 text-sm font-bold text-white active:scale-[0.98]"
+          >
+            Cerrar sesión
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return <AdminDashboardView />;

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "./client";
+import { enviarPushReserva } from "./notificacionesCarrera";
 import type { ReservaCliente } from "@drivip/types";
 
 export interface NuevaReserva {
@@ -65,21 +66,41 @@ export function useReservasCliente(userId: string | null | undefined) {
         .select()
         .single();
       if (insertError) return { error: insertError.message };
-      setReservas((prev) => [...prev, data as ReservaCliente].sort((a, b) => a.fecha_hora.localeCompare(b.fecha_hora)));
+      const reserva = data as ReservaCliente;
+      setReservas((prev) => [...prev, reserva].sort((a, b) => a.fecha_hora.localeCompare(b.fecha_hora)));
+      if (reserva.conductor_tenant_id) {
+        void enviarPushReserva({
+          reserva_id: reserva.id,
+          title: "Nueva reserva",
+          body: `${reserva.origen} hacia ${reserva.destino}`,
+          tag: `reserva-${reserva.id}`,
+          data: { reserva_id: reserva.id },
+        });
+      }
       return { error: null };
     },
     [userId]
   );
 
   const cancelarReserva = useCallback(async (id: string): Promise<{ error: string | null }> => {
+    const reserva = reservas.find((r) => r.id === id);
     const { error: updateError } = await supabase
       .from("reservas")
       .update({ estado: "cancelada" })
       .eq("id", id);
     if (updateError) return { error: updateError.message };
     setReservas((prev) => prev.map((r) => (r.id === id ? { ...r, estado: "cancelada" } : r)));
+    if (reserva?.conductor_tenant_id) {
+      void enviarPushReserva({
+        reserva_id: id,
+        title: "Reserva cancelada",
+        body: `${reserva.origen} hacia ${reserva.destino}`,
+        tag: `reserva-${id}`,
+        data: { reserva_id: id },
+      });
+    }
     return { error: null };
-  }, []);
+  }, [reservas]);
 
   return { reservas, loading, error, refetch, crearReserva, cancelarReserva };
 }

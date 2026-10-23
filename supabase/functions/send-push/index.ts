@@ -11,6 +11,7 @@ interface PushPayload {
   tenant_id?: string;
   user_ids?: string[];
   carrera_id?: string;
+  reserva_id?: string;
   title: string;
   body: string;
   url?: string;
@@ -61,7 +62,12 @@ Deno.serve(async (req: Request) => {
   }
 
   if (!payload?.title || !payload?.body) return json({ error: "title_and_body_required" }, 400);
-  if (!payload.carrera_id && !payload.tenant_id && !(payload.user_ids && payload.user_ids.length)) {
+  if (
+    !payload.carrera_id &&
+    !payload.reserva_id &&
+    !payload.tenant_id &&
+    !(payload.user_ids && payload.user_ids.length)
+  ) {
     return json({ error: "target_required" }, 400);
   }
 
@@ -109,6 +115,37 @@ Deno.serve(async (req: Request) => {
       targetUsers = carrera.cliente_id ? [carrera.cliente_id as string] : [];
     } else if (!targetTenant && !targetUsers?.length) {
       targetTenant = carrera.tenant_id as string;
+    }
+  } else if (payload.reserva_id) {
+    const { data: reserva, error: reservaError } = await admin
+      .from("reservas")
+      .select("id, cliente_id, conductor_tenant_id")
+      .eq("id", payload.reserva_id)
+      .maybeSingle();
+
+    if (reservaError) return json({ error: "reserva_lookup_failed" }, 500);
+    if (!reserva) return json({ error: "reserva_not_found" }, 404);
+
+    const isClient = reserva.cliente_id === caller.id;
+    const isDriver =
+      Boolean(callerTenant) && callerTenant === reserva.conductor_tenant_id;
+
+    if (!superadmin && !isClient && !isDriver) {
+      return json({ error: "forbidden" }, 403);
+    }
+
+    if (isClient) {
+      targetTenant = reserva.conductor_tenant_id as string | null;
+      targetUsers = null;
+    } else if (isDriver) {
+      targetTenant = null;
+      targetUsers = reserva.cliente_id ? [reserva.cliente_id as string] : [];
+    } else if (!targetTenant && !targetUsers?.length) {
+      targetTenant = reserva.conductor_tenant_id as string | null;
+    }
+
+    if (!targetTenant && (!targetUsers || targetUsers.length === 0)) {
+      return json({ error: "target_required" }, 400);
     }
   } else {
     let allowed = superadmin;

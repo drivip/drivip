@@ -37,14 +37,21 @@ export function useConversacionesCliente() {
   }, [fetchAll]);
 
   useEffect(() => {
+    if (!userId) return;
+
     const channel = supabase
-      .channel("conversaciones-cliente-live")
+      .channel(`conversaciones-cliente-live-${userId}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "mensajes_directos" },
+        {
+          event: "*",
+          schema: "public",
+          table: "conversaciones",
+          filter: `cliente_id=eq.${userId}`,
+        },
         () => {
           if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
-          refreshTimerRef.current = setTimeout(() => { void fetchAll(); }, 120);
+          refreshTimerRef.current = setTimeout(() => { void fetchAll(); }, 300);
         }
       )
       .subscribe();
@@ -53,7 +60,7 @@ export function useConversacionesCliente() {
       if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
       supabase.removeChannel(channel);
     };
-  }, [fetchAll]);
+  }, [fetchAll, userId]);
 
   const crearConversacion = useCallback(async (tenantId: string, carreraId: string | null = null) => {
     const { data, error: rpcError } = await supabase.rpc("obtener_o_crear_conversacion", {
@@ -244,7 +251,7 @@ export function useMensajesDirectos(
   return { mensajes, userId, loading, error, noLeidos, enviar, marcarLeidos };
 }
 
-export function useConversacionesConductor() {
+export function useConversacionesConductor(tenantId?: string | null) {
   const [conversaciones, setConversaciones] = useState<ConversacionConductor[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -273,14 +280,21 @@ export function useConversacionesConductor() {
   }, [fetchAll]);
 
   useEffect(() => {
+    if (!tenantId) return;
+
     const channel = supabase
-      .channel("conversaciones-conductor-live")
+      .channel(`conversaciones-conductor-live-${tenantId}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "mensajes_directos" },
+        {
+          event: "*",
+          schema: "public",
+          table: "conversaciones",
+          filter: `tenant_id=eq.${tenantId}`,
+        },
         () => {
           if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
-          refreshTimerRef.current = setTimeout(() => { void fetchAll(); }, 120);
+          refreshTimerRef.current = setTimeout(() => { void fetchAll(); }, 300);
         }
       )
       .subscribe();
@@ -289,7 +303,7 @@ export function useConversacionesConductor() {
       if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
       supabase.removeChannel(channel);
     };
-  }, [fetchAll]);
+  }, [fetchAll, tenantId]);
 
   const marcarLeida = useCallback(async (conversacionId: string) => {
     setConversaciones((prev) =>

@@ -44,6 +44,12 @@ export interface Tenant {
   metodos_pago_actualizado_at?: string | null;
   modulos_activos: string[];
   codigo_referido?: string | null;
+  socio_drivip?: boolean;
+  socio_desde?: string | null;
+  pago_movil_socio_banco?: string | null;
+  pago_movil_socio_cedula?: string | null;
+  pago_movil_socio_telefono?: string | null;
+  pago_movil_socio_actualizado_at?: string | null;
   tarifa_modo: TarifaModo;
   tarifa_base: number;
   tarifa_por_km: number;

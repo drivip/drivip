@@ -37,6 +37,7 @@ export default function DriverMapView({
   const prevPosRef = useRef<[number, number] | null>(null);
   const computedBearingRef = useRef(0);
   const lastRecalcRef = useRef(0);
+  const lastGeocodeRef = useRef<{ lat: number; lng: number; at: number } | null>(null);
   const ridePhaseRef = useRef(ridePhase);
   ridePhaseRef.current = ridePhase;
 
@@ -75,9 +76,17 @@ export default function DriverMapView({
   }, [ridePhase]);
 
   useEffect(() => {
-    if (isOnline && latitude && longitude) {
-      reverseGeocoding(latitude, longitude);
-    }
+    if (!isOnline || !latitude || !longitude) return;
+
+    const now = Date.now();
+    const last = lastGeocodeRef.current;
+    const movedKm = last
+      ? haversineKm([last.lat, last.lng], [latitude, longitude])
+      : Infinity;
+    if (last && movedKm < 0.1 && now - last.at < 30000) return;
+
+    lastGeocodeRef.current = { lat: latitude, lng: longitude, at: now };
+    reverseGeocoding(latitude, longitude);
   }, [isOnline, latitude, longitude, reverseGeocoding]);
 
   const carBearing = heading && heading > 0 ? heading : computedBearingRef.current;

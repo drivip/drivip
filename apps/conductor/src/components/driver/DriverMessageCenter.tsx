@@ -11,6 +11,10 @@ interface DriverMessageCenterProps {
   userId: string | null;
   onMarcarLeida: (conversacionId: string) => void;
   onRefetch: () => void;
+  onOpenSupport: () => void;
+  soporteUnread: number;
+  soporteUltimoMensaje: string | null;
+  soporteUltimoAt: string | null;
   embedded?: boolean;
   initialConversationId?: string | null;
 }
@@ -50,6 +54,10 @@ export default function DriverMessageCenter({
   userId,
   onMarcarLeida,
   onRefetch,
+  onOpenSupport,
+  soporteUnread,
+  soporteUltimoMensaje,
+  soporteUltimoAt,
   embedded = false,
   initialConversationId = null,
 }: DriverMessageCenterProps) {
@@ -171,9 +179,9 @@ export default function DriverMessageCenter({
             )}
 
             {!loading && conversaciones.length === 0 && (
-              <div className="flex h-full flex-col items-center justify-center px-8 text-center">
-                <span className="material-symbols-outlined text-[44px] text-slate-300">mark_chat_unread</span>
-                <p className="mt-2 text-sm font-bold text-slate-600">Aún no tienes mensajes</p>
+              <div className="flex flex-col items-center justify-center px-8 py-6 text-center">
+                <span className="material-symbols-outlined text-[38px] text-slate-300">mark_chat_unread</span>
+                <p className="mt-2 text-sm font-bold text-slate-600">Aún no tienes conversaciones con clientes</p>
                 <p className="mt-1 text-[11px] text-slate-400">
                   Cuando un cliente te escriba o aceptes un servicio, la conversación aparecerá aquí.
                 </p>
@@ -181,6 +189,32 @@ export default function DriverMessageCenter({
             )}
 
             <div className="space-y-2">
+              <button
+                type="button"
+                onClick={onOpenSupport}
+                className="flex w-full items-center gap-3 rounded-2xl border border-slate-800 bg-gradient-to-r from-slate-900 to-slate-700 p-3 text-left text-white transition active:scale-[0.99]"
+              >
+                <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-white">
+                  <span className="material-symbols-outlined text-[22px]">support_agent</span>
+                  {soporteUnread > 0 && (
+                    <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-slate-900 bg-rose-500 px-1 text-[9px] font-black text-white">
+                      {soporteUnread > 9 ? "9+" : soporteUnread}
+                    </span>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="truncate text-xs font-black">Drivip Soporte</p>
+                    <span className="shrink-0 text-[9px] font-semibold text-slate-300">
+                      {hora(soporteUltimoAt)}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 truncate text-[11px] text-slate-200">
+                    {soporteUltimoMensaje ?? "Canal oficial · avisos y soporte"}
+                  </p>
+                </div>
+              </button>
+
               {conversaciones.map((conversacion) => {
                 const activa = conversacion.conversacion_id === selectedId;
                 return (

@@ -120,7 +120,8 @@ export function useMisCarreras(clienteId: string | null | undefined) {
       .from("carreras")
       .select("*")
       .eq("cliente_id", clienteId)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(100);
     if (queryError) {
       setError(queryError.message);
       setCarreras([]);

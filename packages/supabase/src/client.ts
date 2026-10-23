@@ -16,5 +16,13 @@ if (!isConfigured) {
 
 export const supabase: SupabaseClient = createClient(
   supabaseUrl ?? "http://localhost:54321",
-  supabaseAnonKey ?? "placeholder-key"
+  supabaseAnonKey ?? "placeholder-key",
+  {
+    auth: {
+      // Mantiene la sesion entre recargas, pestañas y aperturas de la PWA.
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+  }
 );

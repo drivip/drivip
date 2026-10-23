@@ -13,7 +13,7 @@ export interface Aliado {
   created_at: string;
 }
 
-export type ReferidoEstado = "pendiente" | "activo";
+export type ReferidoEstado = "pendiente" | "activo" | "inactivo";
 
 export interface Referido {
   id: string;
@@ -21,5 +21,9 @@ export interface Referido {
   referido_tenant_id: string;
   codigo: string;
   estado: ReferidoEstado;
+  plan_referido?: string | null;
+  monto_mensual_referido?: number;
   created_at: string;
+  activado_at?: string | null;
+  desactivado_at?: string | null;
 }

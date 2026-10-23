@@ -81,7 +81,8 @@ export function useClientes() {
       .from("profiles")
       .select("id, tenant_id, nombre, apellido, telefono, email, created_at")
       .eq("rol", "cliente")
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(300);
 
     if (profilesError) {
       setState({ clientes: [], loading: false, error: profilesError.message });
@@ -100,11 +101,13 @@ export function useClientes() {
           .from("red_cliente")
           .select("*")
           .in("cliente_id", profileIds)
-          .order("agregado_at", { ascending: false }),
+          .order("agregado_at", { ascending: false })
+          .limit(1000),
         supabase
           .from("clientes")
           .select("profile_id, tenant_id, direccion, lat, lng, total_carreras")
-          .in("profile_id", profileIds),
+          .in("profile_id", profileIds)
+          .limit(1000),
       ]);
       redData = redRes.data ?? [];
       clientesData = (clientesRes.data ?? []) as ClienteRow[];
@@ -195,7 +198,8 @@ export function useClientesTenant(tenantId: string | null | undefined) {
       .from("clientes")
       .select("*")
       .eq("tenant_id", tenantId)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(500);
     if (queryError) {
       setError(queryError.message);
       setClientes([]);

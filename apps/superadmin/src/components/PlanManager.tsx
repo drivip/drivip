@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useConfigReferidos } from "@drivip/supabase";
+import type { Tenant } from "@drivip/types";
 
 interface PlanFeature {
   name: string;
@@ -20,7 +22,7 @@ const INITIAL_PLANS: Plan[] = [
   {
     id: "estandar",
     name: "Estándar",
-    price: 5,
+    price: 10,
     color: "slate",
     gradient: "from-slate-500 to-gray-600",
     conductores: 1240,
@@ -82,9 +84,33 @@ const POSITION_RULES = [
   { plan: "Estándar", position: "#3", color: "text-slate-600", bg: "bg-slate-50", desc: "Posición estándar en los resultados. Visible pero sin destacado." },
 ];
 
-export default function PlanManager() {
+interface PlanManagerProps {
+  tenants: Tenant[];
+}
+
+export default function PlanManager({ tenants }: PlanManagerProps) {
   const [plans, setPlans] = useState(INITIAL_PLANS);
   const [showEditModal, setShowEditModal] = useState<string | null>(null);
+  const { config } = useConfigReferidos();
+
+  const precios: Record<string, number> = {
+    estandar: Number(config?.precio_plan_estandar ?? 10),
+    profesional: Number(config?.precio_plan_profesional ?? 20),
+    premium: Number(config?.precio_plan_premium ?? 30),
+  };
+
+  const conductoresPorPlan = tenants.reduce<Record<string, number>>((acc, tenant) => {
+    if (!tenant.suscripcion_activa) return acc;
+    const planId = String(tenant.plan ?? "").toLowerCase();
+    acc[planId] = (acc[planId] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  const displayPlans = plans.map((plan) => ({
+    ...plan,
+    price: precios[plan.id] ?? plan.price,
+    conductores: conductoresPorPlan[plan.id] ?? 0,
+  }));
 
   const handleTogglePlan = (planId: string) => {
     setPlans((prev) =>
@@ -92,7 +118,7 @@ export default function PlanManager() {
     );
   };
 
-  const totalIngresos = plans.reduce((acc, p) => acc + p.price * p.conductores, 0);
+  const totalIngresos = displayPlans.reduce((acc, p) => acc + p.price * p.conductores, 0);
 
   return (
     <div className="px-4 lg:px-8 py-4 lg:py-6 space-y-5 pb-24 lg:pb-6">
@@ -111,7 +137,7 @@ export default function PlanManager() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {plans.map((plan) => (
+        {displayPlans.map((plan) => (
           <div key={plan.id} className="bg-white rounded-2xl p-4 border border-slate-100" style={{ boxShadow: "4px 4px 10px #d9dde2, -4px -4px 10px #ffffff" }}>
             <div className="flex items-center gap-2 mb-2">
               <div className={`w-8 h-8 rounded-lg bg-gradient-to-tr ${plan.gradient} flex items-center justify-center`}>
@@ -135,7 +161,7 @@ export default function PlanManager() {
 
       {/* Plans detail */}
       <div className="grid lg:grid-cols-3 gap-4">
-        {plans.map((plan) => (
+        {displayPlans.map((plan) => (
           <div
             key={plan.id}
             className={`bg-white rounded-2xl p-5 border ${plan.activo ? "border-slate-100" : "border-slate-200 opacity-60"}`}
@@ -253,8 +279,8 @@ export default function PlanManager() {
       <div className="bg-white rounded-2xl p-5 border border-slate-100" style={{ boxShadow: "4px 4px 10px #d9dde2, -4px -4px 10px #ffffff" }}>
         <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-4">Distribución de Conductores por Plan</h3>
         <div className="space-y-3">
-          {plans.map((plan) => {
-            const total = plans.reduce((a, p) => a + p.conductores, 0);
+          {displayPlans.map((plan) => {
+            const total = displayPlans.reduce((a, p) => a + p.conductores, 0);
             const pct = total > 0 ? (plan.conductores / total) * 100 : 0;
             return (
               <div key={plan.id}>

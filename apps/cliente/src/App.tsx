@@ -8,7 +8,7 @@ import {
   useMensajeEntrante,
 } from "@drivip/supabase";
 import { TASA_BCV_REFERENCIA } from "@drivip/types";
-import { FloatingMessageBadge } from "@drivip/ui";
+import { FloatingMessageBadge, PwaInstallPrompt } from "@drivip/ui";
 import {
   fetchDrivingRoute,
   isInVenezuela,
@@ -315,9 +315,27 @@ function RegisterScreen({ onSwitchToLogin, inviteConductor }: { onSwitchToLogin:
     }
 
     const user = authData?.user;
-    if (!user) {
-      setFormError("No se pudo crear la cuenta. Intenta de nuevo.");
+    if (!user || (authData?.user?.identities?.length ?? 0) === 0) {
+      setFormError("Ya existe una cuenta con este correo. Inicia sesión.");
       setSubmitting(false);
+      return;
+    }
+
+    // Con la confirmacion de email desactivada Supabase devuelve sesion
+    // y el cliente entra directo a su panel. Si la confirmacion esta
+    // activa, intentamos iniciar sesion para no perder el registro.
+    let session = authData?.session ?? null;
+    if (!session) {
+      const { data: signInData } = await supabase.auth.signInWithPassword({
+        email,
+        password: form.password,
+      });
+      session = signInData.session ?? null;
+    }
+
+    if (!session) {
+      setSubmitting(false);
+      setStep("success");
       return;
     }
 
@@ -332,7 +350,8 @@ function RegisterScreen({ onSwitchToLogin, inviteConductor }: { onSwitchToLogin:
       activo: true,
     });
 
-    if (profileError) {
+    // 23505: el perfil ya existe (por ejemplo, creado por un trigger).
+    if (profileError && profileError.code !== "23505") {
       setFormError("Error al crear perfil. Intenta de nuevo.");
       setSubmitting(false);
       return;
@@ -449,6 +468,8 @@ function PostRegisterScreen({ onContinue }: { onContinue: () => void }) {
           </div>
         </div>
 
+        <PwaInstallPrompt appName="Drivip" accent="purple" />
+
         <div className="space-y-2.5 rounded-2xl bg-slate-50 p-4">
           {[
             { icon: "mark_email_read", title: "Confirma tu correo", desc: "Abre el enlace que te enviamos." },
@@ -550,6 +571,7 @@ function PassengerApp() {
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [activeCarrera, setActiveCarrera] = useState<Carrera | null>(null);
+  const restoredCarreraRef = useRef(false);
   const [requestMode, setRequestMode] = useState<"now" | "schedule">("now");
   const [serviceModal, setServiceModal] = useState<ServiceMode | null>(null);
   const [otherDriversOpen, setOtherDriversOpen] = useState(false);
@@ -700,6 +722,24 @@ function PassengerApp() {
         : null,
     [originCoords, origin]
   );
+
+  useEffect(() => {
+    if (restoredCarreraRef.current || misCarreras.length === 0) return;
+    restoredCarreraRef.current = true;
+
+    const limite = Date.now() - 24 * 60 * 60 * 1000;
+    const activa = misCarreras.find(
+      (c) =>
+        (c.estado === "pendiente" || c.estado === "aceptada" || c.estado === "en_curso") &&
+        new Date(c.created_at).getTime() >= limite
+    );
+    if (!activa) return;
+
+    const driver = drivers.find((d) => d.id === activa.tenant_id) ?? null;
+    if (driver) setSelectedDriver(driver);
+    setActiveCarrera(activa);
+    showToast("Recuperamos tu servicio en curso");
+  }, [misCarreras, drivers, showToast]);
 
   useCarreraRealtime(activeCarrera?.id ?? null, setActiveCarrera);
   const { location: conductorLocation, lastUpdated: conductorUpdatedAt } = useConductorLocation(
@@ -1274,6 +1314,8 @@ function PassengerApp() {
           >
           {screen === "home" && (
             <div className="w-full space-y-4 px-4 pb-3 pt-3 lg:px-8">
+              <PwaInstallPrompt appName="Drivip" accent="purple" />
+
               {activeCarrera && activeDriver && (
                 <LiveTripTracker
                   carrera={activeCarrera}

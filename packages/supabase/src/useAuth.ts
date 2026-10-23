@@ -25,7 +25,11 @@ export function useAuth() {
       return;
     }
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    let active = true;
+    let authEventReceived = false;
+
+    const applySession = (session: Session | null) => {
+      if (!active) return;
       setState({
         user: session?.user ?? null,
         session,
@@ -33,23 +37,30 @@ export function useAuth() {
         error: null,
         configured: true,
       });
-    }).catch(() => {
-      setState((s) => ({ ...s, loading: false, error: "Error al conectar con Supabase" }));
-    });
+    };
 
+    // onAuthStateChange emite INITIAL_SESSION al suscribirse y luego
+    // SIGNED_IN, TOKEN_REFRESHED, SIGNED_OUT, etc. Mantener la sesion
+    // sincronizada evita que el usuario vuelva al login al recargar.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
-        setState({
-          user: session?.user ?? null,
-          session,
-          loading: false,
-          error: null,
-          configured: true,
-        });
+        authEventReceived = true;
+        applySession(session);
       }
     );
 
-    return () => subscription.unsubscribe();
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (authEventReceived) return;
+      applySession(session);
+    }).catch(() => {
+      if (!active || authEventReceived) return;
+      setState((s) => ({ ...s, loading: false, error: "Error al conectar con Supabase" }));
+    });
+
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {

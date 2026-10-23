@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useTenantDetail, useTenantActions, useTenantBanners, useTenantNotificaciones, APP_URLS } from "@drivip/supabase";
+import { useTenantDetail, useTenantActions, useTenantBanners, useTenantNotificaciones, useCuentaReferido, useConfigReferidos, APP_URLS } from "@drivip/supabase";
 import type { MetodoPagoSuscripcion } from "@drivip/types";
 
 type DetailTab = "info" | "clientes" | "pagos" | "modulos" | "promociones" | "monitoreo";
@@ -57,6 +57,14 @@ export default function TenantDetailPanel({ tenantId, onBack }: TenantDetailPane
   const actions = useTenantActions();
   const bannerActions = useTenantBanners(tenantId);
   const notifActions = useTenantNotificaciones(tenantId);
+  const { cuenta: cuentaReferidos } = useCuentaReferido(tenantId);
+  const { config: configReferidos } = useConfigReferidos();
+
+  const preciosPlan: Record<string, number> = {
+    estandar: Number(configReferidos?.precio_plan_estandar ?? 10),
+    profesional: Number(configReferidos?.precio_plan_profesional ?? 20),
+    premium: Number(configReferidos?.precio_plan_premium ?? 30),
+  };
 
   const [pauseMotivo, setPauseMotivo] = useState("");
   const [showPauseModal, setShowPauseModal] = useState(false);
@@ -95,6 +103,11 @@ export default function TenantDetailPanel({ tenantId, onBack }: TenantDetailPane
       </div>
     );
   }
+
+  const precioPlanActual =
+    cuentaReferidos?.total_mensual ??
+    preciosPlan[String(tenant.plan ?? "").toLowerCase()] ??
+    preciosPlan.estandar;
 
   const handleTogglePausa = async () => {
     const ok = await actions.togglePausa(tenant.id, !tenant.pausado, pauseMotivo || undefined);
@@ -143,7 +156,7 @@ export default function TenantDetailPanel({ tenantId, onBack }: TenantDetailPane
     if (ok) {
       showToast("Pago registrado y conductor activado");
       setShowPagoModal(false);
-      setPagoForm({ monto: "10", moneda: "VES", metodo_pago: "pago_movil", referencia: "", meses: "1" });
+      setPagoForm({ monto: String(precioPlanActual), moneda: "VES", metodo_pago: "pago_movil", referencia: "", meses: "1" });
       refetch();
     } else {
       showToast("No se pudo registrar el pago");
@@ -410,14 +423,59 @@ export default function TenantDetailPanel({ tenantId, onBack }: TenantDetailPane
                 </p>
               </div>
               <div>
-                <span className="text-[10px] text-slate-500 font-medium">MRR</span>
-                <p className="text-[13px] font-bold text-slate-900">$10/mes</p>
+                <span className="text-[10px] text-slate-500 font-medium">Cuenta mensual</span>
+                <p className="text-[13px] font-bold text-slate-900">
+                  {cuentaReferidos
+                    ? cuentaReferidos.es_gratis
+                      ? "GRATIS"
+                      : `$${cuentaReferidos.total_mensual.toFixed(2)}/mes`
+                    : `$${precioPlanActual.toFixed(2)}/mes`}
+                </p>
               </div>
             </div>
           </div>
 
+          {cuentaReferidos && (
+            <div className="bg-white rounded-2xl p-4 border border-amber-100" style={{ boxShadow: "4px 4px 10px #d9dde2, -4px -4px 10px #ffffff" }}>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Descuento por referidos</h3>
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-black uppercase text-amber-700">
+                  {cuentaReferidos.referidos_activos} activos
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-[11px]">
+                <div>
+                  <span className="text-slate-500">Precio del plan</span>
+                  <p className="font-bold text-slate-900">${cuentaReferidos.precio_plan.toFixed(2)}</p>
+                </div>
+                <div>
+                  <span className="text-slate-500">Descuento ({cuentaReferidos.descuento_pct}%)</span>
+                  <p className="font-bold text-emerald-600">-${cuentaReferidos.monto_descuento.toFixed(2)}</p>
+                </div>
+                <div>
+                  <span className="text-slate-500">Cuenta del mes</span>
+                  <p className="font-black text-purple-700">
+                    {cuentaReferidos.es_gratis ? "GRATIS" : `$${cuentaReferidos.total_mensual.toFixed(2)}`}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-slate-500">Estado</span>
+                  <p className="font-bold text-slate-900">
+                    {cuentaReferidos.es_socio ? "Socio Drivip" : "Conductor"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <button
-            onClick={() => setShowPagoModal(true)}
+            onClick={() => {
+              setPagoForm((prev) => ({
+                ...prev,
+                monto: String(precioPlanActual),
+              }));
+              setShowPagoModal(true);
+            }}
             className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-[12px] font-bold active:scale-95 transition shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2"
           >
             <span className="material-symbols-outlined text-[18px]">payments</span>
@@ -602,18 +660,24 @@ export default function TenantDetailPanel({ tenantId, onBack }: TenantDetailPane
         <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setShowPlanModal(false)}>
           <div className="bg-white rounded-t-2xl lg:rounded-2xl w-full max-w-md p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-sm font-black text-slate-900">Cambiar Plan</h3>
-            {["basico", "premium", "enterprise"].map((plan) => (
+            {[
+              { id: "estandar", label: "Estándar", desc: "Funciones básicas" },
+              { id: "profesional", label: "Profesional", desc: "Más viajes y visibilidad" },
+              { id: "premium", label: "Premium", desc: "Todo incluido + Soporte" },
+            ].map((plan) => (
               <button
-                key={plan}
-                onClick={() => handleCambiarPlan(plan)}
+                key={plan.id}
+                onClick={() => handleCambiarPlan(plan.id)}
                 className={`w-full p-3 rounded-xl text-left transition active:scale-[0.98] ${
-                  tenant.plan === plan
+                  tenant.plan === plan.id
                     ? "bg-blue-50 border-2 border-blue-500"
                     : "bg-slate-50 border border-slate-200"
                 }`}
               >
-                <span className="text-[13px] font-bold text-slate-900 capitalize">{plan}</span>
-                <span className="text-[10px] text-slate-500 block">$10/mes · {plan === "basico" ? "Funciones basicas" : plan === "premium" ? "Plugins + Analytics" : "Todo incluido + Soporte"}</span>
+                <span className="text-[13px] font-bold text-slate-900">{plan.label}</span>
+                <span className="text-[10px] text-slate-500 block">
+                  ${(preciosPlan[plan.id] ?? preciosPlan.estandar).toFixed(2)}/mes · {plan.desc}
+                </span>
               </button>
             ))}
             <button onClick={() => setShowPlanModal(false)} className="w-full py-2.5 rounded-xl bg-slate-100 text-slate-600 text-[11px] font-bold active:scale-95 transition">Cancelar</button>

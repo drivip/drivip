@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import type { ConversacionConductor, Tenant } from "@drivip/types";
+import type { AdminMensaje, ConversacionConductor, Tenant } from "@drivip/types";
 import { cn } from "@drivip/ui";
 import { useScrollLock } from "../../hooks/useScrollLock";
 import MiPerfil from "../MiPerfil";
 import DriverMessageCenter from "./DriverMessageCenter";
+import DriverSupportCenter from "./DriverSupportCenter";
 
-type ProfileTab = "perfil" | "mensajes";
+type ProfileTab = "perfil" | "mensajes" | "soporte";
 
 interface DriverProfileModalProps {
   isOpen: boolean;
@@ -23,6 +24,14 @@ interface DriverProfileModalProps {
   onMarcarLeida: (conversacionId: string) => void;
   onRefetchConversaciones: () => void;
   onNavigate: (module: string) => void;
+  soporteMensajes: AdminMensaje[];
+  soporteLoading: boolean;
+  soporteError: string | null;
+  soporteAvailable: boolean;
+  soporteUserId: string | null;
+  soporteUnread: number;
+  onEnviarSoporte: (contenido: string) => Promise<boolean>;
+  onMarcarSoporteLeido: () => void;
 }
 
 const SHORTCUTS = [
@@ -48,6 +57,14 @@ export default function DriverProfileModal({
   onMarcarLeida,
   onRefetchConversaciones,
   onNavigate,
+  soporteMensajes,
+  soporteLoading,
+  soporteError,
+  soporteAvailable,
+  soporteUserId,
+  soporteUnread,
+  onEnviarSoporte,
+  onMarcarSoporteLeido,
 }: DriverProfileModalProps) {
   const [tab, setTab] = useState<ProfileTab>(initialTab);
 
@@ -123,6 +140,24 @@ export default function DriverProfileModal({
               </span>
             )}
           </button>
+          <button
+            type="button"
+            onClick={() => setTab("soporte")}
+            className={cn(
+              "relative flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2 text-[11px] font-bold transition active:scale-[0.98]",
+              tab === "soporte"
+                ? "bg-slate-900 text-white shadow-md shadow-slate-700/20"
+                : "text-slate-500 hover:bg-slate-100"
+            )}
+          >
+            <span className="material-symbols-outlined text-[17px]">support_agent</span>
+            Drivip
+            {soporteUnread > 0 && (
+              <span className="absolute right-3 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[8px] font-black text-white">
+                {soporteUnread > 9 ? "9+" : soporteUnread}
+              </span>
+            )}
+          </button>
         </div>
 
         <div className="min-h-0 flex-1 overflow-hidden p-3">
@@ -137,6 +172,20 @@ export default function DriverProfileModal({
               userId={userId}
               onMarcarLeida={onMarcarLeida}
               onRefetch={onRefetchConversaciones}
+              onOpenSupport={() => setTab("soporte")}
+              soporteUnread={soporteUnread}
+              soporteUltimoMensaje={soporteMensajes[soporteMensajes.length - 1]?.contenido ?? null}
+              soporteUltimoAt={soporteMensajes[soporteMensajes.length - 1]?.created_at ?? null}
+            />
+          ) : tab === "soporte" ? (
+            <DriverSupportCenter
+              mensajes={soporteMensajes}
+              loading={soporteLoading}
+              error={soporteError}
+              available={soporteAvailable}
+              userId={soporteUserId}
+              onSend={onEnviarSoporte}
+              onMarcarLeidos={onMarcarSoporteLeido}
             />
           ) : (
             <div className="h-full overflow-y-auto pr-0.5">

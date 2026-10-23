@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { AuthProvider, useAuthContext, supabase, conductorInviteUrl, registrarReferido } from "@drivip/supabase";
+import { PwaInstallPrompt } from "@drivip/ui";
 import DriverApp from "./pages/DriverApp";
 
 /* ==================== LANDING PAGE ==================== */
@@ -271,12 +272,25 @@ function LoginScreen({ onSwitchToRegister }: { onSwitchToRegister: () => void })
 }
 
 /* ==================== REGISTER ==================== */
+function normalizarCodigoReferido(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  const match = trimmed.match(/[?&]ref=([^&\s]+)/i);
+  const codigo = match ? match[1] : trimmed;
+  try {
+    return decodeURIComponent(codigo).trim().toUpperCase().slice(0, 32);
+  } catch {
+    return codigo.trim().toUpperCase().slice(0, 32);
+  }
+}
+
 function RegisterScreen({ onSwitchToLogin, onRegistered }: { onSwitchToLogin: () => void; onRegistered: (data: { nombre: string; apellido: string; cedula: string; plan: string; slug: string }) => void }) {
   const { loading: authLoading } = useAuthContext();
   const [form, setForm] = useState({
     nombre: "", apellido: "", cedula: "", email: "", telefono: "", password: "",
     ciudad: "Caracas", vehiculo_tipo: "carro", vehiculo_placa: "", vehiculo_modelo: "",
     plan: "estandar",
+    codigo_referido: new URLSearchParams(window.location.search).get("ref") ?? "",
   });
   const [foto, setFoto] = useState<File | null>(null);
   const [fotoPreview, setFotoPreview] = useState<string | null>(null);
@@ -310,8 +324,26 @@ function RegisterScreen({ onSwitchToLogin, onRegistered }: { onSwitchToLogin: ()
     }
 
     const user = authData?.user;
-    if (!user) {
-      setFormError("No se pudo crear la cuenta. Intenta de nuevo.");
+    if (!user || (authData?.user?.identities?.length ?? 0) === 0) {
+      setFormError("Ya existe una cuenta con este correo. Inicia sesión.");
+      setSubmitting(false);
+      return;
+    }
+
+    // Con confirmacion de email desactivada signUp devuelve sesion.
+    // Si la confirmacion esta activa, intentamos iniciar sesion para
+    // completar el registro sin dejar el tenant a medias.
+    let session = authData?.session ?? null;
+    if (!session) {
+      const { data: signInData } = await supabase.auth.signInWithPassword({
+        email: form.email,
+        password: form.password,
+      });
+      session = signInData.session ?? null;
+    }
+
+    if (!session) {
+      setFormError("Tu cuenta fue creada. Confirma tu correo y vuelve a registrarte para completar tu perfil de conductor.");
       setSubmitting(false);
       return;
     }
@@ -354,13 +386,13 @@ function RegisterScreen({ onSwitchToLogin, onRegistered }: { onSwitchToLogin: ()
       activo: true,
     });
 
-    if (profileError) {
+    if (profileError && profileError.code !== "23505") {
       setFormError("Error al vincular tu cuenta con el perfil de conductor. Intenta de nuevo.");
       setSubmitting(false);
       return;
     }
 
-    const codigoRef = new URLSearchParams(window.location.search).get("ref");
+    const codigoRef = normalizarCodigoReferido(form.codigo_referido);
     if (codigoRef) {
       await registrarReferido(codigoRef);
     }
@@ -514,7 +546,15 @@ function RegisterScreen({ onSwitchToLogin, onRegistered }: { onSwitchToLogin: ()
           </div>
 
           <div>
-            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Contraseña</label>
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">C�digo de referido (opcional)</label>
+            <input type="text" value={form.codigo_referido} onChange={(e) => update("codigo_referido", e.target.value.toUpperCase())}
+              className="w-full mt-1 bg-slate-50 rounded-xl px-4 py-2.5 text-[13px] text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-purple-500 border border-slate-200 font-mono tracking-wider uppercase"
+              placeholder="Ej. A1B2C3D4" />
+            <p className="mt-1 text-[10px] text-slate-400">Si otro conductor te invit�, pega su c�digo o link para que reciba el cr�dito.</p>
+          </div>
+
+          <div>
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Contrase�a</label>
             <input type="password" value={form.password} onChange={(e) => update("password", e.target.value)}
               className="w-full mt-1 bg-slate-50 rounded-xl px-4 py-2.5 text-[13px] text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-purple-500 border border-slate-200"
               placeholder="Mínimo 6 caracteres" minLength={6} required />
@@ -537,7 +577,7 @@ function RegisterScreen({ onSwitchToLogin, onRegistered }: { onSwitchToLogin: ()
 }
 
 /* ==================== PENDING VALIDATION ==================== */
-function PendingValidationScreen({ nombre, apellido, cedula, plan, slug }: { nombre: string; apellido: string; cedula: string; plan: string; slug: string }) {
+function PendingValidationScreen({ nombre, apellido, cedula, plan, slug, onEnterPanel }: { nombre: string; apellido: string; cedula: string; plan: string; slug: string; onEnterPanel: () => void }) {
   const planLabel = plan === "profesional" ? "Profesional ($20)" : "Estándar ($10)";
   const planMonto = plan === "profesional" ? "$20" : "$10";
   const inviteUrl = conductorInviteUrl(slug);
@@ -609,10 +649,16 @@ function PendingValidationScreen({ nombre, apellido, cedula, plan, slug }: { nom
           <p className="text-[11px] text-blue-700 text-center">Te contactaremos por WhatsApp en menos de 24 horas para validar tu pago.</p>
         </div>
 
+        <PwaInstallPrompt appName="Drivip Conductor" accent="purple" className="mb-4" />
+
         {/* IR AL PANEL */}
-        <a href="/conductor" className="block w-full py-3 rounded-xl bg-slate-100 text-slate-700 text-[13px] font-bold text-center hover:bg-slate-200 active:scale-[0.98] transition">
-          Ir al panel de todos modos
-        </a>
+        <button
+          type="button"
+          onClick={onEnterPanel}
+          className="block w-full py-3 rounded-xl bg-purple-700 text-white text-[13px] font-bold text-center shadow-lg shadow-purple-600/30 hover:bg-purple-800 active:scale-[0.98] transition"
+        >
+          Entrar a mi panel
+        </button>
         <a href="https://drivip-home.pages.dev" className="block text-center text-[11px] text-slate-400 hover:text-slate-600 mt-4">← Volver a Drivip</a>
       </div>
     </div>
@@ -648,7 +694,15 @@ function AppContent() {
   }
 
   if (registered) {
-    return <PendingValidationScreen {...registered} />;
+    return (
+      <PendingValidationScreen
+        {...registered}
+        onEnterPanel={() => {
+          setRegistered(null);
+          if (!user) setAuthView("login");
+        }}
+      />
+    );
   }
 
   if (!user) {

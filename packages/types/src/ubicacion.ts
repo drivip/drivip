@@ -9,3 +9,14 @@ export interface Ubicacion {
   direccion: number | null;
   timestamp: string;
 }
+
+export interface UbicacionActual {
+  conductor_id: string;
+  tenant_id: string;
+  carrera_id: string | null;
+  lat: number;
+  lng: number;
+  velocidad: number | null;
+  direccion: number | null;
+  timestamp: string;
+}

@@ -17,73 +17,69 @@ export function useSuscripciones() {
     error: null,
   });
 
-  useEffect(() => {
-    let cancelled = false;
+  const fetchSuscripciones = useCallback(async () => {
+    setState((prev) => ({ ...prev, loading: true }));
 
-    const fetchSuscripciones = async () => {
-      const { data, error } = await supabase
+    const [pendientesRes, todasRes] = await Promise.all([
+      supabase
         .from("suscripciones")
         .select("*")
-        .order("created_at", { ascending: false });
+        .eq("estado", "pendiente")
+        .order("created_at", { ascending: false })
+        .limit(200),
+      supabase
+        .from("suscripciones")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(300),
+    ]);
 
-      if (cancelled) return;
-
-      if (error) {
-        setState({ pendientes: [], todas: [], loading: false, error: error.message });
-      } else {
-        const all = (data as Suscripcion[]) ?? [];
-        const pendientes = all.filter((s) => s.estado === "pendiente");
-        setState({ pendientes, todas: all, loading: false, error: null });
-      }
-    };
-
-    fetchSuscripciones();
-    return () => { cancelled = true; };
+    const error = pendientesRes.error ?? todasRes.error;
+    if (error) {
+      setState({ pendientes: [], todas: [], loading: false, error: error.message });
+    } else {
+      setState({
+        pendientes: (pendientesRes.data as Suscripcion[]) ?? [],
+        todas: (todasRes.data as Suscripcion[]) ?? [],
+        loading: false,
+        error: null,
+      });
+    }
   }, []);
 
-  const verificarSuscripcion = useCallback(async (id: string, aprobado: boolean, verificadoPor: string) => {
-    const updates: Record<string, unknown> = {
-      estado: aprobado ? "verificado" : "rechazado",
-      verificado_por: verificadoPor,
-    };
+  useEffect(() => {
+    void fetchSuscripciones();
+  }, [fetchSuscripciones]);
 
-    if (aprobado) {
-      const now = new Date();
-      const fechaFin = new Date(now);
-      fechaFin.setDate(fechaFin.getDate() + 30);
-      updates.fecha_inicio = now.toISOString();
-      updates.fecha_fin = fechaFin.toISOString();
-    }
+  const verificarSuscripcion = useCallback(
+    async (id: string, aprobado: boolean, verificadoPor: string) => {
+      const { data: tenantId, error } = await supabase.rpc("verificar_suscripcion", {
+        p_id: id,
+        p_aprobado: aprobado,
+        p_verificado_por: verificadoPor,
+      });
 
-    const { error } = await supabase
-      .from("suscripciones")
-      .update(updates)
-      .eq("id", id);
+      if (error || !tenantId) return false;
 
-    if (!error) {
-      setState((prev) => ({
-        ...prev,
-        pendientes: prev.pendientes.filter((s) => s.id !== id),
-        todas: prev.todas.map((s) =>
-          s.id === id ? { ...s, ...updates } as Suscripcion : s
-        ),
-      }));
+      await fetchSuscripciones();
 
-      if (aprobado) {
-        const sub = state.pendientes.find((s) => s.id === id);
-        if (sub) {
-          await supabase
-            .from("tenants")
-            .update({
-              suscripcion_activa: true,
-              fecha_vencimiento: updates.fecha_fin,
-            })
-            .eq("id", sub.tenant_id);
-        }
-      }
-    }
-    return !error;
-  }, [state.pendientes]);
+      void supabase.functions
+        .invoke("send-push", {
+          body: {
+            tenant_id: tenantId,
+            title: aprobado ? "Suscripcion aprobada" : "Suscripcion rechazada",
+            body: aprobado
+              ? "Tu cuenta ya esta activa. Ya puedes recibir solicitudes."
+              : "No pudimos verificar tu pago. Revisa el comprobante.",
+            url: "/",
+          },
+        })
+        .catch(() => undefined);
 
-  return { ...state, verificarSuscripcion };
+      return true;
+    },
+    [fetchSuscripciones]
+  );
+
+  return { ...state, verificarSuscripcion, refetch: fetchSuscripciones };
 }

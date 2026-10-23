@@ -23,6 +23,8 @@ interface LiveTripTrackerProps {
 }
 
 const LIGHT_STYLE = "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json";
+const ROUTE_MIN_MOVE_KM = 0.12;
+const ROUTE_MIN_INTERVAL_MS = 25000;
 
 const BANCOS: Record<string, string> = {
   "0102": "Banco de Venezuela",
@@ -80,6 +82,8 @@ export default function LiveTripTracker({
   const [copiado, setCopiado] = useState<string | null>(null);
   const autoExpandRef = useRef(0);
   const estadoAnteriorRef = useRef(carrera.estado);
+  const lastPickupRouteRef = useRef<{ lat: number; lng: number; at: number } | null>(null);
+  const lastTripRouteRef = useRef<{ lat: number; lng: number; at: number } | null>(null);
 
   const waiting = carrera.estado === "pendiente";
   const accepted = carrera.estado === "aceptada";
@@ -188,6 +192,8 @@ export default function LiveTripTracker({
     setMinimized(false);
     setHidden(false);
     setCopiado(null);
+    lastPickupRouteRef.current = null;
+    lastTripRouteRef.current = null;
   }, [carrera.id]);
 
   useEffect(() => {
@@ -207,6 +213,20 @@ export default function LiveTripTracker({
 
   useEffect(() => {
     if (!accepted || !conductorLocation) return;
+
+    const now = Date.now();
+    const last = lastPickupRouteRef.current;
+    const movedKm = last
+      ? haversineKm([last.lat, last.lng], [conductorLocation.lat, conductorLocation.lng])
+      : Infinity;
+    if (last && movedKm < ROUTE_MIN_MOVE_KM && now - last.at < ROUTE_MIN_INTERVAL_MS) {
+      return;
+    }
+    lastPickupRouteRef.current = {
+      lat: conductorLocation.lat,
+      lng: conductorLocation.lng,
+      at: now,
+    };
 
     let cancelledRequest = false;
     const timer = setTimeout(() => {
@@ -236,11 +256,21 @@ export default function LiveTripTracker({
       return;
     }
 
-    let cancelledRequest = false;
     const from = conductorLocation
       ? { lat: conductorLocation.lat, lng: conductorLocation.lng }
       : { lat: origin[0], lng: origin[1] };
 
+    const now = Date.now();
+    const last = lastTripRouteRef.current;
+    const movedKm = last
+      ? haversineKm([last.lat, last.lng], [from.lat, from.lng])
+      : Infinity;
+    if (last && movedKm < ROUTE_MIN_MOVE_KM && now - last.at < ROUTE_MIN_INTERVAL_MS) {
+      return;
+    }
+    lastTripRouteRef.current = { lat: from.lat, lng: from.lng, at: now };
+
+    let cancelledRequest = false;
     const timer = setTimeout(() => {
       void fetchDrivingRoute([from, { lat: destination[0], lng: destination[1] }]).then((route) => {
         if (cancelledRequest || !route) return;

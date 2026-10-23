@@ -1,5 +1,5 @@
 import type { Carrera, Tenant } from "@drivip/types";
-import { useClientesTenant, useTasaCambio } from "@drivip/supabase";
+import { useClientesTenant, useCuentaReferido, useTasaCambio } from "@drivip/supabase";
 
 const METODO_META: Record<string, { label: string; icon: string; gradient: string }> = {
   pago_movil: { label: "Pago Móvil", icon: "qr_code_2", gradient: "from-blue-500 to-cyan-500" },
@@ -24,6 +24,9 @@ export default function MisPagos({
 }) {
   const { clientes } = useClientesTenant(tenantId);
   const { tasa } = useTasaCambio();
+  const { cuenta: cuentaReferidos, available: referidosDisponibles } = useCuentaReferido(
+    tenantId ?? tenant?.id
+  );
 
   const hoy = new Date();
   const deHoy = carreras.filter((c) => isSameDay(c.completada_at ?? c.created_at, hoy) && c.estado !== "cancelada");
@@ -75,6 +78,51 @@ export default function MisPagos({
           {tenant?.suscripcion_activa ? "Al día" : "Vencido"}
         </span>
       </div>
+
+      {referidosDisponibles && cuentaReferidos && (
+        <div className="overflow-hidden rounded-3xl border border-amber-100 bg-white shadow-xl shadow-amber-100/50">
+          <div className="flex items-center gap-3 bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-3 text-white">
+            <span className="material-symbols-outlined text-[22px]">handshake</span>
+            <div className="flex-1">
+              <p className="text-[12px] font-black">Ganancias por referidos</p>
+              <p className="text-[10px] text-white/80">
+                {cuentaReferidos.referidos_activos} conductores activos
+                {cuentaReferidos.es_socio ? " - Socio Drivip" : ""}
+              </p>
+            </div>
+            <span className="rounded-full bg-white/20 px-2 py-1 text-[10px] font-black">
+              {cuentaReferidos.descuento_pct}% dto.
+            </span>
+          </div>
+          <div className="grid grid-cols-3 divide-x divide-slate-100">
+            <div className="p-3 text-center">
+              <p className="text-[9px] font-bold uppercase text-slate-400">Activos</p>
+              <p className="text-base font-black text-slate-900">{cuentaReferidos.referidos_activos}</p>
+            </div>
+            <div className="p-3 text-center">
+              <p className="text-[9px] font-bold uppercase text-slate-400">Por cobrar</p>
+              <p className="text-base font-black text-amber-600">
+                ${cuentaReferidos.comisiones_pendientes.toFixed(2)}
+              </p>
+            </div>
+            <div className="p-3 text-center">
+              <p className="text-[9px] font-bold uppercase text-slate-400">Acumulado</p>
+              <p className="text-base font-black text-emerald-600">
+                ${cuentaReferidos.comisiones_totales.toFixed(2)}
+              </p>
+            </div>
+          </div>
+          <div className="border-t border-slate-100 px-4 py-2 text-[10px] text-slate-500">
+            Tu mensualidad:{" "}
+            <span className="font-bold text-slate-900">
+              {cuentaReferidos.es_gratis ? "GRATIS" : `$${cuentaReferidos.total_mensual.toFixed(2)}`}
+            </span>
+            {cuentaReferidos.monto_descuento > 0 && !cuentaReferidos.es_gratis
+              ? ` (ahorras $${cuentaReferidos.monto_descuento.toFixed(2)})`
+              : ""}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-white rounded-3xl p-4 shadow-xl shadow-slate-200/60 border border-slate-100">

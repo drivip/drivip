@@ -1,52 +1,41 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { supabase } from "./client";
-import type { Ubicacion } from "@drivip/types";
+import type { UbicacionActual } from "@drivip/types";
 
-export function useUbicaciones(conductorId: string) {
-  const [ubicaciones, setUbicaciones] = useState<Ubicacion[]>([]);
-  const [loading, setLoading] = useState(true);
+export interface ReportarUbicacionInput {
+  lat: number;
+  lng: number;
+  velocidad?: number | null;
+  direccion?: number | null;
+  carrera_id?: string | null;
+}
 
-  useEffect(() => {
-    let cancelled = false;
-
-    supabase
-      .from("ubicaciones")
-      .select("*")
-      .eq("conductor_id", conductorId)
-      .order("timestamp", { ascending: false })
-      .limit(50)
-      .then(({ data }) => {
-        if (!cancelled) {
-          setUbicaciones((data as Ubicacion[]) ?? []);
-          setLoading(false);
-        }
-      });
-
-    return () => { cancelled = true; };
-  }, [conductorId]);
-
-  const reportarUbicacion = useCallback(async (ubicacion: {
-    conductor_id: string;
-    tenant_id: string;
-    lat: number;
-    lng: number;
-    velocidad?: number;
-    direccion?: number;
-    carrera_id?: string;
-  }) => {
-    const { error } = await supabase.from("ubicaciones").insert({
-      ...ubicacion,
-      timestamp: new Date().toISOString(),
+/**
+ * Reporta la posicion del conductor al RPC del servidor.
+ * El servidor decide cuando guardar historial (12 s / 40 m) y actualiza
+ * una unica fila en conductor_ubicacion_actual.
+ */
+export function useReportarUbicacion() {
+  const reportarUbicacion = useCallback(async (ubicacion: ReportarUbicacionInput) => {
+    const { error } = await supabase.rpc("reportar_ubicacion", {
+      p_lat: ubicacion.lat,
+      p_lng: ubicacion.lng,
+      p_velocidad: ubicacion.velocidad ?? null,
+      p_direccion: ubicacion.direccion ?? null,
+      p_carrera_id: ubicacion.carrera_id ?? null,
     });
     return !error;
   }, []);
 
-  return { ubicaciones, loading, reportarUbicacion };
+  return { reportarUbicacion };
 }
+
+/** @deprecated Usar useReportarUbicacion. */
+export const useUbicaciones = useReportarUbicacion;
 
 export function useRealtimeUbicacionConductor(
   conductorId: string,
-  onUbicacion: (ubicacion: Ubicacion) => void
+  onUbicacion: (ubicacion: UbicacionActual) => void
 ) {
   const callbackRef = useRef(onUbicacion);
   callbackRef.current = onUbicacion;
@@ -61,11 +50,12 @@ export function useRealtimeUbicacionConductor(
         {
           event: "*",
           schema: "public",
-          table: "ubicaciones",
+          table: "conductor_ubicacion_actual",
           filter: `conductor_id=eq.${conductorId}`,
         },
         (payload) => {
-          callbackRef.current(payload.new as Ubicacion);
+          if (payload.eventType === "DELETE") return;
+          callbackRef.current(payload.new as UbicacionActual);
         }
       )
       .subscribe();

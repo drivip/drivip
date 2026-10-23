@@ -6,7 +6,10 @@ interface AdminDashboardProps {
   totalTenants: number;
   tenantsActivos: number;
   tenantsLoading: boolean;
+  mrr?: number;
   totalClientes?: number;
+  ridesToday?: number;
+  completedToday?: number;
   onNavigate: (module: AdminModule) => void;
   carreras?: Carrera[];
   pendientes?: Suscripcion[];
@@ -16,18 +19,20 @@ export default function AdminDashboard({
   totalTenants,
   tenantsActivos,
   tenantsLoading,
+  mrr = 0,
   totalClientes = 0,
+  ridesToday,
+  completedToday,
   onNavigate,
   carreras = [],
   pendientes = [],
 }: AdminDashboardProps) {
-  const mrr = tenantsActivos * 10;
-
   const now = new Date();
   const todayStr = now.toDateString();
   const carrerasHoy = carreras.filter((c) => new Date(c.created_at).toDateString() === todayStr);
-  const totalCarreras = carrerasHoy.length;
-  const carrerasCompletadas = carrerasHoy.filter((c) => c.estado === "completada").length;
+  const totalCarreras = ridesToday ?? carrerasHoy.length;
+  const carrerasCompletadas =
+    completedToday ?? carrerasHoy.filter((c) => c.estado === "completada").length;
 
   return (
     <div className="px-4 lg:px-8 py-4 lg:py-6 space-y-5 pb-24 lg:pb-6">
@@ -72,7 +77,7 @@ export default function AdminDashboard({
               <span className="material-symbols-outlined text-[16px] text-emerald-600">payments</span>
             </div>
           </div>
-          <span className="text-[24px] lg:text-[28px] font-black text-emerald-600 block leading-tight">${mrr}</span>
+          <span className="text-[24px] lg:text-[28px] font-black text-emerald-600 block leading-tight">${mrr.toFixed(2)}</span>
           <span className="text-[10px] lg:text-[11px] text-slate-500 font-medium">MRR USD</span>
         </div>
 
@@ -82,7 +87,7 @@ export default function AdminDashboard({
               <span className="material-symbols-outlined text-[16px] text-purple-600">workspace_premium</span>
             </div>
           </div>
-          <span className="text-[24px] lg:text-[28px] font-black text-slate-900 block leading-tight">3</span>
+          <span className="text-[24px] lg:text-[28px] font-black text-slate-900 block leading-tight">{tenantsActivos}</span>
           <span className="text-[10px] lg:text-[11px] text-slate-500 font-medium">Planes Activos</span>
         </div>
 

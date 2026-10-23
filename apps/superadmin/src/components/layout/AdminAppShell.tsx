@@ -9,6 +9,8 @@ interface AdminAppShellProps {
   onNavigate: (module: AdminModule) => void;
   onLogout: () => void;
   pendingCount: number;
+  supportUnread: number;
+  referralsPending: number;
   menuOpen: boolean;
   onMenuOpen: () => void;
   onMenuClose: () => void;
@@ -21,6 +23,7 @@ const NAV_ITEMS_MOBILE: { id: AdminModule; icon: string; label: string; desc: st
   { id: "clientes", icon: "group", label: "Clientes", desc: "Clientes registrados", gradient: "from-emerald-500 to-teal-600" },
   { id: "planes", icon: "workspace_premium", label: "Planes", desc: "Suscripciones y precios", gradient: "from-purple-500 to-indigo-600" },
   { id: "suscripciones", icon: "payments", label: "Suscripciones", desc: "Pagos y verificaciones", gradient: "from-emerald-400 to-teal-600" },
+  { id: "referidos", icon: "handshake", label: "Referidos", desc: "Socios y comisiones", gradient: "from-amber-500 to-orange-600" },
   { id: "plugins", icon: "extension", label: "Plugins", desc: "Catalogo de extensiones", gradient: "from-violet-500 to-purple-700" },
   { id: "promociones", icon: "campaign", label: "Promociones", desc: "Banners y descuentos", gradient: "from-amber-500 to-orange-500" },
   { id: "b2b", icon: "local_shipping", label: "B2B Delivery", desc: "Logistica empresas", gradient: "from-rose-500 to-pink-600" },
@@ -37,6 +40,8 @@ export default function AdminAppShell({
   onNavigate,
   onLogout,
   pendingCount,
+  supportUnread,
+  referralsPending,
   menuOpen,
   onMenuOpen,
   onMenuClose,
@@ -46,15 +51,21 @@ export default function AdminAppShell({
 
   return (
     <div className="flex h-[100dvh] w-full overflow-hidden bg-[#f4f6f8]">
-      <AdminSidebar activeModule={activeModule} onNavigate={onNavigate} onLogout={onLogout} />
+      <AdminSidebar
+        activeModule={activeModule}
+        onNavigate={onNavigate}
+        onLogout={onLogout}
+        supportUnread={supportUnread}
+        referralsPending={referralsPending}
+      />
 
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         <div className="lg:hidden">
           <AdminHeader
             onMenuClick={onMenuOpen}
-            onNotificationsClick={() => onNavigate("suscripciones")}
+            onNotificationsClick={() => onNavigate("soporte")}
             onLogout={onLogout}
-            pendingCount={pendingCount}
+            pendingCount={pendingCount + supportUnread}
           />
         </div>
 
@@ -97,12 +108,22 @@ export default function AdminAppShell({
                 return (
                   <button
                     key={item.id}
-                    className={`p-3.5 rounded-2xl border flex flex-col items-start gap-2 text-left active:scale-95 transition ${
+                    className={`relative p-3.5 rounded-2xl border flex flex-col items-start gap-2 text-left active:scale-95 transition ${
                       isActive ? "bg-white border-red-200 ring-2 ring-red-100" : "bg-white border-slate-100"
                     }`}
                     style={{ boxShadow: "4px 4px 10px #d9dde2, -4px -4px 10px #ffffff" }}
                     onClick={() => { onNavigate(item.id); onMenuClose(); }}
                   >
+                    {item.id === "soporte" && supportUnread > 0 && (
+                      <span className="absolute right-2.5 top-2.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-black text-white">
+                        {supportUnread > 9 ? "9+" : supportUnread}
+                      </span>
+                    )}
+                    {item.id === "referidos" && referralsPending > 0 && (
+                      <span className="absolute right-2.5 top-2.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-orange-500 px-1 text-[9px] font-black text-white">
+                        {referralsPending > 9 ? "9+" : referralsPending}
+                      </span>
+                    )}
                     <div className={`w-10 h-10 rounded-xl bg-gradient-to-tr ${item.gradient} text-white flex items-center justify-center shadow-md`}>
                       <span className="material-symbols-outlined text-[20px]">{item.icon}</span>
                     </div>

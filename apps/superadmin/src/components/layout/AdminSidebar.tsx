@@ -7,6 +7,7 @@ export type AdminModule =
   | "clientes"
   | "planes"
   | "suscripciones"
+  | "referidos"
   | "plugins"
   | "promociones"
   | "b2b"
@@ -29,6 +30,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "clientes", icon: "group", label: "Clientes" },
   { id: "planes", icon: "workspace_premium", label: "Planes" },
   { id: "suscripciones", icon: "payments", label: "Suscripciones" },
+  { id: "referidos", icon: "handshake", label: "Referidos" },
   { id: "plugins", icon: "extension", label: "Plugins" },
   { id: "promociones", icon: "campaign", label: "Promociones" },
   { id: "b2b", icon: "local_shipping", label: "B2B Delivery" },
@@ -44,9 +46,11 @@ interface AdminSidebarProps {
   activeModule: AdminModule;
   onNavigate: (module: AdminModule) => void;
   onLogout: () => void;
+  supportUnread: number;
+  referralsPending: number;
 }
 
-export default function AdminSidebar({ activeModule, onNavigate, onLogout }: AdminSidebarProps) {
+export default function AdminSidebar({ activeModule, onNavigate, onLogout, supportUnread, referralsPending }: AdminSidebarProps) {
   return (
     <aside className="hidden lg:flex flex-col w-[260px] bg-[#f8f9fb] border-r border-slate-200/60">
       <div className="flex items-center h-16 px-4 border-b border-slate-200/60">
@@ -71,7 +75,7 @@ export default function AdminSidebar({ activeModule, onNavigate, onLogout }: Adm
               key={item.id}
               onClick={() => onNavigate(item.id)}
               className={cn(
-                "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all active:scale-[0.98]",
+                "relative w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all active:scale-[0.98]",
                 isActive
                   ? "bg-white text-red-600 font-bold shadow-md border border-slate-100"
                   : "text-slate-500 hover:text-slate-900 hover:bg-white/60"
@@ -80,6 +84,16 @@ export default function AdminSidebar({ activeModule, onNavigate, onLogout }: Adm
             >
               <span className="material-symbols-outlined text-[20px]">{item.icon}</span>
               <span className="text-[11px] tracking-wide font-semibold">{item.label}</span>
+              {item.id === "soporte" && supportUnread > 0 && (
+                <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-black text-white">
+                  {supportUnread > 9 ? "9+" : supportUnread}
+                </span>
+              )}
+              {item.id === "referidos" && referralsPending > 0 && (
+                <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-orange-500 px-1 text-[9px] font-black text-white">
+                  {referralsPending > 9 ? "9+" : referralsPending}
+                </span>
+              )}
             </button>
           );
         })}
