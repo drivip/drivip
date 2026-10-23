@@ -1687,7 +1687,7 @@ function AppContent() {
 
   if (!splashDone || loading) {
     return (
-      <SplashScreen ready={!loading} onFinish={() => setSplashDone(true)} />
+      <SplashScreen logoSrc="/pwa.png" ready={!loading} onFinish={() => setSplashDone(true)} />
     );
   }
 

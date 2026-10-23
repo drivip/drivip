@@ -825,7 +825,7 @@ function AppContent() {
 
   if (!splashDone || !appReady) {
     return (
-      <SplashScreen label="Conductor" ready={appReady} onFinish={() => setSplashDone(true)} />
+      <SplashScreen label="Conductor" logoSrc="/icon.png" ready={appReady} onFinish={() => setSplashDone(true)} />
     );
   }
 

@@ -7,10 +7,16 @@
   "scope": "/",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
-  "background_color": "#f4f6f8",
+  "background_color": "#ffffff",
   "theme_color": "#6b21a8",
   "categories": ["travel", "navigation", "shopping"],
   "icons": [
+    {
+      "src": "/pwa.png",
+      "sizes": "600x600",
+      "type": "image/png",
+      "purpose": "any"
+    },
     {
       "src": "/icon-192.png",
       "sizes": "192x192",
@@ -24,8 +30,8 @@
       "purpose": "any"
     },
     {
-      "src": "/icon-512.png",
-      "sizes": "512x512",
+      "src": "/pwa.png",
+      "sizes": "600x600",
       "type": "image/png",
       "purpose": "maskable"
     }
