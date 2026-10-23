@@ -1687,12 +1687,7 @@ function AppContent() {
 
   if (!splashDone || loading) {
     return (
-      <SplashScreen
-        appName="Drivip"
-        subtitle="Pasajero VIP"
-        ready={!loading}
-        onFinish={() => setSplashDone(true)}
-      />
+      <SplashScreen ready={!loading} onFinish={() => setSplashDone(true)} />
     );
   }
 

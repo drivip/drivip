@@ -825,12 +825,7 @@ function AppContent() {
 
   if (!splashDone || !appReady) {
     return (
-      <SplashScreen
-        appName="Drivip Conductor"
-        subtitle="Panel del Conductor"
-        ready={appReady}
-        onFinish={() => setSplashDone(true)}
-      />
+      <SplashScreen label="Conductor" ready={appReady} onFinish={() => setSplashDone(true)} />
     );
   }
 
