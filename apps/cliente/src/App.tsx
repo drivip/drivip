@@ -1622,7 +1622,6 @@ function PassengerApp() {
 
       <PwaPermissionsPrompt
         appName="Drivip"
-        tenantId={conductorTenantId}
         includeCamera
         role="cliente"
       />
@@ -1687,7 +1686,7 @@ function AppContent() {
 
   if (!splashDone || loading) {
     return (
-      <SplashScreen logoSrc="/pwa.png" ready={!loading} onFinish={() => setSplashDone(true)} />
+      <SplashScreen logoSrc="/icon-512.png" ready={!loading} onFinish={() => setSplashDone(true)} />
     );
   }
 

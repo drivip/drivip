@@ -12,7 +12,7 @@
   "categories": ["business", "navigation"],
   "icons": [
     {
-      "src": "/icon.png",
+      "src": "/pwa.png",
       "sizes": "600x600",
       "type": "image/png",
       "purpose": "any"
@@ -24,13 +24,7 @@
       "purpose": "any"
     },
     {
-      "src": "/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/icon.png",
+      "src": "/pwa.png",
       "sizes": "600x600",
       "type": "image/png",
       "purpose": "maskable"

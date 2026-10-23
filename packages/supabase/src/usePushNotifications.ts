@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase, isConfigured } from "./client";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -26,6 +26,7 @@ export function usePushNotifications(options: UsePushNotificationsOptions = {}) 
   const [subscribed, setSubscribed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const enablingRef = useRef(false);
 
   useEffect(() => {
     const ok =
@@ -52,6 +53,7 @@ export function usePushNotifications(options: UsePushNotificationsOptions = {}) 
   }, []);
 
   const enable = useCallback(async () => {
+    if (enablingRef.current) return false;
     setError(null);
     if (!supported) {
       setError("Tu navegador no soporta notificaciones push");
@@ -62,18 +64,19 @@ export function usePushNotifications(options: UsePushNotificationsOptions = {}) 
       return false;
     }
 
+    enablingRef.current = true;
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        setError("Inicia sesion para activar las notificaciones");
-        return false;
-      }
-
       const perm = await Notification.requestPermission();
       setPermission(perm as PushPermission);
       if (perm !== "granted") {
         setError("Permiso de notificaciones denegado");
+        return false;
+      }
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setError("Inicia sesion para activar las notificaciones");
         return false;
       }
 
@@ -117,6 +120,7 @@ export function usePushNotifications(options: UsePushNotificationsOptions = {}) 
       setError(e instanceof Error ? e.message : "Error al activar notificaciones");
       return false;
     } finally {
+      enablingRef.current = false;
       setLoading(false);
     }
   }, [supported, options.tenantId]);

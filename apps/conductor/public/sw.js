@@ -18,8 +18,8 @@ self.addEventListener("push", (event) => {
   const title = data.title || "Drivip";
   const options = {
     body: data.body || "",
-    icon: "/icon.png",
-    badge: "/icon.png",
+    icon: "/pwa.png",
+    badge: "/pwa.png",
     silent: false,
     vibrate: [200, 100, 200],
     data: { url: data.url || "/", ...(data.data || {}) },
