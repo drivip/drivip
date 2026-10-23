@@ -17,10 +17,10 @@ export default function MiPlan({ tenant, demo = false }: MiPlanProps) {
   const precioBase =
     cuenta?.precio_plan ??
     (plan === "premium"
-      ? Number(config?.precio_plan_premium ?? 30)
+      ? Number(config?.precio_plan_premium ?? 25)
       : plan === "profesional"
-        ? Number(config?.precio_plan_profesional ?? 20)
-        : Number(config?.precio_plan_estandar ?? 10));
+        ? Number(config?.precio_plan_profesional ?? 25)
+        : Number(config?.precio_plan_estandar ?? 25));
   const precioFinal = cuenta?.total_mensual ?? precioBase;
   const precio = cuenta?.es_gratis ? "GRATIS" : `$${precioFinal.toFixed(2)}`;
 

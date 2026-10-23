@@ -15,6 +15,7 @@ import {
   limpiarDisponibilidadLocal,
   useMensajeEntrante,
   useReportarUbicacion,
+  PwaPermissionsPrompt,
 } from "@drivip/supabase";
 import DriverHeader from "../components/driver/DriverHeader";
 import DriverFullGridMenu from "../components/driver/DriverFullGridMenu";
@@ -482,7 +483,7 @@ export default function DriverApp({ demo }: { demo?: boolean }) {
           />
         )}
         {activeModule === "historial" && <Historial carreras={effectiveCarreras} tenantId={tenant?.id} />}
-        {activeModule === "perfil" && <MiPerfil tenant={tenant} demo={demo} />}
+        {activeModule === "perfil" && <MiPerfil tenant={tenant} demo={demo} onSaved={refetchTenant} />}
         {activeModule === "plan" && <MiPlan tenant={tenant} demo={demo} />}
         {activeModule === "referidos" && <Referidos tenant={tenant} />}
         {activeModule === "cupones" && (
@@ -608,6 +609,7 @@ export default function DriverApp({ demo }: { demo?: boolean }) {
         soporteUnread={soporteUnread}
         onEnviarSoporte={enviarSoporte}
         onMarcarSoporteLeido={marcarSoporteLeidos}
+        onSaved={refetchTenant}
       />
 
       <DriverReviewsModal
@@ -615,6 +617,14 @@ export default function DriverApp({ demo }: { demo?: boolean }) {
         onClose={() => setReviewsOpen(false)}
         tenantId={tenant?.id}
       />
+
+      {!demo && (
+        <PwaPermissionsPrompt
+          appName="Drivip Conductor"
+          tenantId={tenant?.id}
+          role="conductor"
+        />
+      )}
     </div>
   );
 }

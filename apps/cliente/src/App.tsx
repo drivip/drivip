@@ -5,10 +5,10 @@ import {
   useTasaCambio, useConductoresRed, useMisCarreras, crearCarreraCliente, calificarCarrera,
   cancelarCarrera, useDireccionesCliente, useReservasCliente, enviarPushCarrera,
   crearSolicitudServicio, conductorInviteUrl, useConversacionesCliente,
-  useMensajeEntrante,
+  useMensajeEntrante, PwaPermissionsPrompt,
 } from "@drivip/supabase";
 import { TASA_BCV_REFERENCIA } from "@drivip/types";
-import { FloatingMessageBadge, PwaInstallPrompt } from "@drivip/ui";
+import { FloatingMessageBadge, PwaInstallPrompt, SplashScreen } from "@drivip/ui";
 import {
   fetchDrivingRoute,
   isInVenezuela,
@@ -1619,6 +1619,13 @@ function PassengerApp() {
         </>,
         document.body
       )}
+
+      <PwaPermissionsPrompt
+        appName="Drivip"
+        tenantId={conductorTenantId}
+        includeCamera
+        role="cliente"
+      />
     </>
   );
 }
@@ -1660,6 +1667,7 @@ function AppContent() {
   const { user, loading, configured } = useAuthContext();
   const [authView, setAuthView] = useState<"landing" | "login" | "register">("landing");
   const [addSlug, setAddSlug] = useState<string | null>(null);
+  const [splashDone, setSplashDone] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -1677,13 +1685,14 @@ function AppContent() {
     window.history.replaceState({}, "", window.location.pathname);
   };
 
-  if (loading) {
+  if (!splashDone || loading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-[#f4f6f8]">
-        <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center animate-pulse">
-          <img src="/logo.png" alt="Drivip" className="w-8 h-8 rounded-lg object-cover" />
-        </div>
-      </div>
+      <SplashScreen
+        appName="Drivip"
+        subtitle="Pasajero VIP"
+        ready={!loading}
+        onFinish={() => setSplashDone(true)}
+      />
     );
   }
 

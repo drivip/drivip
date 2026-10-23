@@ -1,6 +1,6 @@
 import type { AdminModule } from "./layout/AdminSidebar";
 import AdminGridMenu from "./AdminGridMenu";
-import type { Carrera, Suscripcion } from "@drivip/types";
+import type { Carrera, Suscripcion, Tenant } from "@drivip/types";
 
 interface AdminDashboardProps {
   totalTenants: number;
@@ -13,6 +13,7 @@ interface AdminDashboardProps {
   onNavigate: (module: AdminModule) => void;
   carreras?: Carrera[];
   pendientes?: Suscripcion[];
+  tenants?: Tenant[];
 }
 
 export default function AdminDashboard({
@@ -26,6 +27,7 @@ export default function AdminDashboard({
   onNavigate,
   carreras = [],
   pendientes = [],
+  tenants = [],
 }: AdminDashboardProps) {
   const now = new Date();
   const todayStr = now.toDateString();
@@ -33,6 +35,9 @@ export default function AdminDashboard({
   const totalCarreras = ridesToday ?? carrerasHoy.length;
   const carrerasCompletadas =
     completedToday ?? carrerasHoy.filter((c) => c.estado === "completada").length;
+  const ultimoPendiente = pendientes[0];
+  const tenantUltimo = tenants.find((t) => t.id === ultimoPendiente?.tenant_id);
+  const pendientesSinDatos = pendientes.filter((p) => !p.referencia || !p.banco_origen);
 
   return (
     <div className="px-4 lg:px-8 py-4 lg:py-6 space-y-5 pb-24 lg:pb-6">
@@ -114,12 +119,33 @@ export default function AdminDashboard({
 
       <div className="bg-white rounded-2xl p-4 border border-slate-100 space-y-3" style={{ boxShadow: "4px 4px 10px #d9dde2, -4px -4px 10px #ffffff" }}>
         <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Alertas</h3>
-        <div className="flex items-start gap-3 py-2">
-          <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
-            <span className="material-symbols-outlined text-[16px] text-amber-600">warning</span>
+        {ultimoPendiente ? (
+          <button
+            onClick={() => onNavigate("suscripciones")}
+            className="w-full flex items-center gap-3 py-2 text-left active:scale-[0.99] transition"
+          >
+            <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
+              <span className="material-symbols-outlined text-[16px] text-amber-600">person_add</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <span className="text-[12px] lg:text-[13px] text-slate-900 font-bold block truncate">
+                Nuevo cliente: {tenantUltimo?.nombre ?? "Conductor"}
+              </span>
+              <span className="text-[10px] lg:text-[11px] text-slate-500 block">
+                {pendientes.length} pago(s) pendiente(s)
+                {pendientesSinDatos.length > 0 ? ` · ${pendientesSinDatos.length} sin datos de pago` : ""}
+              </span>
+            </div>
+            <span className="material-symbols-outlined text-[18px] text-slate-400">chevron_right</span>
+          </button>
+        ) : (
+          <div className="flex items-start gap-3 py-2">
+            <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
+              <span className="material-symbols-outlined text-[16px] text-emerald-600">check_circle</span>
+            </div>
+            <span className="text-[12px] lg:text-[13px] text-slate-700">No hay pagos pendientes</span>
           </div>
-          <span className="text-[12px] lg:text-[13px] text-slate-700">{pendientes.length} pagos pendientes de verificar</span>
-        </div>
+        )}
         <div className="flex items-start gap-3 py-2">
           <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
             <span className="material-symbols-outlined text-[16px] text-emerald-600">check_circle</span>

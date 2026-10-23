@@ -8,6 +8,7 @@ export interface Suscripcion {
   moneda: string;
   metodo_pago: MetodoPagoSuscripcion;
   referencia: string | null;
+  banco_origen: string | null;
   comprobante_url: string | null;
   estado: SuscripcionEstado;
   verificado_por: string | null;

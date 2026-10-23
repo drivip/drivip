@@ -32,6 +32,7 @@ interface DriverProfileModalProps {
   soporteUnread: number;
   onEnviarSoporte: (contenido: string) => Promise<boolean>;
   onMarcarSoporteLeido: () => void;
+  onSaved?: () => void;
 }
 
 const SHORTCUTS = [
@@ -65,6 +66,7 @@ export default function DriverProfileModal({
   soporteUnread,
   onEnviarSoporte,
   onMarcarSoporteLeido,
+  onSaved,
 }: DriverProfileModalProps) {
   const [tab, setTab] = useState<ProfileTab>(initialTab);
 
@@ -89,8 +91,12 @@ export default function DriverProfileModal({
 
       <div className="relative flex h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-[#f1f4f8] shadow-2xl sm:h-[86dvh] sm:rounded-3xl">
         <div className="flex items-center gap-3 border-b border-slate-200/70 bg-white px-4 py-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-600 to-indigo-700 text-sm font-black text-white shadow-md">
-            {profileInitial}
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-purple-600 to-indigo-700 text-sm font-black text-white shadow-md">
+            {tenant?.logo_url ? (
+              <img src={tenant.logo_url} alt={profileName} className="h-full w-full object-cover" />
+            ) : (
+              profileInitial
+            )}
           </div>
           <div className="min-w-0 flex-1">
             <h2 className="truncate text-sm font-black text-slate-900">{profileName}</h2>
@@ -190,7 +196,7 @@ export default function DriverProfileModal({
           ) : (
             <div className="h-full overflow-y-auto pr-0.5">
               <div className="space-y-4">
-                <MiPerfil tenant={tenant} demo={demo} embedded />
+                <MiPerfil tenant={tenant} demo={demo} embedded onSaved={onSaved} />
 
                 <div className="rounded-3xl border border-slate-100 bg-white p-4 shadow-xl shadow-slate-200/60">
                   <p className="mb-2 text-[10px] font-black uppercase tracking-wider text-slate-400">

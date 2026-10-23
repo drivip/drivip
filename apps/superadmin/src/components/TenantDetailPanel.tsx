@@ -61,9 +61,9 @@ export default function TenantDetailPanel({ tenantId, onBack }: TenantDetailPane
   const { config: configReferidos } = useConfigReferidos();
 
   const preciosPlan: Record<string, number> = {
-    estandar: Number(configReferidos?.precio_plan_estandar ?? 10),
-    profesional: Number(configReferidos?.precio_plan_profesional ?? 20),
-    premium: Number(configReferidos?.precio_plan_premium ?? 30),
+    estandar: Number(configReferidos?.precio_plan_estandar ?? 25),
+    profesional: Number(configReferidos?.precio_plan_profesional ?? 25),
+    premium: Number(configReferidos?.precio_plan_premium ?? 25),
   };
 
   const [pauseMotivo, setPauseMotivo] = useState("");

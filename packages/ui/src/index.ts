@@ -16,6 +16,7 @@ export { default as FilterPills } from "./FilterPills";
 export { default as ConfirmDialog } from "./ConfirmDialog";
 export { default as FloatingMessageBadge } from "./FloatingMessageBadge";
 export { default as PwaInstallPrompt } from "./PwaInstallPrompt";
+export { default as SplashScreen } from "./SplashScreen";
 export { usePwaInstall } from "./usePwaInstall";
 export type { PwaInstallState } from "./usePwaInstall";
 export { registerServiceWorker } from "./registerServiceWorker";

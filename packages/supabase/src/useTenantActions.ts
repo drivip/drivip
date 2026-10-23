@@ -7,8 +7,27 @@ export interface RegistrarPagoInput {
   moneda?: string;
   metodo_pago: MetodoPagoSuscripcion;
   referencia?: string | null;
+  banco_origen?: string | null;
   meses?: number;
   verificado_por?: string | null;
+}
+
+export interface PerfilConductorInput {
+  nombre: string;
+  telefono?: string | null;
+  ciudad?: string | null;
+  direccion?: string | null;
+  vehiculo_tipo?: string | null;
+  vehiculo_placa?: string | null;
+  vehiculo_modelo?: string | null;
+  vehiculo_color?: string | null;
+  logo_url?: string | null;
+}
+
+export interface AccionResult {
+  ok: boolean;
+  error: string | null;
+  url?: string | null;
 }
 
 export function useTenantActions() {
@@ -66,6 +85,7 @@ export function useTenantActions() {
       moneda: input.moneda ?? "VES",
       metodo_pago: input.metodo_pago,
       referencia: input.referencia ?? null,
+      banco_origen: input.banco_origen ?? null,
       estado: "verificado",
       verificado_por: input.verificado_por ?? null,
       fecha_inicio: now.toISOString(),
@@ -85,5 +105,62 @@ export function useTenantActions() {
     return !tenantError;
   }, []);
 
-  return { togglePausa, cambiarPlan, toggleModulo, actualizarVehiculo, toggleActivo, registrarPago };
+  const actualizarPerfil = useCallback(
+    async (perfil: PerfilConductorInput): Promise<AccionResult> => {
+      const { error } = await supabase.rpc("actualizar_perfil_conductor", {
+        p_nombre: perfil.nombre,
+        p_telefono: perfil.telefono ?? null,
+        p_ciudad: perfil.ciudad ?? null,
+        p_direccion: perfil.direccion ?? null,
+        p_vehiculo_tipo: perfil.vehiculo_tipo ?? null,
+        p_vehiculo_placa: perfil.vehiculo_placa ?? null,
+        p_vehiculo_modelo: perfil.vehiculo_modelo ?? null,
+        p_vehiculo_color: perfil.vehiculo_color ?? null,
+        p_logo_url: perfil.logo_url ?? null,
+      });
+
+      return { ok: !error, error: error?.message ?? null };
+    },
+    []
+  );
+
+  const subirImagenPerfil = useCallback(
+    async (tenantId: string, blob: Blob): Promise<AccionResult> => {
+      const extension =
+        blob.type === "image/jpeg" ? "jpg" : blob.type === "image/png" ? "png" : "webp";
+      const path = `${tenantId}/avatar.${extension}`;
+
+      const obsoletas = ["webp", "jpg", "png"]
+        .filter((item) => item !== extension)
+        .map((item) => `${tenantId}/avatar.${item}`);
+      void supabase.storage.from("perfiles").remove(obsoletas);
+
+      const { error } = await supabase.storage.from("perfiles").upload(path, blob, {
+        upsert: true,
+        contentType: blob.type || "image/webp",
+        cacheControl: "3600",
+      });
+
+      if (error) return { ok: false, error: error.message, url: null };
+
+      const { data } = supabase.storage.from("perfiles").getPublicUrl(path);
+      return {
+        ok: true,
+        error: null,
+        url: `${data.publicUrl}?v=${Date.now()}`,
+      };
+    },
+    []
+  );
+
+  return {
+    togglePausa,
+    cambiarPlan,
+    toggleModulo,
+    actualizarVehiculo,
+    toggleActivo,
+    registrarPago,
+    actualizarPerfil,
+    subirImagenPerfil,
+  };
 }

@@ -16,17 +16,31 @@ export {
 export type { ReportarUbicacionInput } from "./useUbicaciones";
 export { useRedCliente } from "./useRedCliente";
 export { usePlugins } from "./usePlugins";
-export { useSuscripciones } from "./useSuscripciones";
+export {
+  useSuscripciones,
+  useMiSuscripcion,
+  crearSuscripcionPendiente,
+  enviarDatosPagoSuscripcion,
+  PRECIO_SUSCRIPCION_USD,
+} from "./useSuscripciones";
+export type { DatosPagoSuscripcionInput } from "./useSuscripciones";
 export { useSuperadminStats } from "./useSuperadminStats";
 export type { SuperadminStats } from "./useSuperadminStats";
 export { useTenantDetail } from "./useTenantDetail";
 export { useTenantActions } from "./useTenantActions";
+export type {
+  PerfilConductorInput,
+  AccionResult,
+  RegistrarPagoInput,
+} from "./useTenantActions";
 export { useTenantBanners, useAllBanners } from "./useTenantBanners";
 export { useTenantNotificaciones } from "./useTenantNotificaciones";
 export { useAdminMensajes, useAdminConversaciones } from "./useAdminMensajes";
 export type { MensajeSoporteEntrante } from "./useAdminMensajes";
 export { usePushNotifications } from "./usePushNotifications";
 export { PushNotificationCard } from "./PushNotificationCard";
+export { PwaPermissionsPrompt } from "./PwaPermissionsPrompt";
+export type { PwaPermissionsPromptProps } from "./PwaPermissionsPrompt";
 export { useMensajesCarrera } from "./useMensajesCarrera";
 export {
   useConversacionesCliente,

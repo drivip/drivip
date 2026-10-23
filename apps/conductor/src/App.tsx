@@ -1,6 +1,17 @@
-import { useState } from "react";
-import { AuthProvider, useAuthContext, supabase, conductorInviteUrl, registrarReferido } from "@drivip/supabase";
-import { PwaInstallPrompt } from "@drivip/ui";
+import { useEffect, useState } from "react";
+import {
+  AuthProvider,
+  useAuthContext,
+  supabase,
+  conductorInviteUrl,
+  registrarReferido,
+  useMiTenant,
+  useMiSuscripcion,
+  crearSuscripcionPendiente,
+  enviarDatosPagoSuscripcion,
+  PRECIO_SUSCRIPCION_USD,
+} from "@drivip/supabase";
+import { PwaInstallPrompt, SplashScreen } from "@drivip/ui";
 import DriverApp from "./pages/DriverApp";
 
 /* ==================== LANDING PAGE ==================== */
@@ -36,7 +47,7 @@ function LandingPage({ onShowAuth }: { onShowAuth: (mode: "login" | "register") 
           Tu propia app<br />
           <span className="text-purple-700">para fidelizar clientes</span>
         </h1>
-        <p className="text-sm text-slate-500 max-w-xl mx-auto mb-8">Tú decides tus tarifas, tu disponibilidad y cómo cobrar. Pagas solo una mensualidad fija, desde $10 al mes.</p>
+        <p className="text-sm text-slate-500 max-w-xl mx-auto mb-8">Tú decides tus tarifas, tu disponibilidad y cómo cobrar. Pagas solo una mensualidad fija de $25 al mes.</p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
           <button onClick={() => onShowAuth("register")} className="w-full sm:w-auto px-7 py-3 rounded-2xl bg-purple-700 text-white font-bold text-[13px] shadow-lg shadow-purple-600/25 active:scale-95 transition flex items-center justify-center gap-2">
             <span className="material-symbols-outlined text-[18px]">drive_eta</span> Quiero mi app
@@ -136,44 +147,22 @@ function LandingPage({ onShowAuth }: { onShowAuth: (mode: "login" | "register") 
       {/* PLANES */}
       <section id="planes" className="max-w-7xl mx-auto px-4 lg:px-8 py-16">
         <div className="text-center mb-10">
-          <span className="text-[10px] font-bold text-purple-600 uppercase tracking-wider">Planes de Suscripción</span>
-          <h2 className="text-2xl font-black text-slate-900 mt-1" style={{ fontFamily: "Poppins, sans-serif" }}>Elige Tu Plan</h2>
+          <span className="text-[10px] font-bold text-purple-600 uppercase tracking-wider">Suscripción</span>
+          <h2 className="text-2xl font-black text-slate-900 mt-1" style={{ fontFamily: "Poppins, sans-serif" }}>Un solo plan, un solo precio</h2>
         </div>
-        <div className="grid md:grid-cols-2 gap-5 max-w-3xl mx-auto">
-          <div className="relative bg-white rounded-2xl p-6 border border-slate-200" style={{ boxShadow: "6px 6px 14px #d9dde2, -6px -6px 14px #ffffff" }}>
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-slate-500 to-gray-600 text-white flex items-center justify-center shadow-md mb-4">
-              <span className="material-symbols-outlined text-[22px]">workspace_premium</span>
-            </div>
-            <h3 className="text-lg font-black text-slate-900">Estándar</h3>
-            <div className="flex items-baseline gap-1 mb-4">
-              <span className="text-3xl font-black text-slate-900">$10</span>
-              <span className="text-[12px] text-slate-400">/mes</span>
-            </div>
-            <ul className="space-y-1.5 mb-5">
-              {["App personal con QR y enlace", "Control de disponibilidad", "Métodos de pago configurables", "Historial de servicios", "Soporte por email"].map((f) => (
-                <li key={f} className="flex items-start gap-2">
-                  <span className="material-symbols-outlined text-[14px] text-emerald-500 mt-0.5">check_circle</span>
-                  <span className="text-[12px] text-slate-600">{f}</span>
-                </li>
-              ))}
-            </ul>
-            <button onClick={() => onShowAuth("register")} className="w-full py-3 rounded-xl bg-slate-100 text-slate-700 text-[13px] font-bold hover:bg-slate-200 active:scale-95 transition">
-              Comenzar con Estándar
-            </button>
-          </div>
-
-          <div className="relative bg-white rounded-2xl p-6 border border-purple-200 ring-2 ring-purple-500 scale-[1.02]" style={{ boxShadow: "6px 6px 14px #d9dde2, -6px -6px 14px #ffffff" }}>
-            <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-purple-700 text-white text-[10px] font-black uppercase tracking-wider shadow-lg">Más Popular</div>
+        <div className="max-w-xl mx-auto">
+          <div className="relative bg-white rounded-2xl p-6 border border-purple-200 ring-2 ring-purple-500" style={{ boxShadow: "6px 6px 14px #d9dde2, -6px -6px 14px #ffffff" }}>
+            <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-purple-700 text-white text-[10px] font-black uppercase tracking-wider shadow-lg">Plan Drivip</div>
             <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-purple-500 to-indigo-600 text-white flex items-center justify-center shadow-md mb-4">
               <span className="material-symbols-outlined text-[22px]">workspace_premium</span>
             </div>
-            <h3 className="text-lg font-black text-slate-900">Profesional</h3>
+            <h3 className="text-lg font-black text-slate-900">Todo incluido</h3>
             <div className="flex items-baseline gap-1 mb-4">
-              <span className="text-3xl font-black text-slate-900">$20</span>
+              <span className="text-3xl font-black text-slate-900">$25</span>
               <span className="text-[12px] text-slate-400">/mes</span>
             </div>
             <ul className="space-y-1.5 mb-5">
-              {["Todo del Estándar", "Tarifas avanzadas (km/zona/hora)", "Reservas de clientes agendadas", "Badge verificado", "Soporte prioritario por WhatsApp"].map((f) => (
+              {["App personal con QR y enlace", "Tarifas avanzadas (km/zona/hora)", "Reservas de clientes agendadas", "Control de disponibilidad", "Pago Móvil, Zelle y efectivo", "Soporte por WhatsApp"].map((f) => (
                 <li key={f} className="flex items-start gap-2">
                   <span className="material-symbols-outlined text-[14px] text-emerald-500 mt-0.5">check_circle</span>
                   <span className="text-[12px] text-slate-600">{f}</span>
@@ -181,7 +170,7 @@ function LandingPage({ onShowAuth }: { onShowAuth: (mode: "login" | "register") 
               ))}
             </ul>
             <button onClick={() => onShowAuth("register")} className="w-full py-3 rounded-xl bg-purple-700 text-white text-[13px] font-bold shadow-lg active:scale-95 transition">
-              Comenzar con Profesional
+              Comenzar por $25/mes
             </button>
           </div>
         </div>
@@ -192,7 +181,7 @@ function LandingPage({ onShowAuth }: { onShowAuth: (mode: "login" | "register") 
       <section className="max-w-7xl mx-auto px-4 lg:px-8 py-16">
         <div className="bg-purple-700 rounded-3xl p-10 text-center shadow-2xl shadow-purple-600/30">
           <h2 className="text-2xl font-black text-white mb-3" style={{ fontFamily: "Poppins, sans-serif" }}>¿Quieres tu propia app?</h2>
-          <p className="text-purple-100 mb-6 text-sm">Desde $10 al mes. Sin comisiones. Tú manejas tu negocio.</p>
+          <p className="text-purple-100 mb-6 text-sm">Una sola mensualidad de $25 al mes. Sin comisiones. Tú manejas tu negocio.</p>
           <button onClick={() => onShowAuth("register")} className="px-7 py-3 rounded-2xl bg-white text-purple-700 font-bold text-[13px] shadow-lg active:scale-95 transition">
             Quiero mi app ahora
           </button>
@@ -284,7 +273,7 @@ function normalizarCodigoReferido(value: string): string {
   }
 }
 
-function RegisterScreen({ onSwitchToLogin, onRegistered }: { onSwitchToLogin: () => void; onRegistered: (data: { nombre: string; apellido: string; cedula: string; plan: string; slug: string }) => void }) {
+function RegisterScreen({ onSwitchToLogin, onRegistered }: { onSwitchToLogin: () => void; onRegistered: (data: { nombre: string; apellido: string; cedula: string; tenantId: string; slug: string }) => void }) {
   const { loading: authLoading } = useAuthContext();
   const [form, setForm] = useState({
     nombre: "", apellido: "", cedula: "", email: "", telefono: "", password: "",
@@ -392,13 +381,15 @@ function RegisterScreen({ onSwitchToLogin, onRegistered }: { onSwitchToLogin: ()
       return;
     }
 
+    await crearSuscripcionPendiente(tenantId);
+
     const codigoRef = normalizarCodigoReferido(form.codigo_referido);
     if (codigoRef) {
       await registrarReferido(codigoRef);
     }
 
     setSubmitting(false);
-    onRegistered({ nombre: form.nombre, apellido: form.apellido, cedula: form.cedula, plan: form.plan, slug });
+    onRegistered({ nombre: form.nombre, apellido: form.apellido, cedula: form.cedula, tenantId, slug });
   };
 
   const update = (field: string, value: string) => setForm((prev) => ({ ...prev, [field]: value }));
@@ -526,23 +517,12 @@ function RegisterScreen({ onSwitchToLogin, onRegistered }: { onSwitchToLogin: ()
             </div>
           </div>
 
-          {/* SELECCION DE PLAN */}
-          <div>
-            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Elige tu plan</label>
-            <div className="grid grid-cols-2 gap-2 mt-1">
-              {[
-                { value: "estandar", label: "Estándar", price: "$10/mes" },
-                { value: "profesional", label: "Profesional", price: "$20/mes" },
-              ].map((p) => (
-                <button key={p.value} type="button" onClick={() => update("plan", p.value)}
-                  className={`flex flex-col items-center gap-0.5 p-3 rounded-xl border-2 transition active:scale-95 ${
-                    form.plan === p.value ? "border-purple-500 bg-purple-50 text-purple-700" : "border-slate-200 bg-slate-50 text-slate-500"
-                  }`}>
-                  <span className="text-[12px] font-bold">{p.label}</span>
-                  <span className="text-[10px] font-semibold opacity-70">{p.price}</span>
-                </button>
-              ))}
+          <div className="bg-purple-50 rounded-xl p-3 border border-purple-100">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-purple-700 uppercase tracking-wider">Mensualidad única</span>
+              <span className="text-[15px] font-black text-purple-700">${PRECIO_SUSCRIPCION_USD}/mes</span>
             </div>
+            <p className="text-[10px] text-purple-600/80 mt-1">Incluye tu app personal, QR, PWA y soporte. El pago se valida después del registro.</p>
           </div>
 
           <div>
@@ -563,7 +543,7 @@ function RegisterScreen({ onSwitchToLogin, onRegistered }: { onSwitchToLogin: ()
           {formError && <p className="text-[12px] text-red-500">{formError}</p>}
           <button type="submit" disabled={submitting}
             className="w-full py-3 rounded-xl bg-purple-700 text-white font-bold text-[13px] disabled:opacity-50 shadow-lg shadow-purple-600/30">
-            {submitting ? "Creando..." : "Crear Cuenta de Conductor"}
+            {submitting ? "Creando..." : "Crear cuenta y continuar al pago"}
           </button>
         </form>
 
@@ -577,59 +557,223 @@ function RegisterScreen({ onSwitchToLogin, onRegistered }: { onSwitchToLogin: ()
 }
 
 /* ==================== PENDING VALIDATION ==================== */
-function PendingValidationScreen({ nombre, apellido, cedula, plan, slug, onEnterPanel }: { nombre: string; apellido: string; cedula: string; plan: string; slug: string; onEnterPanel: () => void }) {
-  const planLabel = plan === "profesional" ? "Profesional ($20)" : "Estándar ($10)";
-  const planMonto = plan === "profesional" ? "$20" : "$10";
+function PendingValidationScreen({
+  nombre,
+  apellido,
+  cedula,
+  tenantId,
+  slug,
+  activo = false,
+  onEnterPanel,
+  onRefreshTenant,
+}: {
+  nombre: string;
+  apellido: string;
+  cedula: string;
+  tenantId: string;
+  slug: string;
+  activo?: boolean;
+  onEnterPanel?: () => void;
+  onRefreshTenant?: () => void;
+}) {
+  const { suscripcion, loading, refetch } = useMiSuscripcion(tenantId);
+  const [banco, setBanco] = useState("");
+  const [referencia, setReferencia] = useState("");
+  const [monto, setMonto] = useState(String(PRECIO_SUSCRIPCION_USD));
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
   const inviteUrl = conductorInviteUrl(slug);
   const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=0&data=${encodeURIComponent(inviteUrl)}`;
+  const tieneDatos = Boolean(suscripcion?.referencia && suscripcion?.banco_origen);
+  const rechazado = suscripcion?.estado === "rechazado";
+  const pagoAprobado = suscripcion?.estado === "verificado";
+  const mostrarFormulario = !loading && !activo && !pagoAprobado && (!tieneDatos || rechazado);
+
+  useEffect(() => {
+    if (suscripcion?.banco_origen) setBanco(suscripcion.banco_origen);
+    if (suscripcion?.referencia) setReferencia(suscripcion.referencia);
+    if (suscripcion?.monto) setMonto(String(suscripcion.monto));
+  }, [suscripcion]);
+
+  useEffect(() => {
+    if (activo || mostrarFormulario) return;
+    const timer = window.setInterval(() => {
+      void refetch();
+      onRefreshTenant?.();
+    }, 20000);
+    return () => window.clearInterval(timer);
+  }, [activo, mostrarFormulario, refetch, onRefreshTenant]);
+
+  useEffect(() => {
+    if (activo) onEnterPanel?.();
+  }, [activo, onEnterPanel]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+
+    const montoNum = Number(monto);
+    if (!banco.trim() || !referencia.trim()) {
+      setFormError("Completa el banco y el número de referencia.");
+      return;
+    }
+    if (!Number.isFinite(montoNum) || montoNum !== PRECIO_SUSCRIPCION_USD) {
+      setFormError(`El monto debe ser $${PRECIO_SUSCRIPCION_USD}.`);
+      return;
+    }
+
+    setSubmitting(true);
+    const { error } = await enviarDatosPagoSuscripcion({
+      tenantId,
+      banco: banco.trim(),
+      referencia: referencia.trim(),
+      monto: montoNum,
+    });
+    setSubmitting(false);
+
+    if (error) {
+      setFormError("No pudimos guardar tus datos. Intenta de nuevo.");
+      return;
+    }
+
+    await refetch();
+  };
 
   const whatsappMsg = encodeURIComponent(
-    `Hola, soy ${nombre} ${apellido}. Acabo de registrarme en Drivip como conductor con la cédula ${cedula}. Quiero activar mi plan ${planLabel}. Adjunto el comprobante de Pago Móvil.`
+    `Hola, soy ${nombre} ${apellido}. Acabo de registrarme en Drivip como conductor con la cédula ${cedula}. Quiero activar mi cuenta de $${PRECIO_SUSCRIPCION_USD}/mes. Banco: ${banco || "por confirmar"}. Referencia: ${referencia || "por confirmar"}.`
   );
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#f4f6f8] flex items-center justify-center p-4">
+        <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center animate-pulse">
+          <span className="material-symbols-outlined text-[24px] text-purple-600">sync</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#f4f6f8] flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-white rounded-3xl p-6 border border-slate-100" style={{ boxShadow: "6px 6px 14px #d9dde2, -6px -6px 14px #ffffff" }}>
         <div className="flex flex-col items-center gap-3 mb-6">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center shadow-lg">
-            <span className="material-symbols-outlined text-[26px] text-white">hourglass_top</span>
+          <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg ${pagoAprobado ? "bg-gradient-to-tr from-emerald-500 to-teal-500" : "bg-gradient-to-tr from-amber-500 to-orange-500"}`}>
+            <span className="material-symbols-outlined text-[26px] text-white">{pagoAprobado ? "verified" : "hourglass_top"}</span>
           </div>
           <div className="text-center">
-            <h1 className="text-xl font-black text-slate-900">Tu cuenta está pendiente</h1>
-            <p className="text-[12px] text-slate-500">Realiza el pago para activar tu app</p>
+            <h1 className="text-xl font-black text-slate-900">
+              {pagoAprobado ? "Pago verificado" : tieneDatos && !rechazado ? "Pago en validación" : "Activa tu cuenta"}
+            </h1>
+            <p className="text-[12px] text-slate-500">
+              {pagoAprobado ? "Tu cuenta se está activando" : tieneDatos && !rechazado ? "Estamos revisando tu pago" : "Realiza el pago de $25 y envía tus datos"}
+            </p>
           </div>
         </div>
 
-        {/* DATOS PAGO MÓVIL */}
         <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200 mb-4">
-          <h3 className="text-[11px] font-bold text-slate-900 uppercase tracking-wider mb-3">Datos del Pago Móvil</h3>
+          <h3 className="text-[11px] font-bold text-slate-900 uppercase tracking-wider mb-3">Datos del Pago Móvil Drivip</h3>
           <div className="space-y-2">
             {[
               { label: "Banco", value: "0102 (Banco de Venezuela)" },
               { label: "Teléfono", value: "0414-3420573" },
               { label: "Cédula", value: "V-15.190.703" },
-              { label: "Monto", value: `${planMonto} (Plan ${plan === "profesional" ? "Profesional" : "Estándar"})` },
+              { label: "Monto", value: `$${PRECIO_SUSCRIPCION_USD} (mensualidad única)` },
             ].map((d) => (
-              <div key={d.label} className="flex items-center justify-between">
+              <div key={d.label} className="flex items-center justify-between gap-3">
                 <span className="text-[11px] text-slate-500 font-medium">{d.label}</span>
-                <span className="text-[12px] text-slate-900 font-bold">{d.value}</span>
+                <span className="text-[12px] text-slate-900 font-bold text-right">{d.value}</span>
               </div>
             ))}
           </div>
         </div>
 
-        {/* BOTON WHATSAPP */}
-        <a
-          href={`https://wa.me/584124058904?text=${whatsappMsg}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="w-full py-3 rounded-xl bg-emerald-500 text-white font-bold text-[13px] shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-2 active:scale-[0.98] transition mb-4"
-        >
-          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-          Enviar comprobante por WhatsApp
-        </a>
+        {rechazado && (
+          <div className="bg-red-50 rounded-xl p-3 border border-red-100 mb-4">
+            <p className="text-[11px] text-red-700 text-center">No pudimos validar tu pago. Verifica los datos y envíalos de nuevo.</p>
+          </div>
+        )}
 
-        {/* QR Y ENLACE */}
+        {mostrarFormulario ? (
+          <form onSubmit={handleSubmit} className="space-y-3 mb-4">
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Banco desde el que pagaste</label>
+              <input
+                type="text"
+                list="bancos-drivip"
+                value={banco}
+                onChange={(e) => setBanco(e.target.value)}
+                className="w-full mt-1 bg-slate-50 rounded-xl px-4 py-2.5 text-[13px] text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-purple-500 border border-slate-200"
+                placeholder="Ej. Banesco"
+                required
+              />
+              <datalist id="bancos-drivip">
+                <option value="Banco de Venezuela" />
+                <option value="Banesco" />
+                <option value="Mercantil" />
+                <option value="BBVA Provincial" />
+                <option value="Banco Nacional de Crédito" />
+                <option value="Banco del Tesoro" />
+                <option value="Bancamiga" />
+                <option value="Banco Exterior" />
+              </datalist>
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Número de referencia</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={referencia}
+                onChange={(e) => setReferencia(e.target.value.replace(/\D/g, "").slice(0, 16))}
+                className="w-full mt-1 bg-slate-50 rounded-xl px-4 py-2.5 text-[13px] text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-purple-500 border border-slate-200 font-mono tracking-wider"
+                placeholder="Ej. 123456789"
+                required
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Monto pagado (USD)</label>
+              <input
+                type="number"
+                inputMode="decimal"
+                min="25"
+                max="25"
+                step="0.01"
+                value={monto}
+                onChange={(e) => setMonto(e.target.value)}
+                className="w-full mt-1 bg-slate-50 rounded-xl px-4 py-2.5 text-[13px] text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-purple-500 border border-slate-200"
+                required
+              />
+            </div>
+            {formError && <p className="text-[11px] text-red-500">{formError}</p>}
+            <button
+              type="submit"
+              disabled={submitting}
+              className="w-full py-3 rounded-xl bg-purple-700 text-white font-bold text-[13px] disabled:opacity-50 shadow-lg shadow-purple-600/30 active:scale-[0.98] transition"
+            >
+              {submitting ? "Enviando..." : "Enviar datos de pago"}
+            </button>
+          </form>
+        ) : (
+          <div className="bg-blue-50 rounded-xl p-3 border border-blue-100 mb-4">
+            <p className="text-[11px] text-blue-700 text-center font-medium">
+              Estamos validando tu pago. Esto puede tardar de 5 a 30 minutos.
+            </p>
+            {tieneDatos && (
+              <p className="text-[10px] text-blue-600/80 text-center mt-1">
+                Banco: {suscripcion?.banco_origen} · Referencia: {suscripcion?.referencia}
+              </p>
+            )}
+          </div>
+        )}
+
+        <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-100 mb-4 text-center">
+          <p className="text-[11px] text-emerald-700 font-bold">Soporte Drivip</p>
+          <a href={`https://wa.me/584143420573?text=${whatsappMsg}`} target="_blank" rel="noopener noreferrer" className="text-[13px] text-emerald-700 font-black underline">
+            0414-3420573
+          </a>
+          <p className="text-[10px] text-emerald-600/80 mt-0.5">Escríbenos si tienes dudas con tu pago.</p>
+        </div>
+
         <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200 mb-4">
           <h3 className="text-[11px] font-bold text-slate-900 uppercase tracking-wider mb-3">Tu app personal</h3>
           <div className="flex items-center gap-4">
@@ -639,26 +783,22 @@ function PendingValidationScreen({ nombre, apellido, cedula, plan, slug, onEnter
             <div className="flex-1 min-w-0">
               <p className="text-[10px] text-slate-400 font-medium mb-1">Tu enlace personal:</p>
               <p className="text-[12px] text-purple-700 font-bold truncate">{inviteUrl}</p>
-              <p className="text-[10px] text-slate-400 mt-2">Compártelo con tus clientes para que instalen tu app.</p>
+              <p className="text-[10px] text-slate-400 mt-2">Compártelo con tus clientes cuando tu cuenta esté activa.</p>
             </div>
           </div>
         </div>
 
-        {/* NOTA */}
-        <div className="bg-blue-50 rounded-xl p-3 border border-blue-100 mb-4">
-          <p className="text-[11px] text-blue-700 text-center">Te contactaremos por WhatsApp en menos de 24 horas para validar tu pago.</p>
-        </div>
-
         <PwaInstallPrompt appName="Drivip Conductor" accent="purple" className="mb-4" />
 
-        {/* IR AL PANEL */}
-        <button
-          type="button"
-          onClick={onEnterPanel}
-          className="block w-full py-3 rounded-xl bg-purple-700 text-white text-[13px] font-bold text-center shadow-lg shadow-purple-600/30 hover:bg-purple-800 active:scale-[0.98] transition"
-        >
-          Entrar a mi panel
-        </button>
+        {activo && onEnterPanel && (
+          <button
+            type="button"
+            onClick={onEnterPanel}
+            className="block w-full py-3 rounded-xl bg-purple-700 text-white text-[13px] font-bold text-center shadow-lg shadow-purple-600/30 hover:bg-purple-800 active:scale-[0.98] transition"
+          >
+            Entrar a mi panel
+          </button>
+        )}
         <a href="https://drivip-home.pages.dev" className="block text-center text-[11px] text-slate-400 hover:text-slate-600 mt-4">← Volver a Drivip</a>
       </div>
     </div>
@@ -673,30 +813,37 @@ export default function App() {
 function AppContent() {
   const { user, loading, configured } = useAuthContext();
   const [authView, setAuthView] = useState<"landing" | "login" | "register">("landing");
-  const [registered, setRegistered] = useState<{ nombre: string; apellido: string; cedula: string; plan: string; slug: string } | null>(null);
+  const [registered, setRegistered] = useState<{ nombre: string; apellido: string; cedula: string; tenantId: string; slug: string } | null>(null);
+  const [splashDone, setSplashDone] = useState(false);
+  const { tenant, loading: tenantLoading, refetch: refetchTenant } = useMiTenant(user?.id);
 
   const demoParam =
     typeof window !== "undefined" &&
     ["1", "true"].includes(new URLSearchParams(window.location.search).get("demo") ?? "");
 
-  if (demoParam) {
-    return <DriverApp demo />;
+  const appReady = demoParam || (!loading && !(user && tenantLoading));
+
+  if (!splashDone || !appReady) {
+    return (
+      <SplashScreen
+        appName="Drivip Conductor"
+        subtitle="Panel del Conductor"
+        ready={appReady}
+        onFinish={() => setSplashDone(true)}
+      />
+    );
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-[#f4f6f8]">
-        <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center animate-pulse">
-          <span className="material-symbols-outlined text-[24px] text-purple-600">sync</span>
-        </div>
-      </div>
-    );
+  if (demoParam) {
+    return <DriverApp demo />;
   }
 
   if (registered) {
     return (
       <PendingValidationScreen
         {...registered}
+        activo={Boolean(tenant?.suscripcion_activa)}
+        onRefreshTenant={refetchTenant}
         onEnterPanel={() => {
           setRegistered(null);
           if (!user) setAuthView("login");
@@ -709,6 +856,21 @@ function AppContent() {
     if (authView === "login") return <LoginScreen onSwitchToRegister={() => setAuthView("register")} />;
     if (authView === "register") return <RegisterScreen onSwitchToLogin={() => setAuthView("login")} onRegistered={setRegistered} />;
     return <LandingPage onShowAuth={(mode) => setAuthView(mode)} />;
+  }
+
+  if (tenant && !tenant.suscripcion_activa) {
+    const [nombre, ...apellido] = tenant.nombre.split(" ");
+    return (
+      <PendingValidationScreen
+        nombre={nombre}
+        apellido={apellido.join(" ")}
+        cedula={tenant.cedula ?? ""}
+        tenantId={tenant.id}
+        slug={tenant.slug}
+        activo={false}
+        onRefreshTenant={refetchTenant}
+      />
+    );
   }
 
   return <DriverApp demo={!configured} />;

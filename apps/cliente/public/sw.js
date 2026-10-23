@@ -20,9 +20,15 @@ self.addEventListener("push", (event) => {
     body: data.body || "",
     icon: "/icon.png",
     badge: "/icon.png",
-    tag: data.tag,
+    silent: false,
+    vibrate: [200, 100, 200],
     data: { url: data.url || "/", ...(data.data || {}) },
   };
+
+  if (data.tag) {
+    options.tag = data.tag;
+    options.renotify = true;
+  }
 
   event.waitUntil(self.registration.showNotification(title, options));
 });

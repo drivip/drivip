@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@source "../../supabase/src";
+
 @theme inline {
   --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: "JetBrains Mono", monospace;
@@ -158,4 +160,43 @@
   }
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { scrollbar-width: none; }
+}
+
+/* Splash de apertura: zoom del logo y pulso suave. */
+@keyframes drivip-splash-zoom {
+  0% { transform: scale(0.45); opacity: 0; filter: blur(8px); }
+  55% { transform: scale(1.08); opacity: 1; filter: blur(0); }
+  75% { transform: scale(0.98); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes drivip-splash-ring {
+  0% { transform: scale(0.82); opacity: 0.7; }
+  70% { transform: scale(1.28); opacity: 0; }
+  100% { transform: scale(1.28); opacity: 0; }
+}
+
+@keyframes drivip-splash-bar {
+  0% { transform: translateX(-110%); }
+  100% { transform: translateX(220%); }
+}
+
+@layer utilities {
+  .drivip-splash-logo {
+    animation: drivip-splash-zoom 850ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .drivip-splash-ring {
+    animation: drivip-splash-ring 1800ms ease-out infinite;
+  }
+  .drivip-splash-bar {
+    animation: drivip-splash-bar 1200ms ease-in-out infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drivip-splash-logo,
+  .drivip-splash-ring,
+  .drivip-splash-bar {
+    animation: none;
+  }
 }

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { AuthProvider, useAuthContext, supabase, useTenants, useSuscripciones, useCarreras, useClientes, useSuperadminStats, useAdminConversaciones, useAdminReferidos } from "@drivip/supabase";
 import { FloatingMessageBadge } from "@drivip/ui";
 import LoginScreen from "./components/LoginScreen";
@@ -63,6 +63,22 @@ function AdminDashboardView() {
     setTimeout(() => setToast(""), 2500);
   }, []);
 
+  const ultimoPendienteCreadoRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const ultimo = pendientes[0];
+    if (!ultimo) return;
+    if (ultimoPendienteCreadoRef.current === null) {
+      ultimoPendienteCreadoRef.current = ultimo.created_at;
+      return;
+    }
+    if (new Date(ultimo.created_at).getTime() > new Date(ultimoPendienteCreadoRef.current).getTime()) {
+      const tenant = tenants.find((t) => t.id === ultimo.tenant_id);
+      showToast(`Nuevo cliente: ${tenant?.nombre ?? "Conductor"}`);
+      ultimoPendienteCreadoRef.current = ultimo.created_at;
+    }
+  }, [pendientes, tenants, showToast]);
+
   const handleNavigate = (module: AdminModule) => {
     setActiveModule(module);
     setMenuOpen(false);
@@ -71,7 +87,7 @@ function AdminDashboardView() {
 
   const handleAprobar = async (id: string) => {
     const ok = await verificarSuscripcion(id, true, "admin@drivip.app");
-    if (ok) showToast("Suscripcion aprobada");
+    showToast(ok ? "Suscripcion aprobada" : "No se pudo aprobar. Revisa banco y referencia.");
   };
 
   const handleRechazar = async (id: string) => {
@@ -164,6 +180,7 @@ function AdminDashboardView() {
             onNavigate={handleNavigate}
             carreras={carreras}
             pendientes={pendientes}
+            tenants={tenants}
           />
         );
       case "tenants":
@@ -206,29 +223,48 @@ function AdminDashboardView() {
                   <p className="text-[12px] text-slate-500">No hay pagos pendientes</p>
                 </div>
               ) : (
-                pendientes.map((p) => (
-                  <div key={p.id} className="flex items-center justify-between py-3 border-b border-slate-100 last:border-0">
-                    <div>
-                      <span className="text-[12px] lg:text-[13px] text-slate-900 font-medium">Tenant: {p.tenant_id.slice(0, 8)}...</span>
-                      <span className="text-[10px] lg:text-[11px] text-slate-500 block">{new Date(p.created_at).toLocaleString()}</span>
+                pendientes.map((p) => {
+                  const tenant = tenants.find((t) => t.id === p.tenant_id);
+                  const tieneDatos = Boolean(p.referencia && p.banco_origen);
+                  return (
+                    <div key={p.id} className="py-3 border-b border-slate-100 last:border-0">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <span className="text-[12px] lg:text-[13px] text-slate-900 font-bold block truncate">
+                            {tenant?.nombre ?? `Tenant ${p.tenant_id.slice(0, 8)}...`}
+                          </span>
+                          <span className="text-[10px] lg:text-[11px] text-slate-500 block">
+                            {tenant?.telefono ?? tenant?.email ?? "Sin contacto"}
+                          </span>
+                          <span className="text-[10px] lg:text-[11px] text-slate-400 block">{new Date(p.created_at).toLocaleString()}</span>
+                        </div>
+                        <span className="font-mono text-[13px] lg:text-[14px] text-emerald-600 font-bold">${p.monto}</span>
+                      </div>
+                      <div className="mt-2 grid grid-cols-2 gap-1 text-[10px] lg:text-[11px]">
+                        <span className="text-slate-500">Banco: <b className="text-slate-700">{p.banco_origen ?? "Sin datos"}</b></span>
+                        <span className="text-slate-500">Ref: <b className="text-slate-700">{p.referencia ?? "Sin datos"}</b></span>
+                      </div>
+                      {!tieneDatos && (
+                        <p className="mt-1 text-[10px] lg:text-[11px] text-amber-600 font-bold">Esperando datos de pago del conductor</p>
+                      )}
+                      <div className="flex items-center gap-2 mt-2">
+                        <button
+                          onClick={() => handleAprobar(p.id)}
+                          disabled={!tieneDatos}
+                          className="px-3 py-1.5 rounded-xl bg-emerald-500 text-white text-[10px] lg:text-[11px] font-bold active:scale-95 transition shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          Aprobar
+                        </button>
+                        <button
+                          onClick={() => handleRechazar(p.id)}
+                          className="px-3 py-1.5 rounded-xl bg-red-500 text-white text-[10px] lg:text-[11px] font-bold active:scale-95 transition shadow-sm"
+                        >
+                          Rechazar
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-[13px] lg:text-[14px] text-emerald-600 font-bold">${p.monto}</span>
-                      <button
-                        onClick={() => handleAprobar(p.id)}
-                        className="px-3 py-1.5 rounded-xl bg-emerald-500 text-white text-[10px] lg:text-[11px] font-bold active:scale-95 transition shadow-sm"
-                      >
-                        Aprobar
-                      </button>
-                      <button
-                        onClick={() => handleRechazar(p.id)}
-                        className="px-3 py-1.5 rounded-xl bg-red-500 text-white text-[10px] lg:text-[11px] font-bold active:scale-95 transition shadow-sm"
-                      >
-                        Rechazar
-                      </button>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>

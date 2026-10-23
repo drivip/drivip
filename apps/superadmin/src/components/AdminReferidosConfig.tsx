@@ -6,9 +6,9 @@ const DEFAULTS: ConfigReferidosInput = {
   descuento_por_referido_pct: 10,
   meta_referidos_gratis: 10,
   comision_socio_pct: 5,
-  precio_plan_estandar: 10,
-  precio_plan_profesional: 20,
-  precio_plan_premium: 30,
+  precio_plan_estandar: 25,
+  precio_plan_profesional: 25,
+  precio_plan_premium: 25,
 };
 
 function usd(value: number | null | undefined) {
@@ -50,6 +50,17 @@ export default function AdminReferidosConfig() {
     setGuardado(false);
   };
 
+  const setPrecioUnico = (value: string) => {
+    const precio = value === "" ? 0 : Number(value);
+    setForm((prev) => ({
+      ...prev,
+      precio_plan_estandar: precio,
+      precio_plan_profesional: precio,
+      precio_plan_premium: precio,
+    }));
+    setGuardado(false);
+  };
+
   const onSubmit = async () => {
     setLocalError(null);
     setGuardado(false);
@@ -75,7 +86,7 @@ export default function AdminReferidosConfig() {
       form.precio_plan_profesional < 0 ||
       form.precio_plan_premium < 0
     ) {
-      setLocalError("Los precios de plan no pueden ser negativos.");
+      setLocalError("El precio no puede ser negativo.");
       return;
     }
 
@@ -134,19 +145,9 @@ export default function AdminReferidosConfig() {
       </div>
 
       {!abierto && (
-        <div className="grid grid-cols-3 gap-2 border-t border-slate-100 bg-slate-50/70 px-4 py-3 text-center lg:px-5">
-          <div>
-            <p className="text-[9px] font-bold uppercase text-slate-400">Estandar</p>
-            <p className="text-[13px] font-black text-slate-900">{usd(config?.precio_plan_estandar)}</p>
-          </div>
-          <div>
-            <p className="text-[9px] font-bold uppercase text-slate-400">Profesional</p>
-            <p className="text-[13px] font-black text-slate-900">{usd(config?.precio_plan_profesional)}</p>
-          </div>
-          <div>
-            <p className="text-[9px] font-bold uppercase text-slate-400">Premium</p>
-            <p className="text-[13px] font-black text-slate-900">{usd(config?.precio_plan_premium)}</p>
-          </div>
+        <div className="border-t border-slate-100 bg-slate-50/70 px-4 py-3 text-center lg:px-5">
+          <p className="text-[9px] font-bold uppercase text-slate-400">Mensualidad unica</p>
+          <p className="text-[15px] font-black text-slate-900">{usd(config?.precio_plan_estandar)}</p>
         </div>
       )}
 
@@ -190,35 +191,13 @@ export default function AdminReferidosConfig() {
               />
             </label>
             <label className="block">
-              <span className="text-[9px] font-bold uppercase text-slate-500">Precio Estandar</span>
+              <span className="text-[9px] font-bold uppercase text-slate-500">Mensualidad unica (USD)</span>
               <input
                 type="number"
                 min={0}
                 step={0.5}
                 value={form.precio_plan_estandar}
-                onChange={(event) => setNumero("precio_plan_estandar", event.target.value)}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12px] font-semibold text-slate-900 outline-none focus:border-purple-400"
-              />
-            </label>
-            <label className="block">
-              <span className="text-[9px] font-bold uppercase text-slate-500">Precio Profesional</span>
-              <input
-                type="number"
-                min={0}
-                step={0.5}
-                value={form.precio_plan_profesional}
-                onChange={(event) => setNumero("precio_plan_profesional", event.target.value)}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12px] font-semibold text-slate-900 outline-none focus:border-purple-400"
-              />
-            </label>
-            <label className="block">
-              <span className="text-[9px] font-bold uppercase text-slate-500">Precio Premium</span>
-              <input
-                type="number"
-                min={0}
-                step={0.5}
-                value={form.precio_plan_premium}
-                onChange={(event) => setNumero("precio_plan_premium", event.target.value)}
+                onChange={(event) => setPrecioUnico(event.target.value)}
                 className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12px] font-semibold text-slate-900 outline-none focus:border-purple-400"
               />
             </label>

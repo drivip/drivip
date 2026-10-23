@@ -94,9 +94,9 @@ export default function PlanManager({ tenants }: PlanManagerProps) {
   const { config } = useConfigReferidos();
 
   const precios: Record<string, number> = {
-    estandar: Number(config?.precio_plan_estandar ?? 10),
-    profesional: Number(config?.precio_plan_profesional ?? 20),
-    premium: Number(config?.precio_plan_premium ?? 30),
+    estandar: Number(config?.precio_plan_estandar ?? 25),
+    profesional: Number(config?.precio_plan_profesional ?? 25),
+    premium: Number(config?.precio_plan_premium ?? 25),
   };
 
   const conductoresPorPlan = tenants.reduce<Record<string, number>>((acc, tenant) => {
